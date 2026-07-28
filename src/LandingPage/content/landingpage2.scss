@@ -410,6 +410,65 @@
         padding: 7px;
         &:hover { background-color: var(--vscode-toolbar-hoverBackground); }
       }
+      // Cloning is a rare action, so it sits here as an icon rather than taking a field.
+      .btn-small { padding: 5px; .icon { width: 16px; height: 16px; } }
+
+      // Anchor for the create and clone popovers. Relative, so the panel hangs off the button.
+      .menu-anchor { position: relative; display: flex; }
+    }
+
+    .popover
+    {
+      position: absolute;
+      top: calc(100% + 4px);
+      right: 0;
+      z-index: 40;
+      display: flex;
+      flex-direction: column;
+      min-width: 240px;
+      padding: 4px;
+      background-color: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+      color: var(--vscode-menu-foreground, var(--vscode-foreground));
+      border-radius: var(--radius);
+      outline: 1px solid var(--hairline);
+      box-shadow: 0 6px 18px rgba(0,0,0,.36);
+
+      > button
+      {
+        justify-content: flex-start;
+        gap: var(--gapspace-s);
+        padding: 6px 10px;
+        border-radius: var(--radius-s);
+        white-space: nowrap;
+        &:hover { background-color: var(--vscode-menu-selectionBackground, var(--vscode-toolbar-hoverBackground)); }
+      }
+      hr { border: none; border-top: 1px solid var(--hairline); margin: 4px 6px; width: auto; }
+    }
+
+    // The clone popover is a one-field form rather than a list of actions.
+    .popover-clone
+    {
+      flex-direction: row;
+      align-items: center;
+      gap: var(--gapspace-s);
+      min-width: 340px;
+      padding: 8px;
+
+      input
+      {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 5px 8px;
+        background-color: var(--vscode-input-background);
+        color: var(--vscode-input-foreground);
+        border: none;
+        border-radius: var(--radius-s);
+        outline: 1px solid var(--hairline);
+        font-family: inherit;
+        font-size: inherit;
+        &:focus { outline-color: var(--accent-color); }
+        &::placeholder { color: var(--vscode-input-placeholderForeground); }
+      }
     }
 
     h1
@@ -427,7 +486,9 @@
     }
   }
 
-  //--- command bar: clone field + filter field -------------------------------
+  //--- command bar: the filter --------------------------------------------------
+  // Filtering is the only thing prominent enough to earn a full-width row here. Creating and
+  // cloning live in the header, so the bar stays a single field.
   .commandbar
   {
     display: flex;
@@ -474,16 +535,20 @@
       }
     }
 
-    // The filter sits directly under the clone field and reads as the quieter of the two.
     .field-filter
     {
-      background-color: transparent;
-      outline-color: transparent;
-      border-bottom: 1px solid var(--hairline);
-      border-radius: 0;
-      padding-left: 0;
-      &:hover, &:focus-within { outline-color: transparent; border-bottom-color: var(--accent-color); }
+      padding: 6px 6px 6px 12px;
+      font-size: 1.1em;
+
+      .field-icon { color: var(--vscode-foreground); }
+
+      .btn-ghost
+      {
+        color: var(--vscode-input-placeholderForeground);
+        &:hover { color: var(--vscode-foreground); }
+      }
     }
+
   }
 
   //--- empty states ----------------------------------------------------------
@@ -534,6 +599,28 @@
       position: relative; //required for dropzones
       --group-accent: var(--vscode-descriptionForeground);
       &[data-shade]:not([data-shade=""]) { --group-accent: var(--shade-color); }
+
+      // Drag to reorder. The group being carried fades; the landing position is drawn as a
+      // line in the gap it would open up. The indicator is a pseudo-element on the group so
+      // the list itself needs no placeholder node, which would reflow everything below it.
+      &.dragging { opacity: .4; }
+      &[data-drop]::after
+      {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 2px;
+        border-radius: 2px;
+        background-color: var(--vscode-focusBorder, var(--group-accent));
+        pointer-events: none;
+      }
+      // Half the row gap, so the line sits centred in the space between two groups.
+      &[data-drop="before"]::after { top: calc(var(--gapspace) / -2); }
+      &[data-drop="after"]::after  { bottom: calc(var(--gapspace) / -2); }
+
+      .draghandle { cursor: grab; }
+      .titlebar[draggable="true"]:active .draghandle { cursor: grabbing; }
 
       .titlebar
       {

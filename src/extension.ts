@@ -55,7 +55,7 @@ export function activate(context: vscode.ExtensionContext)
 	});
 	context.subscriptions.push(cmdClone);
 
-	// Explorer context menu: "Add to Landingpage Group". VS Code passes the clicked resource as
+	// Explorer context menu: "Add to Landing Page Group". VS Code passes the clicked resource as
 	// the first argument and the full multi-selection as the second, which is undefined when the
 	// command is run from the palette with an active editor.
 	const cmdAddBookmark = vscode.commands.registerCommand('vsc-landingpage.addToGroup', async (uri?:vscode.Uri, uris?:vscode.Uri[]) => {
@@ -83,7 +83,7 @@ export function activate(context: vscode.ExtensionContext)
 
 			landingpageWebviewPanel = window.createWebviewPanel(
 					'vsc-landingpage',
-					'Landingpage',
+					'Landing Page',
 					vscode.ViewColumn.One,
 					{
 							enableScripts: true,

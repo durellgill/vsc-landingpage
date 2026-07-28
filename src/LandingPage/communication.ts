@@ -8,7 +8,7 @@ import { parseURI } from './utils';
  */
 interface MessageFromWebview
 {
-	command:'documentReady'|'rename'|'createBookmark'|'createGroup'|'remove'|'hideRecent'|'restoreHiddenRecents'|'moveGroup'|'open'|'move'|'patch'|'openSettings'|'setViewState'|'cloneRepository'|'openFolder'|'moveToGroup';
+	command:'documentReady'|'rename'|'createBookmark'|'createGroup'|'remove'|'hideRecent'|'restoreHiddenRecents'|'moveGroup'|'open'|'move'|'patch'|'openSettings'|'setViewState'|'cloneRepository'|'openFolder'|'moveToGroup'|'createDirectory';
 
   /** For command 'cloneRepository': the repository URL typed into the clone field. */
   url?:string;
@@ -26,6 +26,8 @@ interface MessageFromWebview
   pos?:'before'|'after';
   /** Direction for moving a user-created group one position. */
   direction?:'up'|'down';
+  /** For command 'moveGroup': insertion index the group was dropped at, among user-created groups. */
+  toIndex?:number;
 
   /** For command 'patch' the name of the field to update. */
   field?:'shade'|'layout'|'glyph';
@@ -76,10 +78,75 @@ function saveModel(model:LandingPageModel):void
 }
 
 const HIDDEN_MRU_KEY = 'landingPageHiddenMruGuids';
+const MRU_CUSTOM_KEY = 'landingPageMruCustomisations';
+
+/**
+ * Per-entry customisation for a generated `Recent` bookmark.
+ *
+ * Only the fields a user can actually change are stored. `path` and `icon` always come
+ * from VS Code, never from here.
+ */
+interface MruCustomisation
+{
+  shade?:LandingPageProject['shade'];
+  glyph?:string;
+}
 
 function hiddenMruGuids():Set<string>
 {
   return new Set(landingPageExtContext.globalState.get<string[]>(HIDDEN_MRU_KEY, []));
+}
+
+/**
+ * Reads the stored customisations for generated `Recent` bookmarks, keyed by MRU GUID.
+ *
+ * The `Recent` group's projects are rebuilt from VS Code's history on essentially every
+ * message, so anything a user sets on one of them cannot live on the project object - the
+ * next rebuild throws that object away. This overlay is the durable home for it.
+ */
+function mruCustomisations():Record<string,MruCustomisation>
+{
+  return landingPageExtContext.globalState.get<Record<string,MruCustomisation>>(MRU_CUSTOM_KEY, {});
+}
+
+/**
+ * Records one customisation field for a generated `Recent` bookmark and applies it to the
+ * live model so the reply to the webview already reflects it.
+ *
+ * @param guid MRU GUID of the entry, as produced by `history.ts`.
+ * @param field Which user-editable field changed.
+ * @param value New value. An empty value clears the field and falls back to VS Code's.
+ * @param sharedModel Model to apply the change to.
+ * @returns True if the GUID belonged to an MRU entry and was handled here.
+ */
+async function customiseMru(guid:string|undefined, field:keyof MruCustomisation, value:any, sharedModel:LandingPageModel):Promise<boolean>
+{
+  if (!guid?.startsWith('MRU:')) {return false;}
+
+  const all = {...mruCustomisations()};
+  const entry = {...(all[guid] ?? {})};
+  if (value===undefined || value===null || value==='') {delete entry[field];}
+  else {(entry as any)[field] = value;}
+
+  if (Object.keys(entry).length===0) {delete all[guid];}
+  else {all[guid] = entry;}
+  await landingPageExtContext.globalState.update(MRU_CUSTOM_KEY, all);
+
+  const found = findFirst(guid, sharedModel);
+  if (found) {applyMruCustomisation(found.target as LandingPageProject, entry);}
+  return true;
+}
+
+/**
+ * Overlays a stored customisation onto a freshly imported `Recent` bookmark.
+ * @param project Project built from VS Code's history.
+ * @param custom Stored customisation, if any.
+ */
+function applyMruCustomisation(project:LandingPageProject, custom:MruCustomisation|undefined):void
+{
+  if (!custom) {return;}
+  if (custom.shade) {project.shade = custom.shade;}
+  if (custom.glyph) {project.glyph = custom.glyph;}
 }
 
 async function hideMru(guid:string|undefined):Promise<void>
@@ -96,12 +163,24 @@ async function restoreHiddenMru():Promise<void>
 }
 
 /**
+ * Drops every stored `Recent` customisation. Used by {@link resetModel}, which otherwise
+ * would leave orphaned overlay entries behind after clearing the model.
+ */
+async function clearMruCustomisations():Promise<void>
+{
+  await landingPageExtContext.globalState.update(MRU_CUSTOM_KEY, {});
+}
+
+/**
  * Loads the most recently used (mru) entries from Visual Studio Code itself
  * as bookmarks in the landingpage model.
  * 
- * These bookmarks have limited interaction options as they are managaged via
- * VS Code and therefore updated automatically. Local changes would be replaced/lost.
- * 
+ * These bookmarks have limited interaction options as they are managed via VS Code and
+ * therefore updated automatically. Their *targets* cannot be edited, but their appearance
+ * can: colour, icon and label are stored per entry in {@link mruCustomisations} and
+ * re-applied here after every rebuild. Storing them on the project objects instead does not
+ * work - this function replaces those objects wholesale on nearly every message.
+ *
  * The mru bookmarks are basically modelled similar to custom bookmarks, but they
  * are stored inside a {@link LandingPageGroup} with `guid`=`@vsc-mru`. This guid
  * is used to identify these "sealed" items in frontend.
@@ -122,7 +201,10 @@ async function populateVscMru(sharedModel:LandingPageModel):Promise<void>
     sharedModel.groups.push(mruGroup);
   }
   const hidden = hiddenMruGuids();
-  mruGroup.projects=(await importVscRecentList()).filter(project => !hidden.has(project.guid));
+  const custom = mruCustomisations();
+  const freshProjects = (await importVscRecentList()).filter(project => !hidden.has(project.guid));
+  for(const project of freshProjects) {applyMruCustomisation(project, custom[project.guid]);}
+  mruGroup.projects=freshProjects;
 }
 
 /**
@@ -136,6 +218,32 @@ async function populateVscMru(sharedModel:LandingPageModel):Promise<void>
  * @param sharedModel Current model.
  * @param webviewPanel Panel to refresh afterwards.
  */
+/**
+ * Asks the user which group an item should land in.
+ *
+ * Used by the page-level create actions, which - unlike the group composer - have no
+ * destination implied by where they were clicked.
+ * @param sharedModel Model to choose a group from.
+ * @param title Dialog title describing what is being placed.
+ * @returns The chosen group, or undefined if there are none or the user cancelled.
+ */
+async function pickDestinationGroup(sharedModel:LandingPageModel, title:string):Promise<LandingPageGroup|undefined>
+{
+  const targets = sharedModel.groups.filter(g => g.guid!=='@vsc-mru');
+  if (targets.length===0)
+  {
+    vscode.window.showInformationMessage('There are no groups yet. Create one first with "New group".');
+    return undefined;
+  }
+  if (targets.length===1) {return targets[0];} //nothing to choose between
+
+  const picked = await vscode.window.showQuickPick(
+    targets.map(g => ({label:g.label || 'Group', description:`${g.projects.length} bookmark${g.projects.length===1?'':'s'}`, guid:g.guid})),
+    {title, placeHolder:'Choose a group'}
+  );
+  return picked ? sharedModel.groups.find(g => g.guid===picked.guid) : undefined;
+}
+
 async function moveToGroup(guid:string|undefined, sharedModel:LandingPageModel, webviewPanel:vscode.WebviewPanel):Promise<void>
 {
   const found = findFirst(guid, sharedModel);
@@ -274,16 +382,34 @@ export async function bookmarkUris(uris:vscode.Uri[]|undefined, sharedModel:Land
   }
 }
 
-/** Moves one user-created group while keeping generated Recent at the end of the board. */
-function moveGroup(guid:string|undefined, direction:'up'|'down'|undefined, sharedModel:LandingPageModel):boolean
+/**
+ * Moves one user-created group while keeping generated Recent at the end of the board.
+ *
+ * Accepts either a one-step `direction` or an explicit `toIndex`. `toIndex` is the insertion
+ * point the webview's drop indicator was drawn at, measured *before* the dragged group is
+ * lifted out - so dragging downwards has to lose one place once the gap closes behind it.
+ */
+function moveGroup(guid:string|undefined, direction:'up'|'down'|undefined, toIndex:number|undefined, sharedModel:LandingPageModel):boolean
 {
-  if (!guid || !direction || guid==='@vsc-mru') {return false;}
+  if (!guid || guid==='@vsc-mru') {return false;}
   const userGroups = sharedModel.groups.filter(group => group.guid!=='@vsc-mru');
   const index = userGroups.findIndex(group => group.guid===guid);
-  const targetIndex = direction==='up' ? index-1 : index+1;
-  if (index<0 || targetIndex<0 || targetIndex>=userGroups.length) {return false;}
+  if (index<0) {return false;}
 
-  [userGroups[index], userGroups[targetIndex]] = [userGroups[targetIndex], userGroups[index]];
+  if (typeof toIndex==='number')
+  {
+    const insertAt = Math.max(0, Math.min(userGroups.length-1, toIndex>index ? toIndex-1 : toIndex));
+    if (insertAt===index) {return false;} //dropped back where it started
+    const [moved] = userGroups.splice(index,1);
+    userGroups.splice(insertAt,0,moved);
+  }
+  else
+  {
+    const targetIndex = direction==='up' ? index-1 : direction==='down' ? index+1 : -1;
+    if (targetIndex<0 || targetIndex>=userGroups.length) {return false;}
+    [userGroups[index], userGroups[targetIndex]] = [userGroups[targetIndex], userGroups[index]];
+  }
+
   const generatedGroups = sharedModel.groups.filter(group => group.guid==='@vsc-mru');
   sharedModel.groups = [...userGroups, ...generatedGroups];
   saveModel(sharedModel);
@@ -322,6 +448,47 @@ export async function cloneRepository(url?:string):Promise<void>
 }
 
 /**
+ * Creates a new directory on disk and bookmarks it into the given group.
+ *
+ * Uses the native save dialog rather than an open dialog plus an input box: the save sheet
+ * is the only native picker that lets the user both browse to a parent folder and type the
+ * new folder's name in one step, which keeps text entry out of `showInputBox` as the page
+ * conventions require.
+ * @param groupGuid Group that should receive the bookmark.
+ * @param sharedModel Model to update.
+ * @param webviewPanel Panel to resync.
+ */
+async function createDirectory(groupGuid:string|undefined, sharedModel:LandingPageModel, webviewPanel:vscode.WebviewPanel):Promise<void>
+{
+  // No guid means the action came from the page-level create menu, which names no destination.
+  const destination = groupGuid
+    ? findFirst(groupGuid, sharedModel)?.target as LandingPageGroup|undefined
+    : await pickDestinationGroup(sharedModel, 'Bookmark the new folder in group');
+  if (!destination) {return;}
+
+  const target = await vscode.window.showSaveDialog({title:'Create a new folder', saveLabel:'Create folder'});
+  if (!target) {return;}
+
+  try
+  {
+    await vscode.workspace.fs.createDirectory(target);
+  }
+  catch (err:any)
+  {
+    vscode.window.showErrorMessage(`Could not create folder: ${err?.message ?? err}`);
+    return;
+  }
+
+  const nameParts = parseURI(target);
+  destination.projects.push({guid:crypto.randomUUID(), label:nameParts.basename, path:target.toString(), icon:'folder'});
+  sendMessageToWebview({command:'syncModel',model:sharedModel}, webviewPanel);
+  saveModel(sharedModel);
+
+  const open = await vscode.window.showInformationMessage(`Created ${nameParts.basename}.`, 'Open folder');
+  if (open) {vscode.commands.executeCommand('vscode.openFolder', target, {forceNewWindow:false});}
+}
+
+/**
  * Removes content from given model instance, saves changes and show a reload request message.
  * @param sharedModel Model to reset.
  */
@@ -329,6 +496,8 @@ export async function resetModel(sharedModel:LandingPageModel):Promise<void>
 {
   sharedModel.groups=[];
   sharedModel.viewState={};
+  await restoreHiddenMru();
+  await clearMruCustomisations();
   await populateVscMru(sharedModel);
   saveModel(sharedModel);
   vscode.window.showInformationMessage('Model reset. Please close and reopen landingpage view.');
@@ -378,8 +547,11 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       saveModel(sharedModel);
       break;
     case 'createBookmark':  //{guid: groupGUID to add bookmark into, pickFolder:bool show folder or file picker?}
-      let foundG = findFirst(message.guid, sharedModel);
-      if (!foundG) {vscode.window.showWarningMessage(`Group not found: ${message.guid}`); return;}
+      // No guid means the page-level create menu was used, which names no destination group.
+      const addTo = message.guid
+        ? findFirst(message.guid, sharedModel)?.target as LandingPageGroup|undefined
+        : await pickDestinationGroup(sharedModel, 'Add the bookmark to group');
+      if (!addTo) {if (message.guid) {vscode.window.showWarningMessage(`Group not found: ${message.guid}`);} return;}
       vscode.window.showOpenDialog({canSelectFiles:true, canSelectFolders:message.pickFolder,canSelectMany:true, filters:{'Workspaces':['code-workspace'],'Files':['*']}})
       .then((selectedFiles:vscode.Uri[]|undefined)=>
       {
@@ -394,7 +566,7 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
             else if (nameParts.ext==='code-workspace') {p.icon = 'workspace';}
             //else: unknown file type
 
-            (foundG.target as LandingPageGroup).projects.push(p);
+            addTo.projects.push(p);
           }
           console.log('updated model > created Bookmark',sharedModel);
           sendMessageToWebview({command:'syncModel',model:sharedModel}, webviewPanel);
@@ -456,6 +628,17 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
     case 'move': // {guid:move, guid2:relativeTo, pos:beforeOrAfterGuid2}
       let foundDrag=findFirst(message.guid, sharedModel); // item to move
       let foundDrop=findFirst(message.guid2, sharedModel); //item to move relative to
+      // The `Recent` group is generated and sealed: it is rebuilt from VS Code's history on
+      // every message, so moving anything into or out of it either silently reverts or
+      // deletes a user bookmark. Group ordering also keeps `@vsc-mru` pinned last, which a
+      // free-form move would break. This handler only serves the legacy page; the Preact
+      // webview reorders groups with `moveGroup` and moves bookmarks with `moveToGroup`.
+      const touchesMru = (r:ScanResult|null) => r?.ownerGroup?.guid==='@vsc-mru' || (r?.target as LandingPageGroup)?.guid==='@vsc-mru';
+      if (touchesMru(foundDrag) || touchesMru(foundDrop))
+      {
+        console.warn('move: refused, the generated Recent group cannot be reordered or used as a drop target.');
+        break;
+      }
       if (foundDrag && foundDrop)
       {
         let dragIs=foundDrag.ownerGroup?'project':'group';
@@ -502,6 +685,7 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
           }
         }          
         saveModel(sharedModel);
+        sendMessageToWebview({command:'syncModel',model:sharedModel}, webviewPanel);
       }
       break;
     case 'patch': // {guid: item to patch, field: field to patch('shade' or 'layout'), value: new value}
@@ -511,7 +695,9 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       {
         // Both bookmarks and user-created groups support an accent colour. Groups use it
         // only in their heading treatment; bookmarks use it in their spine and icon.
-        found.target.shade=message.value;
+        // The `Recent` group itself is an ordinary model object and keeps its shade
+        // directly; its generated entries need the overlay.
+        if (!await customiseMru(message.guid,'shade',message.value,sharedModel)) {found.target.shade=message.value;}
       }
       else if (message.field==='layout')
       {
@@ -520,7 +706,7 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       else if (message.field==='glyph')
       {
         // Empty value clears the custom icon and falls back to the item's type/default icon.
-        found.target.glyph=message.value || undefined;
+        if (!await customiseMru(message.guid,'glyph',message.value,sharedModel)) {found.target.glyph=message.value || undefined;}
       }
       else
       {
@@ -536,15 +722,17 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
     case 'hideRecent':
       await hideMru(message.guid);
       await populateVscMru(sharedModel);
-      sendMessageToWebview({command:'syncModel',model:sharedModel}, webviewPanel);
+      saveModel(sharedModel);
+      sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
       break;
     case 'restoreHiddenRecents':
       await restoreHiddenMru();
       await populateVscMru(sharedModel);
-      sendMessageToWebview({command:'syncModel',model:sharedModel}, webviewPanel);
+      saveModel(sharedModel);
+      sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
       break;
     case 'moveGroup':
-      if (moveGroup(message.guid, message.direction, sharedModel))
+      if (moveGroup(message.guid, message.direction, message.toIndex, sharedModel))
       {
         sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
       }
@@ -565,6 +753,9 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       break;
     case 'openFolder':
       vscode.commands.executeCommand('workbench.action.files.openFolder');
+      break;
+    case 'createDirectory': // {guid: groupGUID to add the new folder into}
+      await createDirectory(message.guid, sharedModel, webviewPanel);
       break;
     case 'moveToGroup': // {guid: bookmark to move}
       await moveToGroup(message.guid, sharedModel, webviewPanel);

@@ -78,14 +78,20 @@ Consequences worth knowing:
   user's theme.
 - Bookmark paint colour belongs on the `.spine` and the type icon, not the card background.
   A wash of a warm shade over a dark editor background goes muddy brown.
-- **There are no tool modes and no drag and drop.** Click opens; bookmark-specific actions
-  live on the row's `...` menu or right-click menu. Group headers own their visible Add,
-  Move up, Move down, and Layout controls; group customisation remains on right-click.
+- **There are no tool modes, and dragging reorders groups only.** Click opens;
+  bookmark-specific actions live on the row's `...` menu or right-click menu. Group headers
+  own their visible Add and Layout controls; group customisation remains on right-click.
   Bookmarks change group via "Move to group", which shows a native quick pick from the
-  extension host.
-- **The add flow belongs to its group.** The header Add button opens `.group-composer` directly
-  beneath that group and names the destination before the native filesystem picker appears.
-  Keep new add actions in this composer rather than moving them to a page-level control.
+  extension host - bookmarks themselves are not draggable.
+- **Creating has two entry points, and they differ by destination.** The group header's Add
+  button opens `.group-composer` beneath that group, so the destination is implied by where
+  it was clicked. The page header's **New** menu is global and names no group, so the host
+  resolves the destination with `pickDestinationGroup()` - a native quick pick, skipped when
+  only one group exists. Both end in the same `createBookmark` / `createDirectory` handlers;
+  a missing `guid` on those messages is what marks the action as page-level.
+- **Cloning is deliberately small.** It is a rare action, so it lives as an icon button in
+  the header that opens a one-field popover. Do not promote it back into the command bar -
+  that bar belongs to the filter, which is the frequent action.
 - **The Explorer context menu is the one exception to the two rules above.**
   `vsc-landingpage.addToGroup` (Explorer and editor tab context menus) is initiated outside the
   page, so it uses native quick pick and input box, and works even when the landing page has
@@ -112,10 +118,18 @@ Consequences worth knowing:
 - Group layouts are `list` (default), `grid` and `compact`; the button in the group header
   cycles them in that order. Adding a layout means updating `main.tsx`, the union in
   `LandingPageModel.ts`, and the matching SCSS block.
-- Group ordering is explicit, not drag-and-drop. `moveGroup` swaps adjacent user-created
-  groups, persists the result, and keeps generated `@vsc-mru` Recent at the end. A reordered
-  sync must use `forceRebuild` because the DOM sync is keyed by GUID and does not otherwise
-  reposition existing group elements.
+- Groups are reordered by dragging their title bar. `moveGroup` accepts either a one-step
+  `direction` or an explicit `toIndex`, persists the result, and keeps generated `@vsc-mru`
+  Recent at the end - Recent is neither draggable nor a drop target. A reordered sync must
+  use `forceRebuild` because the DOM sync is keyed by GUID and does not otherwise reposition
+  existing group elements.
+  Two things about the drag are easy to get wrong:
+  - **`toIndex` is measured before the dragged group is lifted out.** It is the insertion
+    point the drop indicator was drawn at, so a downward move loses one place once the gap
+    closes behind it. That adjustment lives in `moveGroup`, not the webview.
+  - **Stop the drop event at the group.** `.content` carries a drop handler for the gaps
+    between groups, so a drop on a group that bubbles fires both handlers and posts
+    `moveGroup` twice.
 - Prefer `outline` over `border` for hover/selection indicators - a border occupies layout
   space and reflows the row when it appears.
 - Never set `overflow` on one axis alone for a container that anything escapes (tooltips,
@@ -127,3 +141,13 @@ Consequences worth knowing:
   note in `history.ts`. The Recent group is generated and sealed: its entries can only be
   hidden locally through `landingPageHiddenMruGuids`, never removed from VS Code history.
   The Recent group's menu restores all locally hidden entries.
+- **Anything a user sets on a Recent *entry* belongs in `landingPageMruCustomisations`, not on
+  the project object.** `populateVscMru()` runs before almost every message and replaces
+  `@vsc-mru`'s `projects` wholesale from VS Code's history, so a field written onto one of
+  those objects is gone by the next message. The overlay is keyed by MRU GUID and re-applied
+  after every rebuild; `patch` routes `shade` and `glyph` into it via `customiseMru()`. The
+  Recent *group* itself is an ordinary model object and keeps its own shade, glyph and layout
+  directly - only its generated children need the overlay.
+- Accent colour and custom icon are available on **every** group and bookmark including the
+  sealed Recent group, which is why those two entries sit outside the `!sealed` branch of the
+  action menu and why the group header's settings button is not marked `ifn-sealed`.

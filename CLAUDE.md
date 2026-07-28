@@ -59,9 +59,12 @@ make a targeted edit.
 - **`data-shade` is model state, not just a swatch hook.** It appears on groups and bookmark
   cards. Palette-only styles must be scoped to `.palette div[data-shade]`, or a whole group
   can accidentally become a patterned circle.
-- **Group ownership is visible.** Add opens `.group-composer` below the destination group;
-  up/down buttons issue `moveGroup` messages and the host replies with a forced rebuild. Do
-  not bring back drag handling or a page-level add destination chooser.
+- **Group ownership is visible.** Add opens `.group-composer` below the destination group.
+  The page header's **New** menu is the deliberate exception: it is global, so it asks for a
+  destination with a native quick pick.
+- **The drop indicator is a pseudo-element, not a node.** `[data-drop]::after` draws the
+  landing line on the group itself. Inserting a real placeholder element into the list
+  reflows everything below it on every `dragover`, which makes the indicator jitter.
 
 ## Verifying behaviour, not just appearance
 

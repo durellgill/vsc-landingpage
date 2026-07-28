@@ -61,7 +61,7 @@ function mruGuid(uri:Uri):string
 
 /**
  * Reads the most recently used items from VS Code and returns it
- * as Landingpage Model presentation. Can include files, folders or workspaces.
+ * as Landing Page Model presentation. Can include files, folders or workspaces.
  *
  * @returns Items from VS Code's history.
  */

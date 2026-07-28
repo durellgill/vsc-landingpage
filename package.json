@@ -1,6 +1,6 @@
 {
   "name": "vsc-landingpage",
-  "displayName": "Landingpage (Dev)",
+  "displayName": "Landing Page (Dev)",
   "description": "Welcome page with customizable project bookmarks. Personal fork of renebuehling/vsc-landingpage.",
   "version": "0.1.0",
   "engines": {
@@ -35,20 +35,20 @@
       },
       {
         "command": "vsc-landingpage.reset",
-        "title": "Reset/Delete Landingpage Contents"
+        "title": "Reset/Delete Landing Page Contents"
       },
       {
         "command": "vsc-landingpage.reload",
-        "title": "Reload Landingpage",
+        "title": "Reload Landing Page",
         "when": "activeWebviewPanelId == 'vsc-landingpage'"
       },
       {
         "command": "vsc-landingpage.cloneRepository",
-        "title": "Landingpage: Clone Repository"
+        "title": "Landing Page: Clone Repository"
       },
       {
         "command": "vsc-landingpage.addToGroup",
-        "title": "Add to Landingpage Group..."
+        "title": "➕ Add to Landing Page Group..."
       }
     ],
     "keybindings": [
@@ -90,12 +90,12 @@
       }
     ],
     "configuration": {
-      "title": "Landingpage",
+      "title": "Landing Page",
       "properties": {
         "vsc-landingpage.autoshowOnStartup": {
           "type": "boolean",
           "default": true,
-          "description": "Open Landingpage automatically in empty windows."
+          "description": "Open Landing Page automatically in empty windows."
         },
         "vsc-landingpage.maxRecentItems": {
           "type": "number",

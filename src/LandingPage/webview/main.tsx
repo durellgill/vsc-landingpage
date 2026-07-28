@@ -37,6 +37,9 @@ function App() {
   const [picker,setPicker] = useState<'shade'|'glyph'|null>(null);
   const [rename,setRename] = useState<string|null>(null);
   const [confirm,setConfirm] = useState<'remove'|'hide'|null>(null);
+  const [popover,setPopover] = useState<'create'|'clone'|null>(null);
+  // `over` is the insertion index the drop indicator is drawn at, in user-group coordinates.
+  const [drag,setDrag] = useState<{guid:string;over:number|null}|null>(null);
 
   useEffect(() => {
     const receive = (event:MessageEvent) => {
@@ -71,24 +74,71 @@ function App() {
   function chooseShade(shade:string) {if (target) {post('patch',{guid:target.item.guid,field:'shade',value:shade});} closeMenu();}
   function chooseGlyph(glyph:string) {if (target) {post('patch',{guid:target.item.guid,field:'glyph',value:glyph});} closeMenu();}
 
-  return <main class="page" onPointerDown={event => {if (!(event.target as Element).closest('#ctxmenu,.modal')) {closeMenu();}}}>
-    <header class="page-header"><div class="titlerow"><div class="titletext"><h1>Landingpage</h1><p class="subtitle">Click to open. Right-click a bookmark or group to customise it.</p></div><div class="header-actions"><button class="btn-secondary" onClick={()=>post('createGroup')}><Svg name="plus"/><span>New group</span></button><button class="btn-ghost" title="Settings" onClick={()=>post('openSettings')}><Svg name="settings"/></button></div></div></header>
-    <div class="commandbar"><form class="field field-clone" onSubmit={event => {event.preventDefault(); const url=(event.currentTarget.elements.namedItem('url') as HTMLInputElement).value.trim(); if (url) {post('cloneRepository',{url}); event.currentTarget.reset();}}}><span class="field-icon"><Svg name="gitBranch"/></span><input name="url" required placeholder="Clone a repository - paste a Git URL"/><button class="btn-primary">Clone</button></form><div class="field field-filter"><span class="field-icon"><Svg name="search"/></span><input value={filter} onInput={event=>setFilter((event.target as HTMLInputElement).value)} placeholder="Filter bookmarks...  Ctrl/Cmd+F"/><button class="btn-ghost" onClick={()=>setFilter('')}><Svg name="clear"/></button></div></div>
-    <div class="content col">{visibleGroups.map(group=><GroupShelf key={group.guid} group={group} index={userGroups.indexOf(group)} total={userGroups.length} filter={needle} composer={composer===group.guid} setComposer={setComposer} openMenu={openMenu}/>)}</div>
+  function create(command:string, data:Record<string,unknown>={}) {setPopover(null); post(command,data);}
+
+  // Drag reorder. `index` is the position among user-created groups; the sealed Recent group
+  // reports -1 and is neither draggable nor a drop target.
+  function dragOver(event:DragEvent, index:number) {
+    if (!drag || index<0) {return;}
+    event.preventDefault();
+    const rect=(event.currentTarget as HTMLElement).getBoundingClientRect();
+    const over=index + (event.clientY > rect.top+rect.height/2 ? 1 : 0);
+    if (drag.over!==over) {setDrag({...drag,over});}
+  }
+  function dropGroup() {
+    if (drag && drag.over!==null) {post('moveGroup',{guid:drag.guid,toIndex:drag.over});}
+    setDrag(null);
+  }
+
+  return <main class="page" onPointerDown={event => {if (!(event.target as Element).closest('#ctxmenu,.modal,.menu-anchor')) {closeMenu(); setPopover(null);}}}>
+    <header class="page-header">
+      <div class="titlerow"><div class="titletext"><h1>Landing Page</h1><p class="subtitle">Click to open. Drag a group to reorder it, right-click to customise.</p></div><div class="header-actions">
+        <div class="menu-anchor">
+          <button class="btn-primary" aria-expanded={popover==='create'} onClick={()=>setPopover(popover==='create'?null:'create')}><Svg name="plus"/><span>New</span><Svg name="chevronDown"/></button>
+          {popover==='create' && <div class="popover">
+            <button onClick={()=>create('createGroup')}><Svg name="glyph-folder"/><span>Group</span></button>
+            <button onClick={()=>create('createDirectory')}><Svg name="folderPlus"/><span>Folder on disk</span></button>
+            <hr/>
+            <button onClick={()=>create('createBookmark',{pickFolder:true})}><Svg name="folder"/><span>Bookmark a folder</span></button>
+            <button onClick={()=>create('createBookmark',{pickFolder:false})}><Svg name="fileSliders"/><span>Bookmark a file or workspace</span></button>
+          </div>}
+        </div>
+        <div class="menu-anchor">
+          <button class="btn-ghost btn-small" title="Clone a repository" aria-expanded={popover==='clone'} onClick={()=>setPopover(popover==='clone'?null:'clone')}><Svg name="gitBranch"/></button>
+          {popover==='clone' && <form class="popover popover-clone" onSubmit={event => {event.preventDefault(); const url=(event.currentTarget.elements.namedItem('url') as HTMLInputElement).value.trim(); if (url) {setPopover(null); post('cloneRepository',{url});}}}><input name="url" required autoFocus placeholder="Paste a Git URL"/><button class="btn-secondary">Clone</button></form>}
+        </div>
+        <button class="btn-ghost btn-small" title="Settings" onClick={()=>post('openSettings')}><Svg name="settings"/></button>
+      </div></div>
+    </header>
+    <div class="commandbar">
+      <div class="field field-filter"><span class="field-icon"><Svg name="search"/></span><input value={filter} onInput={event=>setFilter((event.target as HTMLInputElement).value)} placeholder="Filter bookmarks...  Ctrl/Cmd+F"/>{filter && <button class="btn-ghost" title="Clear filter" onClick={()=>setFilter('')}><Svg name="clear"/></button>}</div>
+    </div>
+    <div class="content col" onDragEnd={()=>setDrag(null)} onDrop={dropGroup}>{visibleGroups.map(group=>{
+      const index=userGroups.indexOf(group);
+      // Only one indicator is ever drawn: 'before' the group at the insertion point, or
+      // 'after' the last one when dropping at the very end.
+      const drop = !drag || drag.over===null || index<0 ? null
+        : drag.over===index ? 'before'
+        : (drag.over===userGroups.length && index===userGroups.length-1) ? 'after' : null;
+      return <GroupShelf key={group.guid} group={group} index={index} total={userGroups.length} filter={needle} composer={composer===group.guid} setComposer={setComposer} openMenu={openMenu}
+        dragging={drag?.guid===group.guid} drop={drop} onDragStart={()=>setDrag({guid:group.guid,over:null})} onDragOver={dragOver} onDrop={dropGroup}/>;
+    })}</div>
     {model.groups.length===0 && <EmptyState/>}
     {needle && visibleGroups.length===0 && <div class="placeholder"><h2>No bookmarks match your filter</h2><button class="btn-secondary" onClick={()=>setFilter('')}>Clear filter</button></div>}
     {menu && target && <ActionMenu menu={menu} target={target} rename={rename} setRename={setRename} confirm={confirm} setConfirm={setConfirm} picker={picker} setPicker={setPicker} close={closeMenu} renameTarget={renameTarget} chooseShade={chooseShade} chooseGlyph={chooseGlyph}/>} 
   </main>;
 }
 
-function GroupShelf({group,index,total,filter,composer,setComposer,openMenu}:{group:LandingPageGroup;index:number;total:number;filter:string;composer:boolean;setComposer:(id:string|null)=>void;openMenu:(event:MouseEvent,guid:string)=>void}) {
+function GroupShelf({group,index,filter,composer,setComposer,openMenu,dragging,drop,onDragStart,onDragOver,onDrop}:{group:LandingPageGroup;index:number;total:number;filter:string;composer:boolean;setComposer:(id:string|null)=>void;openMenu:(event:MouseEvent,guid:string)=>void;dragging:boolean;drop:'before'|'after'|null;onDragStart:()=>void;onDragOver:(event:DragEvent,index:number)=>void;onDrop:()=>void}) {
   const sealed=group.guid==='@vsc-mru';
   const projects=group.projects.filter(project=>project.label.toLocaleLowerCase().includes(filter));
   const layout=group.layout||'list';
   const next:Record<Layout,Layout>={list:'grid',grid:'compact',compact:'list'};
-  return <section class={`group${sealed?' sealed':''}`} data-guid={group.guid} data-shade={shadeForGroup(group)} onContextMenu={event=>openMenu(event,group.guid)}>
-    <div class="titlebar"><span class="group-icon"><Svg name={iconFor(group)}/></span><h1 class="group-label" title="Double-click to rename" onDblClick={event=>openMenu(event,group.guid)}>{group.label}</h1><span class="group-count">{group.projects.length||''}</span><div class="tools"><button class="ifn-sealed" title="Add to this group" onClick={()=>setComposer(composer?null:group.guid)}><Svg name="plus"/></button><button class="ifn-sealed" disabled={index===0} title="Move group up" onClick={()=>post('moveGroup',{guid:group.guid,direction:'up'})}><Svg name="chevronUp"/></button><button class="ifn-sealed" disabled={index===total-1} title="Move group down" onClick={()=>post('moveGroup',{guid:group.guid,direction:'down'})}><Svg name="chevronDown"/></button><button title={`${layout} view - click to change layout`} onClick={()=>post('patch',{guid:group.guid,field:'layout',value:next[layout]})}><Svg name={layout==='list'?'layoutList':layout==='grid'?'layoutGrid':'alignJustify'}/></button></div><div class="rule"/></div>
-    {composer && <div class="group-composer"><span class="composer-label">Add to <b>{group.label}</b></span><button class="btn-secondary" onClick={()=>{setComposer(null);post('createBookmark',{guid:group.guid,pickFolder:true});}}><Svg name="folderPlus"/><span>Folder</span></button><button class="btn-secondary" onClick={()=>{setComposer(null);post('createBookmark',{guid:group.guid,pickFolder:false});}}><Svg name="plus"/><span>File or workspace</span></button><button class="btn-ghost" onClick={()=>setComposer(null)}>Cancel</button></div>}
+  return <section class={`group${sealed?' sealed':''}${dragging?' dragging':''}`} data-guid={group.guid} data-shade={shadeForGroup(group)} data-drop={drop||undefined}
+    onContextMenu={event=>openMenu(event,group.guid)}
+    onDragOver={event=>onDragOver(event,index)} onDrop={event=>{event.preventDefault(); event.stopPropagation(); onDrop();}}>
+    <div class="titlebar" draggable={!sealed} onDragStart={event=>{if (event.dataTransfer) {event.dataTransfer.effectAllowed='move'; event.dataTransfer.setData('text/plain',group.guid);} onDragStart();}}><span class={`group-icon${sealed?'':' draghandle'}`} title={sealed?undefined:'Drag to reorder this group'}><Svg name={iconFor(group)}/></span><h1 class="group-label" title="Double-click to rename" onDblClick={event=>openMenu(event,group.guid)}>{group.label}</h1><span class="group-count">{group.projects.length||''}</span><div class="tools"><button class="ifn-sealed" title="Add to this group" onClick={()=>setComposer(composer?null:group.guid)}><Svg name="plus"/></button><button data-role="layout" title={`${layout} view - click to change layout`} onClick={()=>post('patch',{guid:group.guid,field:'layout',value:next[layout]})}><Svg name={layout==='list'?'layoutList':layout==='grid'?'layoutGrid':'alignJustify'}/></button><button title="Group settings" onClick={event=>openMenu(event,group.guid)}><Svg name="settings"/></button></div><div class="rule"/></div>
+    {composer && <div class="group-composer"><span class="composer-label">Add to <b>{group.label}</b></span><button class="btn-secondary" onClick={()=>{setComposer(null);post('createBookmark',{guid:group.guid,pickFolder:true});}}><Svg name="folder"/><span>Folder</span></button><button class="btn-secondary" onClick={()=>{setComposer(null);post('createBookmark',{guid:group.guid,pickFolder:false});}}><Svg name="plus"/><span>File or workspace</span></button><button class="btn-secondary" title="Create a new folder on disk and bookmark it" onClick={()=>{setComposer(null);post('createDirectory',{guid:group.guid});}}><Svg name="folderPlus"/><span>New folder</span></button><button class="btn-ghost" onClick={()=>setComposer(null)}>Cancel</button></div>}
     <div class={`projects ${layout}`}>{projects.map(project=><BookmarkCard key={project.guid} project={project} openMenu={openMenu}/>)}</div>
   </section>;
 }
@@ -106,11 +156,13 @@ function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,picker,setP
   if (picker==='glyph') return <Palette type="glyph" style={style} choose={chooseGlyph} close={close}/>;
   return <div id="ctxmenu" class="ctxmenu" data-renaming={rename!==null ? 'yes' : undefined} style={style}>
     {project && <button onClick={()=>{post('open',{guid:target.item.guid});close();}}><Svg name="arrowRightIcon"/><span>Open</span></button>}
-    {!sealed && <>{rename!==null ? <div class="ctxrename"><input autoFocus value={rename} onInput={(event:any)=>setRename(event.currentTarget.value)} onKeyDown={(event:any)=>{if(event.key==='Enter')renameTarget();if(event.key==='Escape')close();}}/><button onClick={renameTarget}>Save</button><button onClick={close}>Cancel</button></div> : <button onClick={()=>setRename(target.item.label)}><Svg name="textCursorInput"/><span>Rename</span></button>}<button onClick={()=>setPicker('shade')}><Svg name="paintbrush"/><span>Accent colour</span></button><button onClick={()=>setPicker('glyph')}><Svg name="image"/><span>Custom icon</span></button></>}
+    {!sealed && <>{rename!==null ? <div class="ctxrename"><input autoFocus value={rename} onInput={(event:any)=>setRename(event.currentTarget.value)} onKeyDown={(event:any)=>{if(event.key==='Enter')renameTarget();if(event.key==='Escape')close();}}/><button onClick={renameTarget}>Save</button><button onClick={close}>Cancel</button></div> : <button onClick={()=>setRename(target.item.label)}><Svg name="textCursorInput"/><span>Rename</span></button>}</>}
+    <button onClick={()=>setPicker('shade')}><Svg name="paintbrush"/><span>Accent colour</span></button>
+    <button onClick={()=>setPicker('glyph')}><Svg name="image"/><span>Custom icon</span></button>
     {project && !sealed && <button onClick={()=>{post('moveToGroup',{guid:target.item.guid});close();}}><Svg name="folderInput"/><span>Move to group</span></button>}
     {!project && sealed && <button onClick={()=>{post('restoreHiddenRecents');close();}}>Restore hidden recents</button>}
     <div class="ctxsep"/>
-    {sealed&&project ? (confirm==='hide'?<button class="danger" onClick={()=>{post('hideRecent',{guid:target.item.guid});close();}}>Hide?</button>:<button class="danger" onClick={()=>setConfirm('hide')}><Svg name="trash2"/><span>Hide from Landingpage</span></button>) : !sealed && (confirm==='remove'?<><button class="danger" onClick={()=>{post('remove',{guid:target.item.guid});close();}}>Remove?</button><button onClick={close}>Cancel</button></>:<button class="danger" onClick={()=>setConfirm('remove')}><Svg name="trash2"/><span>Remove</span></button>)}
+    {sealed&&project ? (confirm==='hide'?<button class="danger" onClick={()=>{post('hideRecent',{guid:target.item.guid});close();}}>Hide?</button>:<button class="danger" onClick={()=>setConfirm('hide')}><Svg name="trash2"/><span>Hide from Landing Page</span></button>) : !sealed && (confirm==='remove'?<><button class="danger" onClick={()=>{post('remove',{guid:target.item.guid});close();}}>Remove?</button><button onClick={close}>Cancel</button></>:<button class="danger" onClick={()=>setConfirm('remove')}><Svg name="trash2"/><span>Remove</span></button>)}
   </div>;
 }
 
