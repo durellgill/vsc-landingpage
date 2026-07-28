@@ -18,6 +18,40 @@
 			}
 		},
 		{
+			// Cmd+Shift+P -> "Tasks: Run Task" -> "Build & install extension"
+			"label": "Build & install extension",
+			"type": "npm",
+			"script": "install-local",
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": true
+			}
+		},
+		{
+			"type": "npm",
+			"script": "watch:css",
+			"problemMatcher": [],
+			"isBackground": true,
+			"presentation": {
+				"reveal": "never",
+				"group": "watchers"
+			},
+			"group": "build"
+		},
+		{
+			"type": "npm",
+			"script": "watch:webview",
+			"problemMatcher": "$ts-webpack-watch",
+			"isBackground": true,
+			"presentation": {
+				"reveal": "never",
+				"group": "watchers"
+			},
+			"group": "build"
+		},
+		{
 			"type": "npm",
 			"script": "watch-tests",
 			"problemMatcher": "$tsc-watch",

@@ -10,5 +10,8 @@
 	},
 	// Turn off tsc task auto detection since we have the necessary tasks as npm scripts
 	"typescript.tsc.autoDetect": "off",
+	// This project uses npm. Pinning this stops VS Code walking up to the home directory,
+	// finding stray lockfiles there, and warning about "multiple lockfiles" on every run.
+	"npm.packageManager": "npm",
 	"compile-hero.disable-compile-files-on-did-save-code": false
 }

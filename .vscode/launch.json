@@ -6,7 +6,38 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
+			// Default. Fast and isolated:
+			//
+			// --extensions-dir  gives the dev host an empty extensions directory, so none of
+			//                   the ~33 extensions in ~/.vscode/extensions (1.4 GB) load.
+			//                   Built-in extensions still load - they ship inside the VS Code
+			//                   app bundle, not the extensions dir - so the built-in Git
+			//                   extension that Clone depends on is unaffected.
+			// --user-data-dir   gives it its own profile. Without this the dev host inherits
+			//                   your window restore state and reopens whatever folder you had
+			//                   last, which means workspaceFolders is set and the landing page
+			//                   does NOT auto-open (see extension.ts, autoshowOnStartup).
+			//                   A fresh profile always starts as an empty window.
+			//
+			// Note: bookmarks live in the profile, so the dev host has its own set, separate
+			// from your normal VS Code. That is deliberate - debugging cannot corrupt real data.
 			"name": "Run Extension",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceFolder}",
+				"--extensions-dir=${workspaceFolder}/.vscode-dev-extensions",
+				"--user-data-dir=${workspaceFolder}/.vscode-dev-user-data"
+			],
+			"outFiles": [
+				"${workspaceFolder}/dist/**/*.js"
+			],
+			"preLaunchTask": "${defaultBuildTask}"
+		},
+		{
+			// Use when you need to reproduce something that involves your normal setup
+			// (theme, icon pack, another extension interfering). Slower to start.
+			"name": "Run Extension (with my installed extensions)",
 			"type": "extensionHost",
 			"request": "launch",
 			"args": [

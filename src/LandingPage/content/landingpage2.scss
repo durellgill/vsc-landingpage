@@ -1,27 +1,58 @@
+// Landingpage webview styles.
+//
+// Built to src/LandingPage/content/dist/landingpage2.css by `npm run build:css`
+// and inlined into the webview by LandingPageTemplate2.ts. Do not edit the generated CSS.
+//
+// Every colour here must resolve to a VS Code theme variable so the page works in dark,
+// light and high-contrast themes. The only literal colours are the `data-shade` bookmark
+// palette below, which is a deliberate user-facing set of accent colours.
+
 .landingpage
 {
+  //--- spacing / sizing tokens -----------------------------------------------
   --gapspace:16px;    // gaps between layout areas
   --gapspace-s:8px;   // smaller gaps between layout areas
   --ctrlspace:2px;    // small spacing for padding/margins between i.e. icon and label
-  --corner:4px;       // borderradius
+  --corner:4px;       // legacy borderradius alias, kept for the palette/colorslot
+  --radius:6px;
+  --radius-s:4px;
   --buttonsize:24px;  // base size of a button, including icon (svg may be smaller, but relates to 24x24 design scale)
-  --accent-color: var(--vscode-notebook-cellInsertionIndicator); // blue highlight or action indicator color
-  --danger-color: #d50000;
 
-  div[data-prototype] 
+  // No sidebar any more - kept at 0 so the few rules that offset against it stay valid.
+  --rail-width: 0px;
+  // The content column stops growing here so bookmarks stay scannable on wide monitors.
+  // Kept near a comfortable reading measure - full-width rows on a 32" display read badly.
+  --page-max: 920px;
+
+  // The editor's own monospace face, used for paths and counts.
+  --mono: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, Menlo, monospace);
+
+  --accent-color: var(--vscode-focusBorder);
+  --danger-color: var(--vscode-errorForeground);
+  --hairline: var(--vscode-editorWidget-border, var(--vscode-panel-border));
+  --elevation: 0 1px 3px rgb(0 0 0 / 0.18);
+
+  //--- base ------------------------------------------------------------------
+  // The webview body does not inherit the editor font unless we ask for it. Without this
+  // the whole page renders in the browser default and looks nothing like VS Code.
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-foreground);
+  background-color: var(--vscode-editor-background);
+  user-select: none;
+
+  h1, h2, p { margin: 0; padding: 0; font-weight: 400; }
+
+  div[data-prototype]
   {
     display: none !important;
     --shade-color: fuchsia;
     --shade-foreground: white;
   }
 
-  user-select: none;
-  *
-  {
-    transition: outline-color 0.2s ease-in-out;
-    transition: background-color 0.3s ease-in-out;
-  }
+  .hidden { display: none !important; }
 
+  //--- bookmark accent palette ----------------------------------------------
   *[data-shade="red"]     { --shade-color: #D50000; --shade-foreground:white; }
   *[data-shade="orange"]  { --shade-color: #FF5722; --shade-foreground:white; }
   *[data-shade="yellow"]  { --shade-color: #FFC107; --shade-foreground:black; }
@@ -37,156 +68,95 @@
   *[data-shade="white"]   { --shade-color: #FAFAFA; --shade-foreground:black; }
   *[data-shade="black"]   { --shade-color: #212121; --shade-foreground:white; }
 
-  &[data-active-tool="tExplore"]  
-  { 
-    .project { cursor:pointer; }
-    .group .titlebar .tools {visibility: visible !important;}
-  }
-  &[data-active-tool="tRename"]
-  {
-    .group:not(.sealed) { .group-label, .project{ cursor:text; border:1px dashed var(--accent-color);} }
-    .group.sealed { cursor: not-allowed;  > * { pointer-events: none; } }
-  } 
-  &[data-active-tool="tDelete"]
-  {
-    .group:not(.sealed) { .group-label, .project{ cursor:url(%assetPath%/cursor-delete.png), auto; border:1px dashed var(--danger-color);} }
-    .group.sealed { cursor: not-allowed;  > * { pointer-events: none; } }
-  } 
-  &[data-active-tool="tMove"]
-  {
-    .group 
-    {
-      &:not(.dragged-item) .group-label,  //when move tool > grouplabel bordered (unless dragged itself)
-      .project:not(.dragged-item)         //when move tool > project card bordered (unless dragged itself)
-      {
-        cursor:move; border:1px dashed var(--accent-color);
-      } 
-    }
-    .group.sealed 
-    { 
-      //cursor: not-allowed;  
-      .project {cursor:copy;}
-      .dragup, .dragbefore, .dragdown, .dragafter  { pointer-events: none; display:none;} //TODO: remove double: currently this AND class ifn-sealed try to disable the hotspots, one is sufficient
-    }
-    &:not(.is-dragging) //hide dropzones unless dragging
-    {
-      .dragbefore, .dragafter  {display:none;}
-    }
-    &:not(.is-dragging-group) //hide dropzones unless dragging
-    {
-      .dragup, .dragdown  {display:none;}
-    }
-    // &.is-dragging, &.is-dragging-group  //show dropzones while dragging
-    // {
-    //   .dragup, .dragbefore {background-color:rgba(5, 238, 44, 0.473);} //debug visualization
-    //   .dragdown, .dragafter {background-color:rgba(255, 0, 0, 0.473);} //debug visualization
-    // }
-  } 
-  &:not([data-active-tool="tMove"])
-  {
-    .dragup, .dragbefore, .dragdown, .dragafter  {display:none;} //hide dropzones in tools other than move
-  }
-  &[data-active-tool="tPaint"]
-  {
-    .group { .group-label{ cursor:not-allowed; } }
-    .group:not(.sealed) { .project{ cursor:url(%assetPath%/cursor-paint.png), auto; border:1px dashed var(--accent-color);} }
-    .group.sealed { cursor: not-allowed;  > * { pointer-events: none; } }
-  } 
-
-  .sealed .ifn-sealed 
+  .sealed .ifn-sealed
   {
     display: none !important;
   }
 
+  //--- icons -----------------------------------------------------------------
   .lucide
   {
-    width: 19px;
-    height: auto;
-    stroke: currentColor; 
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
     fill: none;
-    stroke-width: 1px;
+    stroke-width: 1.5px;
     stroke-linecap: round;
     stroke-linejoin: round;
+    flex: none;
   }
 
+  //--- buttons ---------------------------------------------------------------
   button
   {
     display: flex;
     padding: var(--ctrlspace);
     justify-content: center;
     align-items: center;
+    gap: var(--gapspace-s);
 
     cursor:pointer;
+    font-family: inherit;
+    font-size: inherit;
 
     color: var(--vscode-icon-foreground);
     background-color: transparent;
-    &:hover { background-color: var(--vscode-toolbar-hoverBackground); }
-
     border: none;
-    border-radius: var(--corner);
+    border-radius: var(--radius-s);
 
-    span
-    {
-      margin-left: var(--ctrlspace);
-      margin-right: var(--ctrlspace);
-      padding-left: var(--ctrlspace);
-      padding-right: var(--ctrlspace);
-    }
+    transition: background-color .15s ease-in-out, outline-color .15s ease-in-out;
+
+    &:hover { background-color: var(--vscode-toolbar-hoverBackground); }
+    &:focus-visible { outline: 1px solid var(--accent-color); outline-offset: 1px; }
+    &:disabled { cursor: default; opacity: .28; }
   }
 
-  .toolbar
+  // Text buttons used in the command bar and the empty states.
+  .btn-primary, .btn-secondary
   {
-    position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: var(--buttonsize);
-    background-color: var(--vscode-activityBar-background);
-    padding: var(--gapspace-s);
-    border-right: 1px solid var(--vscode-activityBar-border);
-    display: flex;
-    flex-direction: column;
-    gap:var(--ctrlspace);
-    z-index: 99;
-
-    .separator
-    {
-      border-bottom: 1px solid var(--vscode-activityBar-border);
-      margin-left: calc(-1* var(--gapspace-s));
-      margin-right: calc(-1* var(--gapspace-s));
-      height: calc( var(--gapspace-s) / 2);
-      margin-bottom: calc( var(--gapspace-s) / 2);
-    }
-
-    button
-    {
-      width:var(--buttonsize);
-      height:var(--buttonsize);
-      position: relative; //relevant for tooltip
-      color: var(--vscode-activityBar-foreground); //https://code.visualstudio.com/api/references/theme-color#activity-bar
-
-      &.active
-      {
-        background-color: var(--vscode-toolbar-hoverBackground);
-      }
-    }
+    padding: 6px 12px;
+    border-radius: var(--radius-s);
+    white-space: nowrap;
+    gap: 6px;
+  }
+  .btn-primary
+  {
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    &:hover { background-color: var(--vscode-button-hoverBackground); }
+  }
+  .btn-secondary
+  {
+    background-color: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    &:hover { background-color: var(--vscode-button-secondaryHoverBackground); }
+  }
+  .btn-ghost
+  {
+    color: var(--vscode-input-placeholderForeground);
+    &:hover { color: var(--vscode-foreground); background-color: transparent; }
   }
 
+  //--- paint picker ----------------------------------------------------------
+  // Swatch showing the active paint colour. Anchored to the icon wrapper inside the button,
+  // not the button itself - the sidebar buttons are full width, so anchoring to the button
+  // would strand it against the far edge of the sidebar.
   .colorslot
   {
     position: absolute;
-    bottom:0;
-    right:0;
-
-    width: var(--gapspace-s);
-    height: var(--gapspace-s);
+    bottom:-3px;
+    right:-4px;
+    width: 9px;
+    height: 9px;
   }
 
-  .colorslot, div[data-shade]
+  // This selector must stay scoped to palette swatches. Groups and bookmarks also use
+  // data-shade as state, and styling every matching div turned whole groups into circles.
+  .colorslot, .palette div[data-shade]
   {
     border-radius: 50%;
     border: 1px solid rgba(0, 0, 0, 0.3);
-    cursor: pointer;        
+    cursor: pointer;
     background-color:var(--shade-color);
 
     &[data-shade=""] // "clear" slot
@@ -195,380 +165,742 @@
       background-size: 4px 4px;
     }
   }
+
   .palette
   {
     position: absolute;
-    border: 1px solid var(--vscode-menu-border);
+    border: 1px solid var(--vscode-menu-border, var(--hairline));
     min-width: 4px;
     min-height: 4px;
     background-color: var(--vscode-menu-background);
     box-shadow: 0px 3px 7px rgba(0, 0, 0, 0.2);
     top: 20px;
     left: 20px;
-    border-radius: var(--corner);
+    border-radius: var(--radius);
+    // One row. The palette is opened from a row's menu, so it reads as a single strip of
+    // choices rather than a block you have to scan in two dimensions.
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     flex-direction: row;
-    gap: var(--gapspace-s);
+    gap: 6px;
     padding: var(--gapspace-s);
 
-    width: calc((var(--gapspace) + var(--gapspace-s))* 5 + 2px); //(color slot width + gap) * numberOfSlotsPerLine + paletteBorder
     div[data-shade]
     {
-      width: var(--gapspace);
-      height: var(--gapspace);
+      width: 18px;
+      height: 18px;
+      flex: none;
       cursor: pointer;
+      transition: transform .1s ease-out;
+      &:hover { transform: scale(1.18); }
     }
+  }
+
+  // Icon picker, opened by the Icon tool. Same modal pattern as the paint palette.
+  .glyphpalette
+  {
+    position: absolute;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: var(--ctrlspace);
+    padding: var(--gapspace-s);
+    top: 20px;
+    left: 20px;
+
+    background-color: var(--vscode-menu-background);
+    border: 1px solid var(--vscode-menu-border, var(--hairline));
+    border-radius: var(--radius);
+    box-shadow: 0px 3px 7px rgba(0, 0, 0, 0.2);
+
+    button
+    {
+      width: 28px;
+      height: 28px;
+      color: var(--vscode-menu-foreground, var(--vscode-foreground));
+      .lucide { width: 18px; height: 18px; }
+      &:hover { background-color: var(--vscode-menu-selectionBackground, var(--vscode-toolbar-hoverBackground)); }
+    }
+    .glyph-clear { color: var(--vscode-descriptionForeground); }
+  }
+
+  // Preview of the currently selected icon. Anchored to the icon wrapper, see .colorslot.
+  .glyphslot
+  {
+    position: absolute;
+    bottom: -4px;
+    right: -5px;
+    display: flex;
+    padding: 1px;
+    border-radius: 3px;
+    background-color: var(--vscode-activityBar-background);
+    .lucide { width: 10px; height: 10px; stroke-width: 2.5px; }
   }
 
   .modal
   {
     position: fixed;
-    left:calc(var(--buttonsize) + (2 * var(--gapspace-s)) + 1px); 
+    left: var(--rail-width);
     right:0; top:0; bottom:0;
-    background-color: rgba(255,255,255,0.5);
+    // Scrim derived from the editor background, so it dims in dark themes instead of
+    // washing the page white the way a hardcoded rgba(255,255,255,.5) did.
+    //
+    // The alpha MUST live in the colour, not in `opacity`. `opacity` on a parent creates a
+    // stacking context that children cannot exceed, so an opacity scrim silently rendered
+    // the picker itself at 60% too - a child `opacity: 1` cannot undo it.
+    background-color: color-mix(in srgb, var(--vscode-editor-background) 60%, transparent);
     z-index: 98;
-
-    &.hidden
-    {
-      display:none;
-    }
   }
 
-  .searchbar
+  //--- action menu -----------------------------------------------------------
+  // Opened by the row's "..." button or by right-clicking a bookmark or group. One menu
+  // element serves both; entries that do not apply are hidden by the rules below.
+  .ctxmenu
   {
     position: fixed;
-    left: calc( var(--buttonsize) + (2 * var(--gapspace-s)) );
-    top: 0;
-    right: 0;
-    height: var(--buttonsize);
-    background-color: var(--vscode-editor-background);
-    color: var(--vscode-editor-foreground);
-    padding: var(--gapspace-s);
-    // border-right: 1px solid var(--vscode-activityBar-border);
+    z-index: 200;
+    min-width: 184px;
+    padding: 4px;
     display: flex;
-    flex-direction: row;
-    justify-content: center;
-    align-items: center;
-    gap:var(--ctrlspace);
-    z-index: 99;
+    flex-direction: column;
+    gap: 1px;
 
+    background-color: var(--vscode-menu-background);
+    color: var(--vscode-menu-foreground, var(--vscode-foreground));
+    border: 1px solid var(--vscode-menu-border, var(--hairline));
+    border-radius: var(--radius);
+    box-shadow: 0 4px 12px rgb(0 0 0 / 0.28);
 
-    .inputfield
+    button
     {
-      outline: 1px solid var(--vscode-editorWidget-border);
-      box-shadow: 0 2px 5px 0 #9393932e;
-      border-radius: var(--corner);
-      background:var(--shade-color);
-      color: var(--shade-foreground);
-      border:none; 
-      padding: var(--ctrlspace);
-      font-family: var(--vscode-font-family);
-      font-size: var(--vscode-font-size);
-      button {color:var(--shade-foreground);}
+      justify-content: flex-start;
+      gap: 10px;
+      padding: 6px 10px;
+      color: inherit;
+      font-size: .9em;
+      white-space: nowrap;
 
-      display:flex;
-      flex-direction: row;
-    
-      &:hover, &:focus, &:focus-within
+      &:hover
       {
-        outline-color: var(--accent-color);
+        background-color: var(--vscode-menu-selectionBackground, var(--vscode-toolbar-hoverBackground));
+        color: var(--vscode-menu-selectionForeground, inherit);
       }
+      &.danger:hover { color: var(--danger-color); }
+    }
 
-      input, input:active, input:focus
+    .ctxsep
+    {
+      height: 1px;
+      margin: 4px 2px;
+      background-color: var(--vscode-menu-separatorBackground, var(--hairline));
+    }
+
+    // Bookmarks cannot be added to. Layout is intentionally controlled by its visible icon
+    // in the group header, rather than duplicated in this menu.
+    &[data-kind="project"] { [data-act="addfile"], [data-act="addfolder"] { display:none; } }
+    // Groups have no path or custom icon. They do have a heading accent colour.
+    &[data-kind="group"]   { [data-act="open"], [data-act="movetogroup"], [data-act="hiderecent"], [data-act="hiderecentconfirm"] { display:none; } }
+    // The VS Code recents list is generated, so it cannot be renamed, removed or added to.
+    &[data-sealed="yes"]   { [data-act="rename"], [data-act="remove"], [data-act="removeconfirm"], [data-act="cancelremove"], [data-act="addfile"], [data-act="addfolder"] { display:none; } }
+
+    // Removal stays in the menu. The first click replaces it with an explicit confirmation
+    // and a cancel action, instead of opening a notification in a distant VS Code corner.
+    [data-act="restorerecents"], [data-act="hiderecent"], [data-act="hiderecentconfirm"], [data-act="removeconfirm"], [data-act="cancelremove"] { display:none; }
+    &[data-sealed="yes"] [data-act="hiderecent"] { display:flex; }
+    &[data-kind="group"][data-sealed="yes"] [data-act="restorerecents"] { display:flex; }
+    .ctxrename
+    {
+      display: none;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 2px 2px;
+
+      input
       {
-        border: none;
+        min-width: 0;
+        flex: 1 1 120px;
+        padding: 5px 7px;
+        color: var(--vscode-input-foreground);
+        background-color: var(--vscode-input-background);
+        border: 1px solid var(--vscode-input-border, var(--hairline));
+        border-radius: var(--radius-s);
+        font: inherit;
         outline: none;
-        margin: 0; 
+        &:focus { border-color: var(--accent-color); }
       }
 
-      input::placeholder 
-      {
-        color: var(--vscode-input-placeholderForeground);
-        font-size:smaller;
-      }
+      button { padding: 5px 7px; }
+    }
+    &[data-renaming="yes"]
+    {
+      [data-act="rename"] { display:none; }
+      .ctxrename { display:flex; }
+    }
+    &[data-confirming-remove="yes"]
+    {
+      [data-act="remove"] { display:none; }
+      [data-act="removeconfirm"], [data-act="cancelremove"] { display:flex; }
+    }
+    &[data-confirming-hide-recent="yes"]
+    {
+      [data-act="hiderecent"] { display:none; }
+      [data-act="hiderecentconfirm"] { display:flex; }
     }
   }
 
+  // The "..." affordance on each row. Present but quiet until the row is hovered.
+  .rowmenu
+  {
+    flex: none;
+    opacity: 0;
+    color: var(--vscode-descriptionForeground);
+    &:hover, &:focus-visible { color: var(--vscode-foreground); }
+  }
 
-  .content
+  // On a bookmark it is pinned to the top-right corner and taken out of flow. In the card
+  // layout the row is a flex *column*, so an in-flow button landed under the text and added
+  // its own height to every card.
+  .project .rowmenu
   {
     position: absolute;
-    left:calc(var(--buttonsize) + (2 * var(--gapspace-s)) + 1px);
-    top:calc(var(--buttonsize) + (2 * var(--gapspace-s)) + 1px);
-    right:0;
-    height: auto;
-    // outline: 1px dotted fuchsia;
-    padding:var(--gapspace);
-    
+    top: 4px;
+    right: 4px;
+    z-index: 2;
+    background-color: var(--vscode-editorWidget-background);
+    &:hover { background-color: var(--vscode-toolbar-hoverBackground); }
+  }
+  .project:hover .rowmenu,
+  .titlebar:hover .rowmenu,
+  .rowmenu:focus-visible { opacity: 1; }
+
+  //--- page shell ------------------------------------------------------------
+  // Normal document flow to the right of the rail. Previously .searchbar and .content were
+  // each independently position:fixed/absolute with hand-computed left offsets.
+  .page
+  {
+    margin-left: var(--rail-width);
+    max-width: var(--page-max);
+    padding: calc(var(--gapspace) * 1.5) var(--gapspace) calc(var(--gapspace) * 3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--gapspace);
+  }
+
+  .page-header
+  {
+    .titlerow
+    {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--gapspace);
+      flex-wrap: wrap;
+    }
+    .header-actions
+    {
+      display: flex;
+      align-items: center;
+      gap: var(--gapspace-s);
+      flex: none;
+
+      // These are real page actions now that the sidebar is gone, so they should not read
+      // as faintly as an inline field affordance.
+      .btn-ghost
+      {
+        color: var(--vscode-foreground);
+        padding: 7px;
+        &:hover { background-color: var(--vscode-toolbar-hoverBackground); }
+      }
+    }
+
+    h1
+    {
+      font-size: 1.75rem;
+      font-weight: 250;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+    }
+    .subtitle
+    {
+      margin-top: 2px;
+      color: var(--vscode-descriptionForeground);
+      font-size: .9em;
+    }
+  }
+
+  //--- command bar: clone field + filter field -------------------------------
+  .commandbar
+  {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gapspace-s);
+    max-width: 640px;
+    width: 100%;
+
+    .field
+    {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: var(--gapspace-s);
+
+      background-color: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      border-radius: var(--radius);
+      outline: 1px solid var(--hairline);
+      padding: 4px 4px 4px 10px;
+
+      transition: outline-color .15s ease-in-out;
+      &:hover, &:focus-within { outline-color: var(--accent-color); }
+
+      .field-icon
+      {
+        display: flex;
+        color: var(--vscode-input-placeholderForeground);
+      }
+
+      input
+      {
+        flex: 1 1 auto;
+        min-width: 0;
+        background: transparent;
+        color: inherit;
+        font-family: inherit;
+        font-size: inherit;
+        border: none;
+        outline: none;
+        padding: 4px 0;
+
+        &::placeholder { color: var(--vscode-input-placeholderForeground); }
+      }
+    }
+
+    // The filter sits directly under the clone field and reads as the quieter of the two.
+    .field-filter
+    {
+      background-color: transparent;
+      outline-color: transparent;
+      border-bottom: 1px solid var(--hairline);
+      border-radius: 0;
+      padding-left: 0;
+      &:hover, &:focus-within { outline-color: transparent; border-bottom-color: var(--accent-color); }
+    }
+  }
+
+  //--- empty states ----------------------------------------------------------
+  .placeholder
+  {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--gapspace-s);
+    padding: calc(var(--gapspace) * 3) var(--gapspace);
+    color: var(--vscode-descriptionForeground);
+
+    .placeholder-icon
+    {
+      color: var(--vscode-descriptionForeground);
+      opacity: .5;
+      .lucide { width: 40px; height: 40px; stroke-width: 1px; }
+    }
+
+    h2
+    {
+      font-size: 1.15rem;
+      color: var(--vscode-foreground);
+    }
+
+    p { max-width: 46ch; line-height: 1.5; }
+
+    .placeholder-actions
+    {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: var(--gapspace-s);
+      margin-top: var(--gapspace-s);
+    }
+  }
+
+  //--- groups and bookmarks --------------------------------------------------
+  .content
+  {
     display: flex;
     flex-direction: column;
     gap:var(--gapspace);
 
-
-    .col
-    {
-      display: flex;
-      flex-direction: column;
-      gap: var(--gapspace);
-      padding-top: var(--gapspace);
-      padding-bottom: var(--gapspace);
-    }
-
     .group
     {
-      margin-bottom:var(--gapspace);
       position: relative; //required for dropzones
+      --group-accent: var(--vscode-descriptionForeground);
+      &[data-shade]:not([data-shade=""]) { --group-accent: var(--shade-color); }
 
       .titlebar
       {
         margin-bottom:var(--gapspace);
         display: flex;
-        gap:var(--gapspace);
+        align-items: center;
+        gap:var(--gapspace-s);
+
+        &::before
+        {
+          content: '';
+          width: 5px;
+          height: 24px;
+          flex: none;
+          border-radius: 99px;
+          background-color: var(--group-accent);
+          opacity: .8;
+          transition: height .16s ease-out, opacity .16s ease-out;
+        }
 
         .group-label //h1
         {
-          // color:cornflowerblue;
-          font-weight: 400;
-          margin:0;
-          margin-top: -4px; //temporary Bugfix as text is not in line with tools
-          padding:0; //var(--gapspace-s);
-          border-radius: var(--corner);
+          font-size: .8rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: .08em;
+          color: var(--vscode-foreground);
+          border-radius: var(--radius-s);
+          flex: none;
+          transition: color .15s ease-in-out, letter-spacing .15s ease-in-out;
         }
 
-        @at-root body.is-dragging // is currently in card-dragging operation
+        .group-icon
         {
-          .group-label:hover //dragging over group label = show bottom line drop indicator
-          { 
-            border:none !important; 
-            border-radius: 0 !important; 
-            border-bottom: calc( 0.25 * var(--gapspace) ) solid var(--vscode-notebook-cellInsertionIndicator) !important; 
-          }
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex: none;
+          color: var(--group-accent);
+          background-color: color-mix(in srgb, var(--group-accent) 18%, transparent);
+          border-radius: var(--radius-s);
+          .lucide { width: 18px; height: 18px; stroke-width: 2px; }
         }
+
+        // How many bookmarks are in this group. Real information, not decoration - it is
+        // what tells you a collapsed-looking group is actually full.
+        .group-count
+        {
+          font-family: var(--mono);
+          font-variant-numeric: tabular-nums;
+          font-size: .7rem;
+          line-height: 1;
+          padding: 3px 6px;
+          border-radius: 999px;
+          color: var(--vscode-badge-foreground, var(--vscode-descriptionForeground));
+          background-color: var(--vscode-badge-background, transparent);
+          border: 1px solid var(--hairline);
+          flex: none;
+          &:empty { display: none; }
+        }
+
+        // Hairline that runs from the heading to the group's tools, tying the row together.
+        .rule
+        {
+          flex: 1 1 auto;
+          height: 1px;
+          min-width: var(--gapspace-s);
+          background: linear-gradient(to right, var(--group-accent), transparent);
+          transition: background-size .18s ease-out;
+          background-size: 35% 100%;
+          background-repeat: no-repeat;
+        }
+
 
         .tools
         {
-          visibility: hidden; //unless tool is explore
           display: flex;
           gap:var(--ctrlspace);
-          button {aspect-ratio: 1;}
+          button {aspect-ratio: 1; padding: 3px;}
+
+          // The layout icon is the control itself, so it earns a quiet active treatment.
+          [data-role="layout"]
+          {
+            color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+            background-color: var(--vscode-button-secondaryBackground, var(--vscode-toolbar-hoverBackground));
+            &:hover { background-color: var(--vscode-button-secondaryHoverBackground, var(--vscode-toolbar-hoverBackground)); }
+          }
+        }
+        &:hover
+        {
+          .group-label { color: var(--group-accent); letter-spacing: .1em; }
+          .rule { background-size: 100% 100%; }
+          &::before { height: 30px; opacity: 1; }
         }
         &:not(:hover) .hover-only button {visibility: hidden;}
       }
-      &.dragged-item //for the dragged item itself, indicate visually, hide the hotspots/lock mouse interaction
-      {
-        opacity:0.5;
-        pointer-events: none;
-      }
 
-      .dragup, .dragdown //mouse over drop zone -> draw insertion mark (via side-border)
+      .group-composer
       {
-        width: 100%; 
-        height: calc( 50% + var(--gapspace-s) );
-        position: absolute;
-        z-index: 1;
-        &:hover {border-color: var(--vscode-notebook-cellInsertionIndicator);}
-      }
-      .dragup
-      {              
-        border-top: calc(  0.25 * var(--gapspace) ) solid transparent;
-        margin-top: calc( -0.625 * var(--gapspace) );
-        // background-color: rgba(255, 166, 0, 0.438);
-      }
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--gapspace-s);
+        margin: calc(var(--gapspace-s) * -0.5) 0 var(--gapspace);
+        padding: var(--gapspace-s) 10px;
+        border-radius: var(--radius);
+        color: var(--vscode-foreground);
+        background-color: color-mix(in srgb, var(--group-accent) 13%, var(--vscode-editorWidget-background));
+        outline: 1px solid color-mix(in srgb, var(--group-accent) 45%, var(--hairline));
 
-      .dragdown
-      {
-        bottom:0;
-        border-bottom: calc(  0.25 * var(--gapspace) ) solid transparent;
-        margin-bottom: calc( -0.625 * var(--gapspace) );
-        // background-color: rgba(0, 255, 255, 0.479);
-      }
-
-      @at-root body.is-dragging, body.is-dragging-group 
-      {
-        .group.sealed //disable sealed group while dragging (it cannot be a droptarget)
+        .composer-label
         {
-          opacity: 0.5;
-          pointer-events: none;
-          .group-label, .project {border:none !important;}
+          color: var(--vscode-descriptionForeground);
+          margin-right: 2px;
+          b { color: var(--group-accent); font-weight: 600; }
         }
+
+        .btn-secondary { padding: 5px 9px; }
+        .btn-ghost { padding: 5px 7px; }
       }
+
+
 
     }
 
     .projects
     {
+      // Card layout. auto-fill/minmax so cards reflow with the window instead of sitting
+      // at a fixed 150x120 regardless of how much room there is.
       &.grid
       {
-        display: flex;
-        flex-direction: row;
-        flex-wrap: wrap;
-        justify-content: flex-start;
-        align-content: flex-start;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
         gap: var(--gapspace);
 
+        // Icon and label share the top line, path underneath. The icon used to sit alone
+        // above a bottom-anchored label, which left a dead band across the middle of every
+        // card whose name was short.
         .project //card
-        {        
-          width: 150px;
-          height: 120px;
-          display: flex;
-          flex-direction: column;
+        {
+          display: grid;
+          grid-template-columns: auto 1fr;
+          grid-template-rows: auto auto;
+          align-content: start;
+          column-gap: 10px;
+          row-gap: 2px;
+          padding: 12px 14px;
           position: relative;
-          //overflow: hidden; // no! this would hide the drag-drop indicator for move-mode!
 
           .pictoral
           {
-            position: absolute;
-            width: 100%; height: 100%;
-            
-            display: flex;
-            justify-content: center;
-            align-items: center;
-
-            .icon
-            {
-              scale: 4;
-              opacity: .2;
-            }
+            grid-row: 1 / span 2;
+            .icon { display: flex; }
+            .lucide { width: 22px; height: 22px; }
           }
 
           .textblock
           {
-            position: absolute;
-            bottom:0;
-            padding: var(--gapspace-s);
+            min-width: 0;
+            display: contents;
 
-            flex-grow: 1;
-            display: flex;
-            align-items: flex-end;    
-            max-width: stretch;
-  
             [data-field="project.label"]
             {
-              // max-height: 50%;
-  
+              font-weight: 500;
+              line-height: 1.35;
+              padding-right: 22px; // clear the "..." button
               display: -webkit-box;
-              -webkit-line-clamp: 6;
+              -webkit-line-clamp: 2;
               -webkit-box-orient: vertical;
               overflow: hidden;
+              overflow-wrap: anywhere;
             }
           }
-
         }
       }
-      
+
+      // Default layout: one bookmark per full-width row, meant to be read top to bottom
+      // and scrolled. The label sits above the path so long paths never squeeze the name.
       &.list
       {
         display: flex;
-        flex-direction: row;
-        flex-wrap: wrap;
-        justify-content: flex-start;
-        align-items: flex-start;
-        gap:var(--gapspace-s);
+        flex-direction: column;
+        gap: var(--gapspace-s);
 
         .project
         {
           display: flex;
           flex-direction: row;
+          align-items: center;
           flex-wrap: nowrap;
-          max-width: 200px;
-          width: 300px;
-          // height:var(--gapspace);
-          padding:var(--ctrlspace);
-          gap: var(--ctrlspace);
-          //overflow: hidden; // no! this would hide the drag-drop indicator for move-mode!
+          gap: 10px;
+          padding: 10px 14px;
           position: relative;
 
-          .pictoral
-          {
-            .icon
-            {
-              margin-top: 1px; margin-bottom: -1px; //visual fix, ... idk
-            }
-          }
+          .pictoral .icon { display: flex; }
 
           .textblock
           {
-            flex-grow: 1;
+            flex: 1 1 auto;
+            min-width: 0;
             display: flex;
-            align-items: baseline;
-            padding-top: 1px; //visual fix, ... idk
-  
+            flex-direction: column;
+            gap: 1px;
+
             [data-field="project.label"]
             {
-              display: -webkit-box;
-              -webkit-line-clamp: 1;
-              -webkit-box-orient: vertical;
+              font-weight: 500;
+              white-space: nowrap;
               overflow: hidden;
-              max-height: 100%;
+              text-overflow: ellipsis;
             }
+          }
+        }
+      }
+
+      // Compact layout: dense multi-column rows, for groups with a lot of bookmarks.
+      &.compact
+      {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: var(--gapspace-s) var(--gapspace);
+
+        .project
+        {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          flex-wrap: nowrap;
+          gap: var(--gapspace-s);
+          padding: 6px 10px;
+          position: relative;
+
+          .pictoral .icon { display: flex; }
+
+          .textblock
+          {
+            flex: 1 1 auto;
+            min-width: 0;
+            display: flex;
+            flex-direction: row;
+            align-items: baseline;
+            gap: var(--gapspace-s);
+
+            // The label keeps its width and the path absorbs the slack, so a long path
+            // truncates before the bookmark name does.
+            [data-field="project.label"]
+            {
+              flex: 0 1 auto;
+              min-width: 0;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+            .project-path { flex: 1 1 0; min-width: 0; }
           }
         }
       }
 
       // all layouts:
-      .project 
-      {        
-        outline: 1px solid var(--vscode-editorWidget-border);
-        box-shadow: 0 2px 5px 0 #9393932e;
-        border-radius: var(--corner);
-        background:var(--shade-color);
-        color: var(--shade-foreground);
-        button {color:var(--shade-foreground);}
-        border:none; 
+      &.layout-changing .project
+      {
+        animation: bookmark-rearrange .2s ease-out both;
+      }
+
+      .project
+      {
+        outline: 1px solid var(--hairline);
+        box-shadow: var(--elevation);
+        border-radius: var(--radius);
+        border:none;
+        overflow: hidden; // clip the spine to the rounded corners
+
+        // The paint colour lives in the spine (below), not the card body. Flooding the whole
+        // card with a saturated colour fought every editor theme and made the pale shades
+        // unreadable; as a tint it reads as an accent and the text keeps theme contrast.
+        background: var(--vscode-editorWidget-background);
+        color: var(--vscode-foreground);
+
+        transition: outline-color .15s ease-in-out, background-color .15s ease-in-out, transform .12s ease-out;
 
         &:hover
         {
           outline-color: var(--accent-color);
+          background: var(--vscode-list-hoverBackground, var(--vscode-editorWidget-background));
         }
 
-        .textblock
+        // Signature element: a colour spine down the leading edge of every bookmark.
+        // Painted bookmarks show their shade at full strength; unpainted ones keep a quiet
+        // marker so a group still reads as a shelf rather than a stack of grey boxes.
+        .spine
         {
-          overflow:hidden;
-        }
-
-        &.dragged-item //for the dragged item itself, indicate visually, hide the hotspots/lock mouse interaction
-        {
-          opacity:0.5;
-          pointer-events: none;            
-        }
-
-        .dragbefore, .dragafter //mouse over drop zone -> draw insertion mark (via side-border)
-        {
-          width: calc( 50% + var(--gapspace-s) );
-          height: 100%;
           position: absolute;
-          top:0;
-          z-index: 1; //required for correct event overlapping
-          //@at-root body.is-dragging
-          //{
-            &:hover {border-color: var(--vscode-notebook-cellInsertionIndicator);}
-          //}
+          left: 0; top: 0; bottom: 0;
+          width: 3px;
+          background-color: var(--shade-color, var(--vscode-descriptionForeground));
+          opacity: var(--shade-presence, .35);
+          // The one piece of motion on the page, and it belongs to the signature element:
+          // the spine thickens as you point at a bookmark.
+          transition: width .12s ease-out, opacity .12s ease-out;
+        }
+        &:hover .spine { width: 5px; opacity: 1; }
+        // Painted bookmarks get a full-strength, slightly wider spine. Deliberately no
+        // background wash: mixing a warm shade (yellow, orange) into a dark editor
+        // background turns muddy brown. The spine and the icon carry the colour instead.
+        &[data-shade]:not([data-shade=""])
+        {
+          --shade-presence: 1;
+          .spine { width: 4px; }
         }
 
-        .dragbefore
+        .textblock { overflow:hidden; }
+
+        // Type colours make the page legible before any personal accents are chosen.
+        // A user-selected accent below always takes precedence.
+        &[data-kind="folder"] { --type-color: var(--vscode-charts-blue, var(--accent-color)); }
+        &[data-kind="workspace"] { --type-color: var(--vscode-charts-purple, var(--accent-color)); }
+        &[data-kind="file"] { --type-color: var(--vscode-charts-green, var(--accent-color)); }
+        .pictoral
         {
-          left:calc( var(--gapspace-s) * 0.25);
-          border-left: calc(  0.25 * var(--gapspace) ) solid transparent;
-          margin-left: calc( -0.625 * var(--gapspace) );
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex: none;
+          color: var(--type-color, var(--vscode-descriptionForeground));
+          background-color: color-mix(in srgb, var(--type-color, var(--vscode-descriptionForeground)) 16%, transparent);
+          border-radius: var(--radius-s);
+          .lucide { width: 20px; height: 20px; stroke-width: 1.8px; }
         }
-        .dragafter
+
+        // Paths are set in the editor's own monospace face - it is the vernacular of the
+        // thing being bookmarked, and it makes directory segments line up between rows.
+        .project-path
         {
-          right:calc( var(--gapspace-s) * 0.25);
-          border-right: calc(  0.25 * var(--gapspace) ) solid transparent;
-          margin-right: calc( -0.625 * var(--gapspace) );
+          font-family: var(--mono);
+          font-size: .8em;
+          color: var(--vscode-descriptionForeground);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          &:empty { display: none; }
         }
+
+        // The type icon picks up the paint colour, tying the row to its spine.
+        &[data-shade]:not([data-shade=""])
+        {
+          .pictoral { color: var(--shade-color); background-color: color-mix(in srgb, var(--shade-color) 16%, transparent); }
+        }
+
+
+
 
         &.hidden-by-filter
         {
-          opacity: .3;
-          filter: saturate(0.5);
+          display: none;
         }
       }
     }
+
+    // A group whose bookmarks are all filtered out collapses instead of leaving a stray heading.
+    .group.filtered-out { display: none; }
   }
 
-
+  //--- tooltips --------------------------------------------------------------
   button
   {
     position: relative; //required for tooltip
@@ -578,47 +910,58 @@
     {
       visibility: hidden;
       max-width: 250px;
-      width: max-content; 
-      background-color: var(--vscode-activityBar-background);
-      border:1px solid var(--vscode-activityBar-border);
-      color: var(--vscode-activityBar-foreground);
-      box-shadow: 0px 4px 8px rgba(0,0,0,0.3);        
-      border-radius: var(--corner);
-      padding: var(--gapspace-s);                
+      width: max-content;
+      background-color: var(--vscode-editorHoverWidget-background, var(--vscode-activityBar-background));
+      border:1px solid var(--vscode-editorHoverWidget-border, var(--hairline));
+      color: var(--vscode-editorHoverWidget-foreground, var(--vscode-activityBar-foreground));
+      box-shadow: 0px 4px 8px rgba(0,0,0,0.3);
+      border-radius: var(--radius);
+      padding: var(--gapspace-s);
 
       text-align: left;
-      font-family: Segoe WPC, Segoe UI, sans-serif;
+      font-family: var(--vscode-font-family);
       font-size: smaller;
 
       h1
       {
         padding:0; margin:0;
         font-size: small;
+        font-weight: 600;
         light {font-weight: lighter;}
       }
-      p:last-child
-      {
-        margin-bottom: 0; //otherwise the p's margin will add to tooltip's padding and make the gap too big
-      }
-    
-      /* Position the tooltip, default: left-align */
+      p { margin: 4px 0 0; }
+      p:last-child { margin-bottom: 0; }
+
+      /* Position the tooltip, default: to the right of the button. */
       position: absolute;
-      // z-index: 1;
+      // Must sit above the rail (z-index 99) or the rail's own buttons paint over it.
+      z-index: 100;
       left: calc( var(--buttonsize) + var(--ctrlspace));
-      top: calc( var(--buttonsize) + var(--ctrlspace));
- 
-      &.centered  // explicitly centered
+      top: 0;
+
+      &.centered  // explicitly centered below the button
       {
         left: 50%;
+        top: calc( var(--buttonsize) + var(--ctrlspace));
         transform: translateX(-50%);
       }
     }
-    &:hover .tooltiptext 
+    &:hover .tooltiptext
     {
       visibility: visible;
     }
-  }//button
-  
+  }
+
+  //--- reduced motion --------------------------------------------------------
+  @keyframes bookmark-rearrange
+  {
+    from { opacity: .65; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce)
+  {
+    *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  }
 
 } //.landingpage
-

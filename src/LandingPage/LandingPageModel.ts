@@ -30,15 +30,21 @@ export interface LandingPageGroup extends LandingPageItem
 {  
   /** Display text. */
   label:string;
+  /** Optional accent colour for the group heading and divider. */
+  shade?:LandingPageProject['shade'];
+  /** Optional user-chosen icon for the group heading. */
+  glyph?:string;
   /** Collection of bookmarks in this group. */
   projects:LandingPageProject[];
 
-  /** 
+  /**
    * How the group is layouted graphically.
-   * Default is grid (card tiles).
-   * List uses less space and is similar to filesystem list.
+   *
+   * - `list` (default): one bookmark per row, full width. Best for reading and scrolling.
+   * - `grid`: card tiles.
+   * - `compact`: dense multi-column rows, for groups with many bookmarks.
    */
-  layout?:'grid'|'list';
+  layout?:'grid'|'list'|'compact';
 }
 
 /**
@@ -53,6 +59,12 @@ export interface LandingPageProject extends LandingPageItem
   path?:string;
   /** Hint to icon to display, usually initialized when setting path. */
   icon?:'file'|'folder'|'workspace'; // omitted/default = 'file'
+  /**
+   * User-chosen icon, set with the Icon tool. Holds the key suffix of a `glyph-*` entry in
+   * `iconography.ts` (e.g. `rocket` for `glyph-rocket`). When omitted, the icon is derived
+   * from {@link icon} instead, i.e. the file/folder/workspace type.
+   */
+  glyph?:string;
   /** Color theming for this bookmark. */
   shade?:'red'|'orange'|'yellow'|'green'|'teal'|'pink'|'purple'|'blue'|'cyan'|'gray'|'silver'|'brown'|'white'|'black';
 }

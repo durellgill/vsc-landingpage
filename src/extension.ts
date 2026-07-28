@@ -2,9 +2,8 @@
 import { join } from 'path';
 import * as vscode from 'vscode';
 import { window } from 'vscode';
-import { handleMessageFromWebview, registerContext, resetModel, syncModelInWebview } from './LandingPage/communication';
+import { bookmarkUris, cloneRepository, handleMessageFromWebview, registerContext, resetModel, syncModelInWebview } from './LandingPage/communication';
 import { LandingPageModel } from './LandingPage/LandingPageModel';
-import { importVscRecentList } from './LandingPage/history';
 import { LandingPageTemplate2 } from './LandingPage/LandingPageTemplate2';
 
 // This method is called when your extension is activated
@@ -14,7 +13,10 @@ export function activate(context: vscode.ExtensionContext)
 	registerContext(context);
 
 	let landingpageWebviewPanel:vscode.WebviewPanel|null = null;
-	let model:LandingPageModel = {groups:[]};
+	// Loaded here rather than when the panel opens, because the Explorer context menu can add
+	// bookmarks in a window where the landing page was never shown. Starting from an empty
+	// model there would save over the user's stored groups.
+	let model:LandingPageModel = context.globalState.get<LandingPageModel>('landingPageModel') || {groups:[]};
 
 	// The command has been defined in the package.json file
 	// Now provide the implementation of the command with registerCommand
@@ -47,6 +49,21 @@ export function activate(context: vscode.ExtensionContext)
 	});
 	context.subscriptions.push(cmdReload);
 
+	// Same code path as the Clone button in the webview, see communication.ts.
+	const cmdClone = vscode.commands.registerCommand('vsc-landingpage.cloneRepository', async () => {
+		await cloneRepository();
+	});
+	context.subscriptions.push(cmdClone);
+
+	// Explorer context menu: "Add to Landingpage Group". VS Code passes the clicked resource as
+	// the first argument and the full multi-selection as the second, which is undefined when the
+	// command is run from the palette with an active editor.
+	const cmdAddBookmark = vscode.commands.registerCommand('vsc-landingpage.addToGroup', async (uri?:vscode.Uri, uris?:vscode.Uri[]) => {
+		const selection = (uris && uris.length>0) ? uris : (uri ? [uri] : (vscode.window.activeTextEditor ? [vscode.window.activeTextEditor.document.uri] : []));
+		await bookmarkUris(selection, model, landingpageWebviewPanel);
+	});
+	context.subscriptions.push(cmdAddBookmark);
+
 	//console.log(`Creating vsc-landingpage.showWelcomePage`);
 
 	const cmdShowWelcomePage = vscode.commands.registerCommand('vsc-landingpage.showWelcomePage', async() => 
@@ -70,7 +87,10 @@ export function activate(context: vscode.ExtensionContext)
 					vscode.ViewColumn.One,
 					{
 							enableScripts: true,
-							// retainContextWhenHidden: true,							
+							// The webview only ever loads the cursor PNGs and the panel icon,
+							// so restrict local content to the assets folder.
+							localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'assets')],
+							// retainContextWhenHidden: true,
 					}
 			);
 
@@ -87,12 +107,12 @@ export function activate(context: vscode.ExtensionContext)
 			model = context.globalState.get<LandingPageModel>('landingPageModel')|| {groups:[]};
 
 			landingpageWebviewPanel.webview.onDidReceiveMessage(async message => await handleMessageFromWebview(message, landingpageWebviewPanel!, model), undefined, context.subscriptions);
-			landingpageWebviewPanel.webview.html = new LandingPageTemplate2().makeHTML(assetPath); // getWebviewContent(await gerRecentProjects(), context, webviewPanel);
+			landingpageWebviewPanel.webview.html = new LandingPageTemplate2().makeHTML(assetPath, landingpageWebviewPanel.webview.cspSource); // getWebviewContent(await gerRecentProjects(), context, webviewPanel);
 
 			landingpageWebviewPanel.onDidDispose(()=>{landingpageWebviewPanel=null;});
 
-			importVscRecentList(); //refresh VS Code's mru items
-			
+			// (No MRU read here: the webview's `documentReady` message triggers
+			// populateVscMru() immediately afterwards, so doing it here only duplicated the work.)
 		}
 		catch (err: any) 
 		{

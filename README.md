@@ -1,5 +1,95 @@
 # Landingpage
 
+> **My fork.** Upstream is [renebuehling/vsc-landingpage](https://github.com/renebuehling/vsc-landingpage).
+> See [PROGRESS.md](PROGRESS.md) for what I changed and [AGENTS.md](AGENTS.md) for how the
+> code is put together.
+
+## Running it locally
+
+**First time only:**
+
+```bash
+npm install
+```
+
+**To work on it — press F5.** That builds, then opens a second VS Code window titled
+*[Extension Development Host]* with the extension loaded. It opens with no folder, so the
+landing page appears on its own. If it doesn't, run **Show Landing Page** from the command
+palette (`Cmd+Shift+P`) in that window.
+
+The default *Run Extension* launch config gives that window its own extensions directory and
+its own profile:
+
+- **Own extensions dir** — none of your ~33 installed extensions load. That is the difference
+  between a slow F5 and a fast one. Built-in extensions still load, so Clone still works.
+- **Own profile** — the dev host always starts as an empty window. Without this it inherits
+  your window restore state, reopens the last folder you had, and then the landing page does
+  *not* auto-open, because it only auto-opens when no folder is present.
+
+The profile also means the dev host keeps its own bookmarks, separate from your real VS Code —
+so debugging can't corrupt your actual data.
+
+If you ever need your real setup (a theme, another extension interfering), pick
+**Run Extension (with my installed extensions)** from the debug dropdown instead. That one
+reopens your last folder, so use **Show Landing Page** from the palette to see the page.
+
+**After you edit something:** press `Cmd+R` in the Extension Development Host to reload.
+The watch tasks rebuild in the background, so you never run a build by hand:
+
+| Changed | Rebuilt by |
+|---|---|
+| `.ts` | `npm: watch` (webpack) |
+| `.scss` | `npm: watch:css` (sass) |
+| `.html`, `landingpage2.js` | `npm: watch` |
+
+**To see errors** — the page is a sandboxed webview with its own console, separate from the
+extension:
+
+- Webview (`landingpage2.js`): in the dev host, `Cmd+Shift+P` → *Developer: Open Webview
+  Developer Tools*.
+- Extension (`extension.ts`, `communication.ts`): the **Debug Console** in your first
+  window. Breakpoints in `.ts` files work there.
+- Slow startup? `Cmd+Shift+P` → *Developer: Show Running Extensions* lists activation time
+  per extension.
+
+## Installing my build for daily use
+
+```bash
+npx @vscode/vsce package
+code --install-extension vsc-landingpage-0.1.0.vsix
+```
+
+Bump `version` in `package.json` first, or VS Code may not register the update.
+
+This build's extension ID is `local.vsc-landingpage`, so it installs alongside the
+marketplace copy (`renebuehling.vsc-landingpage`) without an ID clash. They do still both
+register the same command IDs, so uninstall the marketplace one to avoid duplicate entries
+in the palette:
+
+```bash
+code --uninstall-extension renebuehling.vsc-landingpage
+```
+
+**Before ever publishing:** `publisher` in `package.json` is the placeholder `local`. It must
+be changed to a real VS Code Marketplace publisher account or `vsce publish` will fail.
+
+Note that the extension ID is also the key for stored bookmarks, so this build starts with
+an empty landing page rather than inheriting whatever the marketplace copy had saved.
+
+Build commands: `npm run compile` (build once), `npm run lint`.
+
+> **Heads up on `npm test`.** It runs `vscode-test`, which **downloads its own standalone
+> copy of VS Code** (~315 MB download, ~1 GB on disk in `.vscode-test/`) and runs the tests
+> inside it. Extension tests need a real extension host, and it uses a pinned copy rather
+> than your installed VS Code so runs are reproducible and don't touch your profile.
+>
+> `.vscode-test/` is gitignored and excluded from the .vsix, so it is only local disk.
+> Delete it any time with `rm -rf .vscode-test`; the next `npm test` re-downloads it.
+>
+> **F5 downloads nothing** - it uses your installed VS Code.
+
+---
+
 Use this extension to create and organise bookmarks to folders, files and workspaces in a personal startup page. VS Code's default *recently used* list is a strict temporal list without reflecting your personal working status. But you might want to keep shortcuts to your currently active projects still in sight even when you work on other things for a while.
 
 Landingpage extension shows both, VS code's recently used files and folders as well as custom bookmarks which can be organised in groups, renamed, ordered and colorized. 

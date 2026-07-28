@@ -9,6 +9,13 @@ out/
 dist/
 lib/
 
+# Generated CSS (built from landingpage2.scss by `npm run build:css`)
+src/LandingPage/content/dist/
+
+# Isolated extensions directory and profile used by the "Run Extension" launch config
+.vscode-dev-extensions/
+.vscode-dev-user-data/
+
 # Logs
 logs/
 *.log

@@ -1,7 +1,8 @@
 import typescriptEslint from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
+import { globalIgnores } from "eslint/config";
 
-export default [{
+export default [globalIgnores(["src/LandingPage/content/dist/**/*"], "Generated Webview Assets"), {
     files: ["**/*.ts"],
 }, {
     plugins: {
