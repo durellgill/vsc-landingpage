@@ -91,7 +91,7 @@ const themes = {
     'list-hoverBackground': '#2a2d2e',
     'menu-background': '#1f1f1f', 'menu-border': '#454545', 'menu-foreground': '#cccccc',
     'menu-selectionBackground': '#0078d4', 'menu-selectionForeground': '#ffffff', 'menu-separatorBackground': '#454545',
-    'panel-border': '#2b2b2b', 'toolbar-hoverBackground': '#383a49'
+    'panel-border': '#2b2b2b', 'toolbar-hoverBackground': '#383a49', 'terminal-ansiGreen': '#23d18b'
   },
   light: {
     'editor-background': '#ffffff', foreground: '#3b3b3b', 'descriptionForeground': '#3b3b3b99',
@@ -108,7 +108,7 @@ const themes = {
     'list-hoverBackground': '#f2f2f2',
     'menu-background': '#ffffff', 'menu-border': '#cecece', 'menu-foreground': '#3b3b3b',
     'menu-selectionBackground': '#005fb8', 'menu-selectionForeground': '#ffffff', 'menu-separatorBackground': '#d4d4d4',
-    'panel-border': '#e5e5e5', 'toolbar-hoverBackground': '#b8b8b850'
+    'panel-border': '#e5e5e5', 'toolbar-hoverBackground': '#b8b8b850', 'terminal-ansiGreen': '#0dbc79'
   }
 };
 
@@ -128,6 +128,11 @@ const stub = `<script>
       // lives in the model - layout, shade, collapsed - actually round-trips in the harness
       // instead of appearing to do nothing.
       if (message.command === 'patch') { patch(message); sync(); }
+      // Stands in for copyPath(): the host writes the clipboard and confirms, which is what
+      // drives the tick. The webview never assumes success.
+      if (message.command === 'copyPath') {
+        setTimeout(() => window.dispatchEvent(new MessageEvent('message', {data: {command: 'pathCopied', guid: message.guid}})), 0);
+      }
       if (message.command === 'documentReady' || message.command === 'refreshRecents') { health(); }
     },
     getState() { return undefined; },

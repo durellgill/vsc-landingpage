@@ -8,7 +8,7 @@ import { parseURI } from './utils';
  */
 interface MessageFromWebview
 {
-	command:'documentReady'|'rename'|'createBookmark'|'createGroup'|'remove'|'hideRecent'|'restoreHiddenRecents'|'refreshRecents'|'moveGroup'|'open'|'move'|'patch'|'openSettings'|'setViewState'|'cloneRepository'|'openFolder'|'moveToGroup'|'createDirectory';
+	command:'documentReady'|'rename'|'createBookmark'|'createGroup'|'remove'|'hideRecent'|'restoreHiddenRecents'|'refreshRecents'|'moveGroup'|'open'|'move'|'patch'|'openSettings'|'setViewState'|'cloneRepository'|'openFolder'|'moveToGroup'|'createDirectory'|'copyPath';
 
   /** For command 'cloneRepository': the repository URL typed into the clone field. */
   url?:string;
@@ -574,6 +574,74 @@ async function createDirectory(groupGuid:string|undefined, sharedModel:LandingPa
 }
 
 /**
+ * Puts a bookmark's target path on the clipboard.
+ *
+ * Uses `vscode.env.clipboard` rather than the webview's `navigator.clipboard`, which needs a
+ * permission and a user gesture the webview cannot always supply.
+ *
+ * Local targets are copied as a platform path via `fsPath` - backslashes on Windows, no
+ * `file://` and no percent-escapes - because that is what you paste into a terminal. Anything
+ * else is copied as its URI, which is the only meaningful form it has.
+ *
+ * @param guid Bookmark to copy.
+ * @param sharedModel Model to resolve the GUID against.
+ */
+async function copyPath(guid:string|undefined, sharedModel:LandingPageModel, webviewPanel:vscode.WebviewPanel):Promise<void>
+{
+  const found = findFirst(guid, sharedModel);
+  const path = (found?.target as LandingPageProject|undefined)?.path;
+  if (!path) {return;}
+
+  let text = path;
+  try
+  {
+    const uri = vscode.Uri.parse(path);
+    if (uri.scheme==='file') {text = uri.fsPath;}
+  }
+  catch {/* not a URI: copy it exactly as stored */}
+
+  text = shellQuote(text);
+
+  try
+  {
+    await vscode.env.clipboard.writeText(text);
+  }
+  catch (err:any)
+  {
+    vscode.window.showErrorMessage(`Could not copy the path: ${err?.message ?? err}`);
+    return; //no confirmation message, so the page does not show a false tick
+  }
+
+  webviewPanel.webview.postMessage({command:'pathCopied', guid});
+  vscode.window.setStatusBarMessage(`Copied ${text}`, 3000);
+}
+
+/**
+ * Quotes a path so it survives being pasted into a shell, and only when it needs it.
+ *
+ * A path with a space in it is the common case that breaks - `cd /Users/me/My Project` runs
+ * `cd` with two arguments. Quoting unconditionally would be worse though: most paths need
+ * nothing, and a quoted one pasted into a file dialog or an editor is wrong. So this only
+ * acts when the text actually contains something a shell would treat specially.
+ *
+ * POSIX gets single quotes, which suppress every expansion; an embedded single quote is
+ * closed, escaped and reopened (`'\''`), the only way to include one. Windows gets double
+ * quotes, which is what `cmd` and PowerShell understand, and a Windows path cannot contain a
+ * double quote so there is nothing further to escape.
+ *
+ * @param text Path to quote.
+ * @returns The path, quoted only if a shell would otherwise mangle it.
+ */
+function shellQuote(text:string):string
+{
+  // Whitespace, glob characters, redirections, expansions, quotes and comment markers.
+  if (!/[\s'"\\$`&|;<>()*?\[\]{}!#~]/.test(text)) {return text;}
+
+  if (process.platform==='win32') {return `"${text}"`;}
+  return `'${text.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
  * Removes content from given model instance, saves changes and show a reload request message.
  * @param sharedModel Model to reset.
  */
@@ -967,6 +1035,9 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
         sharedModel.viewState[message.field]=message.value; // just store generic key-value pair 
         saveModel(sharedModel);
       }
+      break;
+    case 'copyPath': // {guid: bookmark whose target path should go to the clipboard}
+      await copyPath(message.guid, sharedModel, webviewPanel);
       break;
     case 'openSettings':
       vscode.commands.executeCommand('workbench.action.openSettings', 'vsc-landingpage');

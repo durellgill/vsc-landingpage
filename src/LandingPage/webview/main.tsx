@@ -95,6 +95,19 @@ function pinnedFirst(projects:LandingPageProject[]):LandingPageProject[] {
     .map(entry => entry.project);
 }
 
+/**
+ * Whether anything on the card is actually cut off.
+ *
+ * The hover card exists to reveal what the row could not fit - the label, the path, or the
+ * branch. When all three fit, it would pop up to repeat text already on screen, so it stays
+ * shut. `scrollHeight` covers the grid layout, where the label is clamped to two lines
+ * vertically rather than ellipsised horizontally.
+ */
+function isClipped(card:HTMLElement):boolean {
+  const parts = Array.from(card.querySelectorAll<HTMLElement>('.project-label, .path-text, .branch-name'));
+  return parts.some(part => part.scrollWidth > part.clientWidth+1 || part.scrollHeight > part.clientHeight+1);
+}
+
 /** Every bookmark card currently on the page, in document order. */
 // Array.from rather than spread: tsconfig's `lib` is ES2022 with no DOM.Iterable, so a
 // NodeList is not iterable as far as the compiler is concerned.
@@ -172,7 +185,14 @@ function App() {
   // the pointer at a time, and a popover per card would be hundreds of top-layer elements.
   const [hover,setHover] = useState<{guid:string;left:number;top:number;bottom:number}|null>(null);
   const hovercard = useRef<HTMLDivElement>(null);
+  const menuOpen = useRef(false);
   const hoverTimer = useRef<number>(0);
+  // Grace period between leaving a bookmark and the card closing, so the pointer can travel
+  // into the card to reach its copy button.
+  const hideTimer = useRef<number>(0);
+  // GUID whose path was just copied, driving the tick. Set by the host's reply rather than
+  // optimistically on click, so a clipboard failure cannot show a false confirmation.
+  const [copied,setCopied] = useState<string|null>(null);
 
   useEffect(() => {
     const receive = (event:MessageEvent) => {
@@ -180,11 +200,19 @@ function App() {
       // Sent by the Ctrl/Cmd+F keybinding, which VS Code handles outside the webview.
       if (event.data?.command==='setFocusToFilterInput') {filterInput.current?.focus(); filterInput.current?.select();}
       if (event.data?.command==='bookmarkHealth') {setHealth({missing:event.data.missing ?? [], branches:event.data.branches ?? {}});}
+      if (event.data?.command==='pathCopied') {setCopied(event.data.guid);}
     };
     window.addEventListener('message',receive);
     post('documentReady');
     return () => window.removeEventListener('message',receive);
   },[]);
+
+  // The tick is a transient acknowledgement, not a state, so it clears itself.
+  useEffect(() => {
+    if (!copied) {return;}
+    const timer = window.setTimeout(() => setCopied(null), 1600);
+    return () => window.clearTimeout(timer);
+  },[copied]);
 
   // Shows and places the hover card. The Popover API puts it in the top layer, so it escapes
   // every `overflow` and stacking context on the page without z-index games - which is the
@@ -229,7 +257,15 @@ function App() {
       if (event.key==='/' && !typing) {filterInput.current?.focus(); filterInput.current?.select(); event.preventDefault(); return;}
 
       if (active===filterInput.current && event.key==='ArrowDown') {cards()[0]?.focus(); event.preventDefault(); return;}
-      if (typing || !card) {return;}
+      if (typing) {return;}
+      // Copy works from a hovered card as well as a focused one, so it is checked before the
+      // guard below that requires focus to be on a card.
+      if ((event.key==='c' || event.key==='C') && (event.ctrlKey || event.metaKey)) {
+        const guid = card?.dataset.guid ?? hover?.guid;
+        if (guid && (window.getSelection()?.isCollapsed ?? true)) {post('copyPath',{guid}); event.preventDefault();}
+        return;
+      }
+      if (!card) {return;}
 
       if (event.key==='Enter' || event.key===' ') {
         // `data-kind` carries the bookmark type, so the same rule as Ctrl/Cmd+click applies
@@ -282,9 +318,14 @@ function App() {
 
   function openMenu(event:MouseEvent,guid:string) {
     event.preventDefault(); event.stopPropagation();
+    // The hover card and the context menu describe the same bookmark and would sit on top of
+    // one another. Opening the menu is a deliberate act, so it wins: the card goes, and its
+    // pending timers go with it or it would reappear over the menu a moment later.
+    window.clearTimeout(hoverTimer.current); window.clearTimeout(hideTimer.current); setHover(null);
     setMenu({guid,x:event.clientX,y:event.clientY}); setPicker(null); setConfirm(null); setRename(null);
   }
   function closeMenu() {setMenu(null); setPicker(null); setConfirm(null); setRename(null);}
+  menuOpen.current = menu!==null;
   function renameTarget() {
     if (target && rename?.trim()) {post('rename',{guid:target.item.guid,value:rename.trim()}); closeMenu();}
   }
@@ -304,6 +345,9 @@ function App() {
     // Moving between children of the same card is not a new hover.
     if (!card || (from && card.contains(from))) {return;}
     window.clearTimeout(hoverTimer.current);
+    window.clearTimeout(hideTimer.current);
+    if (menuOpen.current) {return;} //a context menu owns the interaction until it closes
+    if (!isClipped(card)) {setHover(null); return;} //nothing hidden, nothing to reveal
     const show = () => {
       const rect = card.getBoundingClientRect();
       setHover({guid:card.dataset.guid ?? '', left:rect.left, top:rect.top, bottom:rect.bottom});
@@ -317,8 +361,13 @@ function App() {
     const to = (event as MouseEvent).relatedTarget as Element|null;
     if (!card || (to && card.contains(to))) {return;}
     window.clearTimeout(hoverTimer.current);
-    setHover(null);
+    // Not closed immediately: the card carries a copy button, and the pointer has to cross a
+    // gap to reach it. Entering the card cancels this.
+    window.clearTimeout(hideTimer.current);
+    hideTimer.current = window.setTimeout(() => setHover(null), 220);
   }
+  function holdHover() {window.clearTimeout(hideTimer.current);}
+  function releaseHover() {window.clearTimeout(hideTimer.current); setHover(null);}
 
   // Drag reorder. `index` is the position among user-created groups; the sealed Recent group
   // reports -1 and is neither draggable nor a drop target.
@@ -371,7 +420,8 @@ function App() {
     })}</div>
     {model.groups.length===0 && <EmptyState/>}
     {needles.length>0 && visibleGroups.length===0 && <div class="placeholder"><h2>No bookmarks match your filter</h2><button class="btn-secondary" onClick={()=>setFilter('')}>Clear filter</button></div>}
-    <HoverCard reference={hovercard} project={hovered} branch={hovered ? health.branches[hovered.guid] : undefined} missing={!!hovered && health.missing.includes(hovered.guid)}/>
+    <HoverCard reference={hovercard} project={hovered} branch={hovered ? health.branches[hovered.guid] : undefined} missing={!!hovered && health.missing.includes(hovered.guid)}
+      copied={!!hovered && copied===hovered.guid} onCopy={()=>{if (hovered) {post('copyPath',{guid:hovered.guid});}}} onHold={holdHover} onRelease={releaseHover}/>
     {menu && target && <ActionMenu menu={menu} target={target} rename={rename} setRename={setRename} confirm={confirm} setConfirm={setConfirm} picker={picker} setPicker={setPicker} close={closeMenu} renameTarget={renameTarget} chooseShade={chooseShade} chooseGlyph={chooseGlyph}/>} 
   </main>;
 }
@@ -414,6 +464,7 @@ function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,picker,setP
   return <div id="ctxmenu" class="ctxmenu" data-renaming={rename!==null ? 'yes' : undefined} style={style}>
     {project && <button onClick={()=>{post('open',{guid:target.item.guid});close();}}><Svg name="arrowRightIcon"/><span>Open</span></button>}
     {project && opensInWindow(target.item) && <button onClick={()=>{post('open',{guid:target.item.guid,newWindow:true});close();}}><Svg name="appWindow"/><span>Open in new window</span></button>}
+    {project && <button onClick={()=>{post('copyPath',{guid:target.item.guid});close();}}><Svg name="copy"/><span>Copy path</span></button>}
     {project && <button onClick={()=>{post('patch',{guid:target.item.guid,field:'pinned',value:!target.item.pinned});close();}}><Svg name={target.item.pinned?'pinOff':'pin'}/><span>{target.item.pinned?'Unpin':'Pin to top'}</span></button>}
     {!sealed && <>{rename!==null ? <div class="ctxrename"><input autoFocus value={rename} onInput={(event:any)=>setRename(event.currentTarget.value)} onKeyDown={(event:any)=>{if(event.key==='Enter')renameTarget();if(event.key==='Escape')close();}}/><button onClick={renameTarget}>Save</button><button onClick={close}>Cancel</button></div> : <button onClick={()=>setRename(target.item.label)}><Svg name="textCursorInput"/><span>Rename</span></button>}</>}
     <button onClick={()=>setPicker('shade')}><Svg name="paintbrush"/><span>Accent colour</span></button>
@@ -436,10 +487,16 @@ function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,picker,setP
  * Always rendered, empty when nothing is hovered: `showPopover()` needs an element already in
  * the document, and mounting one on hover would mean measuring it before it had been laid out.
  */
-function HoverCard({reference,project,branch,missing}:{reference:any;project:LandingPageProject|null;branch?:string;missing:boolean}) {
-  return <div class="hovercard" popover="manual" ref={reference}>
+function HoverCard({reference,project,branch,missing,copied,onCopy,onHold,onRelease}:{reference:any;project:LandingPageProject|null;branch?:string;missing:boolean;copied:boolean;onCopy:()=>void;onHold:()=>void;onRelease:()=>void}) {
+  return <div class="hovercard" popover="manual" ref={reference} onMouseEnter={onHold} onMouseLeave={onRelease}>
     {project && <>
-      <div class="hovercard-name">{project.label}</div>
+      <div class="hovercard-head">
+        <div class="hovercard-name">{project.label}</div>
+        <button class="hovercard-copy" data-copied={copied?'yes':undefined} title={copied?'Copied':'Copy path'} aria-label={copied?'Path copied':'Copy path'} onClick={onCopy}>
+          <Svg name={copied?'check':'copy'}/>
+          <span>{copied?'Copied':'Copy'}</span>
+        </button>
+      </div>
       <div class="hovercard-path">{displayPath(project) || 'No target set'}</div>
       {(branch || missing) && <div class="hovercard-meta">
         {branch && <span class="hovercard-branch"><Svg name="gitBranch"/>{branch}</span>}

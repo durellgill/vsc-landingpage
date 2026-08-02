@@ -250,6 +250,22 @@ gets.
   can be placed by hand; it must be `pointer-events: none`, or it steals the hover that
   opened it and flickers; and one element is shared by the whole board, since only one
   bookmark can be pointed at.
+- **The hover card only opens when something is actually cut off.** `isClipped()` checks the
+  label, path and branch; when all three fit, the card would pop up to repeat text already on
+  screen. Copy therefore cannot live only in the card - it is also on the bookmark menu and
+  Ctrl/Cmd+C, which work whether or not the card is showing.
+- **Copied paths are shell-quoted, but only when they need it.** `shellQuote()` in
+  `communication.ts` wraps a path in single quotes (double on Windows) when it contains
+  whitespace or a shell metacharacter, escaping embedded single quotes as `'\''`. Quoting
+  unconditionally would be wrong the moment the path is pasted somewhere that is not a shell.
+  The clipboard write goes through `vscode.env.clipboard`, not the webview's
+  `navigator.clipboard`, which needs a permission and gesture the webview cannot guarantee.
+  The tick is driven by the host's `pathCopied` reply, never assumed on click.
+- **The page carries deep bottom padding on purpose.** The last bookmark needs room beneath
+  it for its hover card, and the page must scroll far enough to expose that room.
+- **Right-click closes the hover card.** The two describe the same bookmark and would stack;
+  opening a menu is deliberate, so it wins, and the pending hover timers are cleared with it
+  or the card reappears over the menu.
 - **Hover and focus are delegated from `.content`, not bound per card.** `mouseenter` and
   `mouseleave` do not bubble and cannot be delegated at all, so it listens for
   `mouseover`/`mouseout` and ignores moves between children of the same card. Pointer hover

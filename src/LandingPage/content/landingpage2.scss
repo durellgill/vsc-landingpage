@@ -379,7 +379,11 @@
   {
     margin-left: var(--rail-width);
     max-width: var(--page-max);
-    padding: calc(var(--gapspace) * 1.5) var(--gapspace) calc(var(--gapspace) * 3);
+    // The generous bottom padding is not decoration: the last bookmark on the board needs
+    // room beneath it for its hover card, and the page has to be able to scroll far enough
+    // to expose that room. Without it the final row sits flush against the viewport edge and
+    // its card has nowhere to open.
+    padding: calc(var(--gapspace) * 1.5) var(--gapspace) 140px;
     display: flex;
     flex-direction: column;
     gap: var(--gapspace);
@@ -1219,15 +1223,57 @@
     box-shadow: 0 2px 8px rgb(0 0 0 / 0.28);
 
     font-size: var(--vscode-font-size);
-    // Purely informational, and it can sit under the pointer. Without this it would steal
-    // the hover it was opened by and flicker itself in and out.
-    pointer-events: none;
+    // Interactive, because it carries the copy button. That means it can be entered with the
+    // pointer, so leaving a bookmark closes it after a short grace period rather than at
+    // once, and entering the card itself cancels that.
+    pointer-events: auto;
 
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
+    // Setting `display` on a popover at all is a trap: the UA stylesheet hides a closed one
+    // with `[popover]:not(:popover-open) { display: none }`, and *any* author `display` beats
+    // it - author rules win over UA rules regardless of specificity. Without this the closed
+    // popover stayed on the page as a small empty bordered box, parked wherever it was last
+    // positioned. Scope the layout to the open state.
+    &:popover-open
+    {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
 
+    .hovercard-head
+    {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
     .hovercard-name { font-weight: 600; }
+
+    // The standard copy affordance: two pages, turning into a tick on success. Colour is the
+    // point of it - the accent says "this does something", the green says "it worked" without
+    // having to be read. The generic `button` rule paints every button in icon-foreground on
+    // transparent, so both have to be restated here to win.
+    .hovercard-copy
+    {
+      flex: none;
+      gap: 5px;
+      padding: 3px 8px;
+      font-size: .9em;
+      color: var(--vscode-button-foreground);
+      background-color: var(--vscode-button-background);
+      &:hover { background-color: var(--vscode-button-hoverBackground); }
+
+      // Terminal green is the nearest thing VS Code themes have to a defined success colour.
+      &[data-copied]
+      {
+        --tick: var(--vscode-terminal-ansiGreen, var(--vscode-charts-green));
+        color: var(--tick);
+        background-color: color-mix(in srgb, var(--tick) 20%, transparent);
+        &:hover { background-color: color-mix(in srgb, var(--tick) 20%, transparent); }
+      }
+
+      .lucide { width: 13px; height: 13px; stroke-width: 2.2px; }
+    }
 
     // The path is the reason this exists, so it gets the monospace treatment and is allowed
     // to wrap rather than truncate - truncating here would defeat the point.
