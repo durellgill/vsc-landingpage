@@ -17,7 +17,9 @@ interface MessageFromWebview
   /** GUID value of model fragment this command refers to. */
 	guid?:string;
   /** For command createBookmark: if true, a folder picker is shown, else a filepicker is shown.  */
-  pickFolder?:boolean;  
+  pickFolder?:boolean;
+  /** For command 'open': open the target in a new VS Code window instead of this one. */
+  newWindow?:boolean;
   /** For command 'move' the GUID of the element the dragged element (GUID) is placed relative to. */
   guid2?:string;
   /** If given, command 'move' will create a copy and assign this GUID to the cloned node. */
@@ -635,7 +637,17 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
           // plain file and must use `vscode.open` - `vscode.openFolder` on a file does not
           // open the file, it tries to treat it as a workspace root.
           const asWorkspace = project.icon==='folder' || project.icon==='workspace';
-          vscode.commands.executeCommand(asWorkspace?'vscode.openFolder':'vscode.open', vscode.Uri.parse(path)); //https://code.visualstudio.com/api/references/commands
+          // `forceNewWindow` only exists on `vscode.openFolder`. A plain file has no new-window
+          // form - `vscode.open` opens an editor in the current window - so the flag is simply
+          // not offered for files, rather than silently ignored.
+          if (asWorkspace)
+          {
+            vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.parse(path), {forceNewWindow:message.newWindow===true}); //https://code.visualstudio.com/api/references/commands
+          }
+          else
+          {
+            vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(path));
+          }
           return;
         }
         else //group in model > cannot open group

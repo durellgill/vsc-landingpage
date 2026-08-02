@@ -22,7 +22,7 @@ Working list for turning this into the start page I actually want. One commit pe
       a mouse toy.
 - [x] **4. Filter on paths, not just labels.** Two bookmarks called `src` are
       indistinguishable today, and typing a folder name finds nothing.
-- [ ] **5. Open in a new window.** The single most common thing to want from a start page
+- [x] **5. Open in a new window.** The single most common thing to want from a start page
       and it is not offered anywhere.
 - [ ] **6. Collapsible groups, persisted.** A board with eight groups needs to fold.
 - [ ] **7. Flag bookmarks whose target is gone.** A dead bookmark currently looks identical

@@ -68,6 +68,15 @@ function groupMatches(group:LandingPageGroup, needles:string[]):boolean {
   return needles.every(needle => label.includes(needle));
 }
 
+/**
+ * Whether a bookmark can be opened in a second window.
+ *
+ * Only folders and workspaces can. `vscode.open` has no new-window form for a plain file -
+ * it opens an editor in the current window - so the action is withheld rather than offered
+ * and then quietly ignored.
+ */
+function opensInWindow(project:LandingPageProject):boolean {return project.icon==='folder' || project.icon==='workspace';}
+
 /** Every bookmark card currently on the page, in document order. */
 // Array.from rather than spread: tsconfig's `lib` is ES2022 with no DOM.Iterable, so a
 // NodeList is not iterable as far as the compiler is concerned.
@@ -171,7 +180,14 @@ function App() {
       if (active===filterInput.current && event.key==='ArrowDown') {cards()[0]?.focus(); event.preventDefault(); return;}
       if (typing || !card) {return;}
 
-      if (event.key==='Enter' || event.key===' ') {post('open',{guid:card.dataset.guid}); event.preventDefault(); return;}
+      if (event.key==='Enter' || event.key===' ') {
+        // `data-kind` carries the bookmark type, so the same rule as Ctrl/Cmd+click applies
+        // without having to look the project up in the model.
+        const canWindow = card.dataset.kind==='folder' || card.dataset.kind==='workspace';
+        post('open',{guid:card.dataset.guid, newWindow:(event.ctrlKey||event.metaKey) && canWindow});
+        event.preventDefault();
+        return;
+      }
       if (event.key==='Home' || event.key==='End') {
         const all = cards();
         (event.key==='Home' ? all[0] : all[all.length-1])?.focus();
@@ -234,7 +250,7 @@ function App() {
 
   return <main class="page" onPointerDown={event => {if (!(event.target as Element).closest('#ctxmenu,.modal,.menu-anchor')) {closeMenu(); setPopover(null);}}}>
     <header class="page-header">
-      <div class="titlerow"><div class="titletext"><h1>Landing Page</h1><p class="subtitle">Click to open. Drag a group to reorder it, right-click to customise.</p></div><div class="header-actions">
+      <div class="titlerow"><div class="titletext"><h1>Landing Page</h1><p class="subtitle">Click to open, Ctrl/Cmd+click for a new window. Drag a group to reorder it, right-click to customise.</p></div><div class="header-actions">
         <div class="menu-anchor">
           <button class="btn-primary" aria-expanded={popover==='create'} onClick={()=>setPopover(popover==='create'?null:'create')}><Svg name="plus"/><span>New</span><Svg name="chevronDown"/></button>
           {popover==='create' && <div class="popover">
@@ -290,7 +306,7 @@ function GroupShelf({group,index,needles,composer,setComposer,openMenu,refreshin
 function BookmarkCard({project,openMenu}:{project:LandingPageProject;openMenu:(event:MouseEvent,guid:string)=>void}) {
   const type=project.icon||'file'; const shade=project.shade||typeShades[type];
   const path=project.path?.replace(/^file:\/\//,'')||''; const parent=path.slice(0,path.lastIndexOf('/'));
-  return <article class="project interactable" tabIndex={0} role="button" aria-label={project.label} data-guid={project.guid} data-shade={shade} data-kind={type} title={path} onClick={event=>{if (!(event.target as Element).closest('button')) {post('open',{guid:project.guid});}}} onContextMenu={event=>openMenu(event,project.guid)}><div class="spine"/><div class="pictoral"><Svg name={iconFor(project)}/></div><div class="textblock"><div>{project.label}</div><div class="project-path">{parent}</div></div><button class="rowmenu" title="More actions" onClick={event=>openMenu(event,project.guid)}><Svg name="ellipsis"/></button></article>;
+  return <article class="project interactable" tabIndex={0} role="button" aria-label={project.label} data-guid={project.guid} data-shade={shade} data-kind={type} title={path} onClick={event=>{if (!(event.target as Element).closest('button')) {post('open',{guid:project.guid, newWindow:(event.ctrlKey||event.metaKey) && opensInWindow(project)});}}} onContextMenu={event=>openMenu(event,project.guid)}><div class="spine"/><div class="pictoral"><Svg name={iconFor(project)}/></div><div class="textblock"><div>{project.label}</div><div class="project-path">{parent}</div></div><button class="rowmenu" title="More actions" onClick={event=>openMenu(event,project.guid)}><Svg name="ellipsis"/></button></article>;
 }
 
 function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,picker,setPicker,close,renameTarget,chooseShade,chooseGlyph}:any) {
@@ -300,6 +316,7 @@ function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,picker,setP
   if (picker==='glyph') return <Palette type="glyph" style={style} choose={chooseGlyph} close={close}/>;
   return <div id="ctxmenu" class="ctxmenu" data-renaming={rename!==null ? 'yes' : undefined} style={style}>
     {project && <button onClick={()=>{post('open',{guid:target.item.guid});close();}}><Svg name="arrowRightIcon"/><span>Open</span></button>}
+    {project && opensInWindow(target.item) && <button onClick={()=>{post('open',{guid:target.item.guid,newWindow:true});close();}}><Svg name="appWindow"/><span>Open in new window</span></button>}
     {!sealed && <>{rename!==null ? <div class="ctxrename"><input autoFocus value={rename} onInput={(event:any)=>setRename(event.currentTarget.value)} onKeyDown={(event:any)=>{if(event.key==='Enter')renameTarget();if(event.key==='Escape')close();}}/><button onClick={renameTarget}>Save</button><button onClick={close}>Cancel</button></div> : <button onClick={()=>setRename(target.item.label)}><Svg name="textCursorInput"/><span>Rename</span></button>}</>}
     <button onClick={()=>setPicker('shade')}><Svg name="paintbrush"/><span>Accent colour</span></button>
     <button onClick={()=>setPicker('glyph')}><Svg name="image"/><span>Custom icon</span></button>

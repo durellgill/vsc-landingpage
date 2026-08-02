@@ -155,6 +155,10 @@ gets.
   - **Stop the drop event at the group.** `.content` carries a drop handler for the gaps
     between groups, so a drop on a group that bubbles fires both handlers and posts
     `moveGroup` twice.
+- **Opening in a new window is folder- and workspace-only.** `vscode.open` has no
+  new-window form for a plain file, so the `newWindow` flag on the `open` message is withheld
+  for files rather than sent and quietly ignored. Three entry points, all gated the same way:
+  Ctrl/Cmd+click, Ctrl/Cmd+Enter, and the *Open in new window* item in the bookmark menu.
 - **The filter searches labels, paths and group names, and every term must match.** A board
   has two checkouts called `api`; a label-only search cannot tell them apart, and typing a
   directory name found nothing at all. `haystack()` in `main.tsx` is label plus decoded path;
