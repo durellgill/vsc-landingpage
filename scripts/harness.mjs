@@ -51,7 +51,8 @@ const model = {
       guid: 'g-work', label: 'Work', layout: 'list', shade: 'purple', projects: [
         {guid: 'p-1', label: 'landing-page', path: 'file:///Users/dev/Projects/landing-page', icon: 'folder', glyph: 'rocket'},
         {guid: 'p-2', label: 'api', path: 'file:///Users/dev/Projects/api', icon: 'folder', shade: 'green'},
-        {guid: 'p-3', label: 'notes.md', path: 'file:///Users/dev/Documents/notes.md'}
+        {guid: 'p-3', label: 'notes.md', path: 'file:///Users/dev/Documents/notes.md'},
+        {guid: 'p-6', label: 'moved-away', path: 'file:///Users/dev/Projects/moved-away', icon: 'folder'}
       ]
     },
     {
@@ -127,10 +128,16 @@ const stub = `<script>
       // lives in the model - layout, shade, collapsed - actually round-trips in the harness
       // instead of appearing to do nothing.
       if (message.command === 'patch') { patch(message); sync(); }
+      if (message.command === 'documentReady' || message.command === 'refreshRecents') { health(); }
     },
     getState() { return undefined; },
     setState() {}
   });
+  // Stands in for reportBookmarkHealth(): the host stats every file: target and reports the
+  // ones it could not find, as a separate message that never enters the model.
+  function health() {
+    setTimeout(() => window.dispatchEvent(new MessageEvent('message', {data: {command: 'bookmarkHealth', missing: __MISSING__}})), 0);
+  }
   function patch(message) {
     for (const group of model.groups) {
       const target = group.guid === message.guid ? group : group.projects.find(p => p.guid === message.guid);
@@ -155,7 +162,9 @@ const server = createServer(async (request, response) => {
   const payload = url.searchParams.has('empty') ? {groups: []} : model;
   let html = (await renderer())('/assets', "'self'");
   // The stub must be installed before the bundle runs, so it goes ahead of the page script.
-  html = html.replace('<script>', stub.replace('__MODEL__', JSON.stringify(payload)) + '\n<script>');
+  // ?healthy suppresses the missing-target verdict, for checking the undecorated board.
+  const missing = url.searchParams.has('healthy') ? [] : ['p-6'];
+  html = html.replace('<script>', stub.replace('__MODEL__', JSON.stringify(payload)).replace('__MISSING__', JSON.stringify(missing)) + '\n<script>');
   // Theme variables go last in <head> so they win over anything the page defines itself.
   html = html.replace('</head>', themeStyle(url.searchParams.get('theme')) + '</head>');
   // The harness is served over http, where the webview CSP meta tag only gets in the way.

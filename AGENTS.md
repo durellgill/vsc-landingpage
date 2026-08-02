@@ -155,6 +155,14 @@ gets.
   - **Stop the drop event at the group.** `.content` carries a drop handler for the gaps
     between groups, so a drop on a group that bubbles fires both handlers and posts
     `moveGroup` twice.
+- **A bookmark whose target is gone is marked, never hidden or disabled.** The host stats
+  every `file:` target and posts a `bookmarkHealth` message listing the GUIDs it could not
+  find. This is observed state and deliberately stays out of the model: persisting it would
+  let a stale verdict outlive the file coming back. Only `file:` targets are checked - a
+  remote or virtual path can be perfectly valid while its provider is not registered, and
+  flagging those would be worse than not checking. The card keeps its accent, icon, tab stop
+  and click behaviour; only the spine colour and a badge change, because removing someone's
+  bookmark is not this page's decision.
 - **Groups fold, and the fold is model state.** `LandingPageGroup.collapsed` is persisted
   through `patch`, so a tidied board stays tidy across reloads and windows - including the
   generated `Recent` group, which is an ordinary model object and only needs the MRU overlay

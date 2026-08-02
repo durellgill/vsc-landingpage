@@ -506,6 +506,48 @@ export async function resetModel(sharedModel:LandingPageModel):Promise<void>
 }
 
 /**
+ * Checks every bookmark's target and tells the page which ones no longer exist.
+ *
+ * A bookmark whose folder has been moved, renamed or deleted looks identical to a live one
+ * until you click it and get an error from VS Code. Since the whole point of the board is to
+ * be trusted at a glance, the check happens up front instead.
+ *
+ * Deliberately *not* part of the model: this is observed state, not something the user set,
+ * and persisting it would mean a stale verdict survives the thing being put back. It is sent
+ * as its own message and held only in the webview.
+ *
+ * Only `file:` targets are checked. Bookmarks on a remote or virtual filesystem may be
+ * perfectly valid while their provider is not currently registered, and flagging those as
+ * dead would be worse than not checking at all.
+ *
+ * @param webviewPanel Panel to report to.
+ * @param sharedModel Model whose bookmarks are checked.
+ */
+async function reportBookmarkHealth(webviewPanel:vscode.WebviewPanel, sharedModel:LandingPageModel):Promise<void>
+{
+  const checks:Promise<string|null>[] = [];
+  for (const group of sharedModel.groups)
+  {
+    for (const project of group.projects)
+    {
+      if (!project.path) {continue;}
+      let uri:vscode.Uri;
+      try {uri = vscode.Uri.parse(project.path);}
+      catch {continue;} //unparseable path is a model problem, not a missing target
+      if (uri.scheme!=='file') {continue;}
+
+      // `fs.stat` returns a Thenable, not a Promise, so the result is wrapped before it can
+      // be collected for Promise.all.
+      const guid = project.guid;
+      checks.push(Promise.resolve(vscode.workspace.fs.stat(uri)).then(() => null, () => guid));
+    }
+  }
+
+  const missing = (await Promise.all(checks)).filter((guid):guid is string => guid!==null);
+  webviewPanel.webview.postMessage({command:'bookmarkHealth', missing});
+}
+
+/**
  * Rereads VS Code's recently-opened list and pushes the result to the page.
  *
  * The `Recent` group is a mirror of state the page has no way to observe. Opening a project
@@ -523,6 +565,9 @@ export async function refreshRecents(webviewPanel:vscode.WebviewPanel, sharedMod
 {
   await populateVscMru(sharedModel);
   sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
+  // Not awaited: the board should paint from the fresh model immediately, and the health
+  // verdict decorates it a moment later.
+  void reportBookmarkHealth(webviewPanel, sharedModel);
 }
 
 /**
@@ -557,6 +602,7 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
   {
     case 'documentReady':
       syncModelInWebview(webviewPanel, sharedModel);
+      void reportBookmarkHealth(webviewPanel, sharedModel);
       // vscode.window.showWarningMessage(`postmessage syncmodel!: ${JSON.stringify(sharedModel)}`);
       break;
     case 'rename': // guid: ID of model element to rename
