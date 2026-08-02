@@ -50,6 +50,12 @@ one string using Vite's `?raw` and `?inline` imports, substituting these placeho
 | `%assetPath%` | webview URI of `assets/` (custom cursors) |
 | `${iconName}` | inline SVG from `iconography.ts` |
 
+Two Vite 8 details that cost time:
+
+- `minify: 'esbuild'` fails - esbuild is no longer bundled. Use `'oxc'`.
+- `tsconfig.json` needs an explicit `"include": ["src"]`, or `tsc` pulls the `.mts` config
+  files into the program and fails them against `rootDir`.
+
 Consequences worth knowing:
 
 - **Editing the SCSS or TSX alone does nothing** until its build runs. `npm run watch` starts
@@ -235,6 +241,14 @@ gets.
   in the same grid ended up with icons at different heights. `.textblock` is `display: contents`
   there, so the label and path need explicit `grid-column`/`grid-row` or the path auto-places
   underneath the icon.
+- **`text-overflow: ellipsis` does nothing on a flex item.** It styles a block container's
+  own text, so a badge that becomes `display: flex` to align its icon stops truncating and
+  starts cutting mid-word instead. Give the text its own block inside - that is what
+  `.branch-name` and `.path-text` are for.
+- **Resolve a destination only after the irreversible step has succeeded.** `createDirectory`
+  originally called `defaultGroup()` before creating the folder, and `defaultGroup()` can
+  append a group to the model - so a failed `fs.createDirectory` left a stray empty group
+  behind, to be saved by the next unrelated write.
 - Prefer `outline` over `border` for hover/selection indicators - a border occupies layout
   space and reflows the row when it appears.
 - Never set `overflow` on one axis alone for a container that anything escapes (tooltips,

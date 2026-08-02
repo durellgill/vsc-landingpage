@@ -100,6 +100,38 @@ collect messages, dispatch real `MouseEvent`s, and check what was sent. That is 
 inline rename, local Recent hiding, menu contents per target type, and the layout cycle are
 verified. Screenshots confirm looks; message assertions confirm behaviour.
 
+## Mistakes already made here, and what they cost
+
+These are judgement errors, not gaps in knowledge. Each one had the evidence available at
+the time and was talked past anyway.
+
+- **Do not explain away something that looks wrong on screen.** The very first screenshot
+  after the Vite migration showed a grey box where the grid-layout icon should be. It was
+  dismissed as a hover state and shipped. It was actually eleven blank icons caused by a
+  regex in `iconography.ts`, and the user reported it several commits later. If a rendered
+  thing looks off, measure that specific thing before moving on - a two-line check would have
+  caught it.
+- **A measurement can pass while the rendering is wrong.** The branch badge's width,
+  position and alignment all asserted correctly while it was visibly cut mid-word, because
+  `display: flex` had silently disabled its `text-overflow: ellipsis`. Assertions prove the
+  properties you thought to check; only looking proves the result.
+- **Confirm the environment before concluding a rule is broken.** `:focus-visible` was
+  declared unreliable and swapped for `:focus` on the strength of a measurement taken while
+  `document.hasFocus()` was false, so *no* focus rule could match. The conclusion was wrong
+  even though the change happened to be defensible. Check `document.hasFocus()`, check the
+  element actually matches, and check the value is not mid-transition, before rewriting CSS.
+- **A tool that stalls is usually wedged, not unavailable.** `agent-browser screenshot`
+  started timing out, visual checks were abandoned for a whole session, and the fix was
+  `agent-browser close --all` and reopen. Restart the tool before designing around its
+  absence.
+- **Isolate test fixtures per case.** A `takeExisting` test failed because a later fixture
+  recreated directories an earlier one had deliberately left missing. The assertion was wrong,
+  not the code - check which one is lying before editing the implementation.
+- **Verify a doc claim against the source before writing it down.** The README rewrite
+  initially stated that Recent entries can be copied with *Move to group*. That action is
+  gated behind `!sealed` and never appears there. The host still has a copy-from-Recent
+  branch, which is what made the claim sound right.
+
 ## When the user reports something is broken
 
 Reproduce it in the harness before changing code. Two reports in this repo turned out to be
