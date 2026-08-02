@@ -40,10 +40,14 @@ function App() {
   const [popover,setPopover] = useState<'create'|'clone'|null>(null);
   // `over` is the insertion index the drop indicator is drawn at, in user-group coordinates.
   const [drag,setDrag] = useState<{guid:string;over:number|null}|null>(null);
+  // True between posting `refreshRecents` and the model coming back, so the control can show
+  // that something is happening. Any `syncModel` clears it - the host only ever answers with
+  // one, and a refresh that changed nothing still arrives as a sync.
+  const [refreshing,setRefreshing] = useState(false);
 
   useEffect(() => {
     const receive = (event:MessageEvent) => {
-      if (event.data?.command==='syncModel') {setModel(event.data.model);}
+      if (event.data?.command==='syncModel') {setModel(event.data.model); setRefreshing(false);}
     };
     window.addEventListener('message',receive);
     post('documentReady');
@@ -121,6 +125,7 @@ function App() {
         : drag.over===index ? 'before'
         : (drag.over===userGroups.length && index===userGroups.length-1) ? 'after' : null;
       return <GroupShelf key={group.guid} group={group} index={index} total={userGroups.length} filter={needle} composer={composer===group.guid} setComposer={setComposer} openMenu={openMenu}
+        refreshing={refreshing} refresh={()=>{setRefreshing(true); post('refreshRecents');}}
         dragging={drag?.guid===group.guid} drop={drop} onDragStart={()=>setDrag({guid:group.guid,over:null})} onDragOver={dragOver} onDrop={dropGroup}/>;
     })}</div>
     {model.groups.length===0 && <EmptyState/>}
@@ -129,7 +134,7 @@ function App() {
   </main>;
 }
 
-function GroupShelf({group,index,filter,composer,setComposer,openMenu,dragging,drop,onDragStart,onDragOver,onDrop}:{group:LandingPageGroup;index:number;total:number;filter:string;composer:boolean;setComposer:(id:string|null)=>void;openMenu:(event:MouseEvent,guid:string)=>void;dragging:boolean;drop:'before'|'after'|null;onDragStart:()=>void;onDragOver:(event:DragEvent,index:number)=>void;onDrop:()=>void}) {
+function GroupShelf({group,index,filter,composer,setComposer,openMenu,refreshing,refresh,dragging,drop,onDragStart,onDragOver,onDrop}:{group:LandingPageGroup;index:number;total:number;filter:string;composer:boolean;setComposer:(id:string|null)=>void;openMenu:(event:MouseEvent,guid:string)=>void;refreshing:boolean;refresh:()=>void;dragging:boolean;drop:'before'|'after'|null;onDragStart:()=>void;onDragOver:(event:DragEvent,index:number)=>void;onDrop:()=>void}) {
   const sealed=group.guid==='@vsc-mru';
   const projects=group.projects.filter(project=>project.label.toLocaleLowerCase().includes(filter));
   const layout=group.layout||'list';
@@ -137,7 +142,7 @@ function GroupShelf({group,index,filter,composer,setComposer,openMenu,dragging,d
   return <section class={`group${sealed?' sealed':''}${dragging?' dragging':''}`} data-guid={group.guid} data-shade={shadeForGroup(group)} data-drop={drop||undefined}
     onContextMenu={event=>openMenu(event,group.guid)}
     onDragOver={event=>onDragOver(event,index)} onDrop={event=>{event.preventDefault(); event.stopPropagation(); onDrop();}}>
-    <div class="titlebar" draggable={!sealed} onDragStart={event=>{if (event.dataTransfer) {event.dataTransfer.effectAllowed='move'; event.dataTransfer.setData('text/plain',group.guid);} onDragStart();}}><span class={`group-icon${sealed?'':' draghandle'}`} title={sealed?undefined:'Drag to reorder this group'}><Svg name={iconFor(group)}/></span><h1 class="group-label" title="Double-click to rename" onDblClick={event=>openMenu(event,group.guid)}>{group.label}</h1><span class="group-count">{group.projects.length||''}</span><div class="tools"><button class="ifn-sealed" title="Add to this group" onClick={()=>setComposer(composer?null:group.guid)}><Svg name="plus"/></button><button data-role="layout" title={`${layout} view - click to change layout`} onClick={()=>post('patch',{guid:group.guid,field:'layout',value:next[layout]})}><Svg name={layout==='list'?'layoutList':layout==='grid'?'layoutGrid':'alignJustify'}/></button><button title="Group settings" onClick={event=>openMenu(event,group.guid)}><Svg name="settings"/></button></div><div class="rule"/></div>
+    <div class="titlebar" draggable={!sealed} onDragStart={event=>{if (event.dataTransfer) {event.dataTransfer.effectAllowed='move'; event.dataTransfer.setData('text/plain',group.guid);} onDragStart();}}><span class={`group-icon${sealed?'':' draghandle'}`} title={sealed?undefined:'Drag to reorder this group'}><Svg name={iconFor(group)}/></span><h1 class="group-label" title="Double-click to rename" onDblClick={event=>openMenu(event,group.guid)}>{group.label}</h1><span class="group-count">{group.projects.length||''}</span><div class="tools"><button class="ifn-sealed" title="Add to this group" onClick={()=>setComposer(composer?null:group.guid)}><Svg name="plus"/></button>{sealed && <button data-role="refresh" data-busy={refreshing?'yes':undefined} disabled={refreshing} title="Reread VS Code's recently-opened list" onClick={refresh}><Svg name="refreshCw"/></button>}<button data-role="layout" title={`${layout} view - click to change layout`} onClick={()=>post('patch',{guid:group.guid,field:'layout',value:next[layout]})}><Svg name={layout==='list'?'layoutList':layout==='grid'?'layoutGrid':'alignJustify'}/></button><button title="Group settings" onClick={event=>openMenu(event,group.guid)}><Svg name="settings"/></button></div><div class="rule"/></div>
     {composer && <div class="group-composer"><span class="composer-label">Add to <b>{group.label}</b></span><button class="btn-secondary" onClick={()=>{setComposer(null);post('createBookmark',{guid:group.guid,pickFolder:true});}}><Svg name="folder"/><span>Folder</span></button><button class="btn-secondary" onClick={()=>{setComposer(null);post('createBookmark',{guid:group.guid,pickFolder:false});}}><Svg name="plus"/><span>File or workspace</span></button><button class="btn-secondary" title="Create a new folder on disk and bookmark it" onClick={()=>{setComposer(null);post('createDirectory',{guid:group.guid});}}><Svg name="folderPlus"/><span>New folder</span></button><button class="btn-ghost" onClick={()=>setComposer(null)}>Cancel</button></div>}
     <div class={`projects ${layout}`}>{projects.map(project=><BookmarkCard key={project.guid} project={project} openMenu={openMenu}/>)}</div>
   </section>;

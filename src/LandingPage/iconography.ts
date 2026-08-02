@@ -65,6 +65,7 @@ import svgTrophy from 'lucide-static/icons/trophy.svg?raw';
 import svgSparkles from 'lucide-static/icons/sparkles.svg?raw';
 import svgZap from 'lucide-static/icons/zap.svg?raw';
 import svgShoppingBag from 'lucide-static/icons/shopping-bag.svg?raw';
+import svgRefreshCw from 'lucide-static/icons/refresh-cw.svg?raw';
 import svgSearch from 'lucide-static/icons/search.svg?raw';
 import svgFolderOpen from 'lucide-static/icons/folder-open.svg?raw';
 
@@ -124,6 +125,7 @@ export const icons=
   gitBranch : icon(svgGitBranch),
   image : icon(svgImage),
   folderInput : icon(svgFolderInput), // toolbar button for the icon picker
+  refreshCw : icon(svgRefreshCw),
 
   //--- glyphs -----------------------------------------------------------------
   // User-selectable bookmark icons. The key after `glyph-` is what gets stored in

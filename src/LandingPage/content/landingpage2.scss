@@ -710,6 +710,14 @@
             background-color: var(--vscode-button-secondaryBackground, var(--vscode-toolbar-hoverBackground));
             &:hover { background-color: var(--vscode-button-secondaryHoverBackground, var(--vscode-toolbar-hoverBackground)); }
           }
+
+          // Refreshing Recent is a round trip to the extension host. Without a visible busy
+          // state, a refresh that returns an unchanged list looks like a dead button.
+          [data-role="refresh"][data-busy] .lucide
+          {
+            animation: landingpage-spin .8s linear infinite;
+          }
+          [data-role="refresh"]:disabled { cursor: default; }
         }
         &:hover
         {
@@ -1052,3 +1060,10 @@
   }
 
 } //.landingpage
+
+// Outside .landingpage: keyframes are not selectors and cannot be nested into a rule.
+@keyframes landingpage-spin
+{
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}

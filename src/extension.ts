@@ -2,7 +2,7 @@
 import { join } from 'path';
 import * as vscode from 'vscode';
 import { window } from 'vscode';
-import { bookmarkUris, cloneRepository, handleMessageFromWebview, registerContext, resetModel, syncModelInWebview } from './LandingPage/communication';
+import { bookmarkUris, cloneRepository, handleMessageFromWebview, refreshRecents, registerContext, resetModel, syncModelInWebview } from './LandingPage/communication';
 import { LandingPageModel } from './LandingPage/LandingPageModel';
 import { LandingPageTemplate2 } from './LandingPage/LandingPageTemplate2';
 
@@ -48,6 +48,12 @@ export function activate(context: vscode.ExtensionContext)
 		if (landingpageWebviewPanel) {syncModelInWebview(landingpageWebviewPanel!, model);}
 	});
 	context.subscriptions.push(cmdReload);
+
+	// Same code path as the refresh control on the Recent group header, see communication.ts.
+	const cmdRefreshRecents = vscode.commands.registerCommand('vsc-landingpage.refreshRecents', async () => {
+		if (landingpageWebviewPanel) {await refreshRecents(landingpageWebviewPanel, model);}
+	});
+	context.subscriptions.push(cmdRefreshRecents);
 
 	// Same code path as the Clone button in the webview, see communication.ts.
 	const cmdClone = vscode.commands.registerCommand('vsc-landingpage.cloneRepository', async () => {
@@ -110,6 +116,13 @@ export function activate(context: vscode.ExtensionContext)
 			landingpageWebviewPanel.webview.html = new LandingPageTemplate2().makeHTML(assetPath, landingpageWebviewPanel.webview.cspSource); // getWebviewContent(await gerRecentProjects(), context, webviewPanel);
 
 			landingpageWebviewPanel.onDidDispose(()=>{landingpageWebviewPanel=null;});
+
+			// The Recent group mirrors VS Code's history, which changes while this panel sits in a
+			// background tab - opening a project in another window is the usual case. Refresh when
+			// the panel comes back into view so the user never reads a stale list.
+			landingpageWebviewPanel.onDidChangeViewState(async event => {
+				if (event.webviewPanel.visible) {await refreshRecents(event.webviewPanel, model);}
+			}, undefined, context.subscriptions);
 
 			// (No MRU read here: the webview's `documentReady` message triggers
 			// populateVscMru() immediately afterwards, so doing it here only duplicated the work.)

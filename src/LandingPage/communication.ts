@@ -8,7 +8,7 @@ import { parseURI } from './utils';
  */
 interface MessageFromWebview
 {
-	command:'documentReady'|'rename'|'createBookmark'|'createGroup'|'remove'|'hideRecent'|'restoreHiddenRecents'|'moveGroup'|'open'|'move'|'patch'|'openSettings'|'setViewState'|'cloneRepository'|'openFolder'|'moveToGroup'|'createDirectory';
+	command:'documentReady'|'rename'|'createBookmark'|'createGroup'|'remove'|'hideRecent'|'restoreHiddenRecents'|'refreshRecents'|'moveGroup'|'open'|'move'|'patch'|'openSettings'|'setViewState'|'cloneRepository'|'openFolder'|'moveToGroup'|'createDirectory';
 
   /** For command 'cloneRepository': the repository URL typed into the clone field. */
   url?:string;
@@ -504,6 +504,26 @@ export async function resetModel(sharedModel:LandingPageModel):Promise<void>
 }
 
 /**
+ * Rereads VS Code's recently-opened list and pushes the result to the page.
+ *
+ * The `Recent` group is a mirror of state the page has no way to observe. Opening a project
+ * in another window, or removing one from VS Code's own history, leaves this page showing a
+ * list that was correct when the panel was created and has been wrong ever since. There are
+ * two ways in: the refresh control on the Recent group, and the panel regaining visibility.
+ *
+ * `forceRebuild` is required because the DOM sync is keyed by GUID, and MRU GUIDs are derived
+ * from the target path - a reordered history changes positions without changing keys.
+ *
+ * @param webviewPanel Panel to update.
+ * @param sharedModel Model whose `@vsc-mru` group is rebuilt in place.
+ */
+export async function refreshRecents(webviewPanel:vscode.WebviewPanel, sharedModel:LandingPageModel):Promise<void>
+{
+  await populateVscMru(sharedModel);
+  sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
+}
+
+/**
  * Performs a resync/reload of the webview to reflect the given model.
  * @param webviewPanel Webview instance to update.
  * @param sharedModel Model to render.
@@ -723,6 +743,11 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       await hideMru(message.guid);
       await populateVscMru(sharedModel);
       saveModel(sharedModel);
+      sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
+      break;
+    case 'refreshRecents':
+      // populateVscMru() already ran above for this command, so the model is current; all
+      // that is left is to hand it back with the rebuild flag set.
       sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
       break;
     case 'restoreHiddenRecents':

@@ -4,14 +4,14 @@ Working list for turning this into the start page I actually want. One commit pe
 
 ## Build
 
-- [ ] **1. Migrate the build from webpack to Vite.** Two Vite builds - the extension host
+- [x] **1. Migrate the build from webpack to Vite.** Two Vite builds - the extension host
       (CommonJS, `vscode` external) and the webview (IIFE, Preact). Sass moves into Vite via
       `?inline`, so `build:css` disappears. `raw-loader` / `svg-inline-loader` / `ts-loader`
       all go away with it.
 
 ## Recents
 
-- [ ] **2. Refresh the Recent group.** A refresh control on the Recent group header plus an
+- [x] **2. Refresh the Recent group.** A refresh control on the Recent group header plus an
       explicit `refreshRecents` message, and an automatic resync when the panel regains
       focus so the list is not stale after opening a project in another window.
 

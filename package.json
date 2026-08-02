@@ -43,12 +43,17 @@
         "when": "activeWebviewPanelId == 'vsc-landingpage'"
       },
       {
+        "command": "vsc-landingpage.refreshRecents",
+        "title": "Landing Page: Refresh Recent",
+        "when": "activeWebviewPanelId == 'vsc-landingpage'"
+      },
+      {
         "command": "vsc-landingpage.cloneRepository",
         "title": "Landing Page: Clone Repository"
       },
       {
         "command": "vsc-landingpage.addToGroup",
-        "title": "➕ Add to Landing Page Group..."
+        "title": "\u2795 Add to Landing Page Group..."
       }
     ],
     "keybindings": [

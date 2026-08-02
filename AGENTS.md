@@ -163,7 +163,13 @@ gets.
 - The Preact webview is keyed by GUID. Keep `data-guid` and `data-shade` on rendered
   groups and bookmarks because the CSS and harness use them.
 - MRU bookmark GUIDs must be derived from the target path, never from list position. See the
-  note in `history.ts`. The Recent group is generated and sealed: its entries can only be
+  note in `history.ts`. That is also why every `Recent` resync sets `forceRebuild`: a
+  reordered history changes positions without changing keys, and the DOM sync is keyed by GUID.
+- **`Recent` goes stale on its own and has three ways to be refreshed.** The list mirrors VS
+  Code history, which changes while the panel sits in a background tab. `refreshRecents` in
+  `communication.ts` is the single implementation, reached from the refresh control on the
+  Recent group header, from `onDidChangeViewState` when the panel becomes visible, and from
+  the *Landing Page: Refresh Recent* palette command. The Recent group is generated and sealed: its entries can only be
   hidden locally through `landingPageHiddenMruGuids`, never removed from VS Code history.
   The Recent group's menu restores all locally hidden entries.
 - **Anything a user sets on a Recent *entry* belongs in `landingPageMruCustomisations`, not on
