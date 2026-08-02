@@ -2,6 +2,33 @@
 
 Fork of `renebuehling/vsc-landingpage`. Tracks work done in this fork and what is still open.
 
+## 2026-08-02 - Hover detail, copying, and two open bugs
+
+Follow-up work after the feature run, driven by review of the running page.
+
+- **Group hover no longer changes size.** The accent bar grew and the title tracked out, both
+  of which occupy layout, so the count badge and divider shifted and the group appeared to
+  swell under the pointer. Hover is colour and opacity only now.
+- **Bookmarks have a hover detail card**, built on the Popover API so it sits in the top layer
+  and escapes every `overflow` and stacking context on the page. It shows the full path, the
+  branch and the missing-target notice, and only opens when something on the card is actually
+  cut off.
+- **Paths can be copied** from a button on that card, from the bookmark menu, and with
+  Ctrl/Cmd+C. The clipboard write goes through `vscode.env.clipboard` and the tick is driven
+  by the host's reply, so a failure cannot show a false confirmation. Paths are shell-quoted
+  when - and only when - they contain whitespace or a shell metacharacter; verified by running
+  sixteen awkward paths back through `/bin/sh`.
+- **Several defects fixed along the way**: eleven icons blanked by an over-broad regex in the
+  Vite migration, bookmark labels unstyled since the Preact migration because the SCSS hooked
+  a `data-field` attribute only the old page emitted, `maxRecentItems` applied before its
+  exclusions rather than after, and a branch name cut mid-word because `display: flex`
+  disables `text-overflow`.
+
+Two things are **open**, see `TODO.md` items 11 and 12: the hover card is still reported to
+leave an empty square behind despite testing clean in the harness - check for a stale
+installed build first - and a project filed into a group still appears again in Recent, which
+needs a path-comparison plan before any code.
+
 ## 2026-08-02 - Start page features
 
 Seven features on top of the Vite migration, one commit each. Everything was verified in
