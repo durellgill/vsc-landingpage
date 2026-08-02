@@ -1,34 +1,32 @@
 # TODO
 
-## Next interaction work
+Working list for turning this into the start page I actually want. One commit per item.
 
-- Add a small, scoped management view for locally hidden Recent entries so they can be restored
-  individually, rather than only restoring the entire set from the Recent group menu.
-- Evaluate a searchable icon picker if the expanded glyph palette becomes difficult to scan.
-- Add a browser-harness scenario for inline rename, group glyphs and colours, and local Recent
-  hiding/restoration.
-- Add browser-harness coverage for group ordering boundaries and the inline add composer.
+## Build
 
-## Preact follow-up
+- [ ] **1. Migrate the build from webpack to Vite.** Two Vite builds - the extension host
+      (CommonJS, `vscode` external) and the webview (IIFE, Preact). Sass moves into Vite via
+      `?inline`, so `build:css` disappears. `raw-loader` / `svg-inline-loader` / `ts-loader`
+      all go away with it.
 
-Preact now owns the production webview. The legacy `landingpage2.js` remains only as a
-reference while the new UI settles.
+## Recents
 
-- Replace the temporary browser smoke harness with committed, repeatable interaction tests.
-- Decide whether and when to remove the legacy `landingpage2.js` and its old HTML prototype
-  markup after the Preact UI has had real-world use.
-- Add menu positioning that flips or clamps near the right and lower viewport edges.
+- [ ] **2. Refresh the Recent group.** A refresh control on the Recent group header plus an
+      explicit `refreshRecents` message, and an automatic resync when the panel regains
+      focus so the list is not stale after opening a project in another window.
 
-## Personal workstation start page
+## The rest of a good start page
 
-Explore an opt-in, read-only System area that makes the landing page useful beyond recent
-VS Code workspaces.
-
-- Let people choose which dotfile roots and configuration directories to show.
-- Display file and folder names, locations, existence, and repository status without reading
-  or rendering file contents by default.
-- Add quick actions to open a selected item in VS Code, Finder, or its configured application.
-- Keep the provider layer independent from the webview so it can later be reused by a small
-  desktop companion app, if the page needs to run outside VS Code.
-- Treat all locations as explicit opt-ins. Dotfiles can contain credentials and should never
-  be automatically indexed or exposed.
+- [ ] **3. Keyboard navigation.** Arrow keys move between bookmarks, Enter opens, Escape
+      clears the filter, `/` focuses it. A start page you cannot drive from the keyboard is
+      a mouse toy.
+- [ ] **4. Filter on paths, not just labels.** Two bookmarks called `src` are
+      indistinguishable today, and typing a folder name finds nothing.
+- [ ] **5. Open in a new window.** The single most common thing to want from a start page
+      and it is not offered anywhere.
+- [ ] **6. Collapsible groups, persisted.** A board with eight groups needs to fold.
+- [ ] **7. Flag bookmarks whose target is gone.** A dead bookmark currently looks identical
+      to a live one until you click it.
+- [ ] **8. Pin bookmarks to the top of their group.**
+- [ ] **9. Show git branch on folder bookmarks.**
+- [ ] **10. Empty-state and first-run polish** once the above have settled.

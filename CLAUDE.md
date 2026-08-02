@@ -14,24 +14,26 @@ actual page and message bridge after UI changes.
 
 After **any** change to `main.tsx`, `landingpage-preact.html` or `landingpage2.scss`:
 
-1. `npm run compile` and `npm run lint`.
-2. Render it with a stubbed VS Code bridge and read the browser console.
+1. `npm run compile`, `npm run lint` and `npm run typecheck`.
+2. `npm run harness`, then drive the page in a browser and read the console.
 
 ## Rendering the page outside VS Code
 
-The fastest feedback loop is not F5. `LandingPageTemplate2.makeHTML()` is pure string
-substitution, so the same page can be produced in Node and opened in a browser:
+The fastest feedback loop is not F5 - it is `npm run harness`, which serves the real page at
+`http://localhost:5599` against a stubbed extension host. See *The browser harness* in
+`AGENTS.md` for what it provides.
 
-- serve `landingpage-preact.html`, the compiled CSS and `landingpage-preact.js` together
-- stub `window.acquireVsCodeApi` and dispatch a `syncModel` message with a fake model
-- serve over `http://` and drive it
-
-Two traps when doing this:
+Things that used to go wrong here and no longer should, because the harness handles them:
 
 - **Wait for `documentReady` before dispatching `syncModel`.** The Preact listener is
   installed in an effect, just as the extension host waits for that message before syncing.
-- **Keep the icon map in sync with `iconography.ts`.** A missing key renders an empty icon,
-  which looks like a layout bug, not a missing icon.
+- **Do not rebuild the icon map by hand.** The harness renders through the same
+  `renderLandingPage()` the extension uses, so `iconography.ts` cannot drift out of sync with
+  it. A missing key renders an empty icon, which looks like a layout bug, not a missing icon;
+  `[...document.querySelectorAll('.icon')].filter(i => !i.querySelector('svg')).length` is the
+  check.
+- **Shut the harness down when you are finished with it.** It holds port 5599, and the next
+  run binding a different port means later verification silently targets the wrong page.
 
 ## Editing this codebase
 

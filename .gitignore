@@ -9,7 +9,7 @@ out/
 dist/
 lib/
 
-# Generated CSS (built from landingpage2.scss by `npm run build:css`)
+# Built webview bundle (produced by `npm run build:webview`)
 src/LandingPage/content/dist/
 
 # Isolated extensions directory and profile used by the "Run Extension" launch config

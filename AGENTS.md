@@ -28,15 +28,19 @@ host, not the page.
 
 ## Build
 
-`npm run compile`. Three steps run in order and **all are required**:
+`npm run compile`. Two Vite builds run **in that order, and the order matters**:
 
-1. `npm run build:css` compiles `landingpage2.scss` to `content/dist/landingpage2.css`.
-2. `npm run build:webview` bundles `webview/main.tsx` with Preact to
-   `content/dist/landingpage-preact.js`.
-3. `webpack` bundles `src/extension.ts` to `dist/extension.js`.
+1. `npm run build:webview` (`vite.config.webview.mts`) bundles `webview/main.tsx` with Preact
+   to `content/dist/landingpage-preact.js`, as a single self-contained IIFE.
+2. `npm run build:extension` (`vite.config.extension.mts`) bundles `src/extension.ts` to
+   `dist/extension.js` as CommonJS, with `vscode` and Node builtins external.
 
-`LandingPageTemplate2.ts` inlines the built CSS, Preact bundle and the raw HTML into one string
-via `raw-loader`, substituting these placeholders:
+Step 2 imports the output of step 1 as text, so a stale webview bundle silently ships an old
+page. There is no separate CSS step: `LandingPageTemplate2.ts` imports the SCSS with
+`?inline`, so Vite compiles Sass as part of the extension build.
+
+`LandingPageTemplate2.ts` inlines the compiled CSS, the Preact bundle and the raw HTML into
+one string using Vite's `?raw` and `?inline` imports, substituting these placeholders:
 
 | Placeholder | Replaced with |
 |---|---|
@@ -49,7 +53,10 @@ via `raw-loader`, substituting these placeholders:
 Consequences worth knowing:
 
 - **Editing the SCSS or TSX alone does nothing** until its build runs. `npm run watch` starts
-  coordinated CSS, Preact and extension watchers for F5.
+  both Vite watchers for F5.
+- **Icon SVGs are imported with `?raw`**, which returns the file untouched - including the
+  `width="24" height="24"` the old `svg-inline-loader` stripped. `iconography.ts` strips them
+  itself now, so icons stay sized by the SCSS.
 - **`content/dist/` is generated** and gitignored. Never edit it.
 - `landingpage2.js` is retained as the pre-Preact reference implementation. Do not make
   product changes there unless intentionally maintaining the fallback as well.
@@ -62,6 +69,24 @@ Consequences worth knowing:
   console and inspect its DOM.
 - The page only auto-opens in a window with no folder open. Otherwise run
   *Show Landing Page* from the command palette.
+
+### The browser harness
+
+`npm run harness` builds everything and serves the *real* page at `http://localhost:5599`
+with a stubbed extension host. This is the fast loop: an ordinary browser console, an
+ordinary DOM inspector, and every message the page posts recorded on `window.__posted`.
+
+- `?empty` renders the empty state, `?theme=light` the light theme. The harness supplies the
+  `--vscode-*` variables itself, so colours are real rather than missing.
+- The stub replies to `documentReady` before sending `syncModel`, exactly as
+  `communication.ts` does. Dispatching earlier races the Preact listener, which is installed
+  in an effect.
+- Assert on messages, not on looks: stub-posted commands are the behaviour. Screenshots only
+  confirm appearance.
+
+The page it serves is built by `vite.config.harness.mts` from `renderLandingPage()`, the same
+pure function `LandingPageTemplate2.makeHTML()` calls - so what you see is what the webview
+gets.
 
 ## Package and release
 

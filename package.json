@@ -108,23 +108,25 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
-    "build:css": "sass src/LandingPage/content/landingpage2.scss src/LandingPage/content/dist/landingpage2.css --no-source-map --style=compressed",
-    "watch:css": "sass --watch src/LandingPage/content/landingpage2.scss src/LandingPage/content/dist/landingpage2.css --no-source-map",
-    "build:webview": "webpack --config webpack.webview.config.js",
-    "watch:webview": "webpack --config webpack.webview.config.js --watch",
-    "compile": "npm run build:css && npm run build:webview && webpack",
+    "build:webview": "vite build --config vite.config.webview.mts",
+    "build:extension": "vite build --config vite.config.extension.mts",
+    "build:harness": "vite build --config vite.config.harness.mts",
+    "compile": "npm run build:webview && npm run build:extension",
     "watch": "node scripts/watch.mjs",
-    "package": "npm run build:css && npm run build:webview && webpack --mode production --devtool hidden-source-map",
+    "package": "npm run compile",
     "build": "npm run compile",
     "vsix": "npx -y @vscode/vsce package",
     "install-local": "node scripts/install-local.mjs",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
+    "typecheck": "tsc -p . --noEmit",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "harness": "npm run compile && npm run build:harness && node scripts/harness.mjs"
   },
   "devDependencies": {
+    "@preact/preset-vite": "^2.10.6",
     "@types/mocha": "^10.0.10",
     "@types/node": "^20.19.43",
     "@types/vscode": "^1.96.0",
@@ -133,17 +135,12 @@
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^2.4.1",
     "eslint": "^10.8.0",
-    "raw-loader": "^4.0.2",
     "sass": "^1.83.1",
-    "sass-loader": "^16.0.4",
-    "ts-loader": "^9.5.1",
     "typescript": "^5.7.2",
-    "webpack": "^5.97.1",
-    "webpack-cli": "^5.1.4"
+    "vite": "^8.2.0"
   },
   "dependencies": {
     "lucide-static": "^0.471.0",
-    "preact": "^10.29.7",
-    "svg-inline-loader": "^0.8.2"
+    "preact": "^10.29.7"
   }
 }

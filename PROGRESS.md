@@ -2,6 +2,27 @@
 
 Fork of `renebuehling/vsc-landingpage`. Tracks work done in this fork and what is still open.
 
+## 2026-08-02 - Vite build, and a permanent browser harness
+
+Replaced webpack with two Vite builds: the webview (`vite.config.webview.mts`, IIFE) and the
+extension host (`vite.config.extension.mts`, CommonJS with `vscode` external). The webview
+build must run first, because the extension bundle inlines its output as text.
+
+- The separate `build:css` step is gone. `LandingPageTemplate2.ts` imports the SCSS with
+  Vite's `?inline`, so Sass runs inside the extension build.
+- `raw-loader`, `svg-inline-loader`, `ts-loader`, `sass-loader`, `webpack` and `webpack-cli`
+  are all removed. `?raw` replaced the first two.
+- `?raw` returns SVGs untouched, so `iconography.ts` now strips the `width`/`height`
+  attributes that `svg-inline-loader` used to remove. Without that, icons render at a fixed
+  24px and ignore the SCSS.
+- Added `npm run harness`: `scripts/harness.mjs` serves the real page at `localhost:5599`
+  with a stubbed extension host, records posted messages on `window.__posted`, and supplies
+  the `--vscode-*` theme variables so colours are real. `?empty` and `?theme=light` cover the
+  other states. The page comes from `renderLandingPage()`, the same pure function the webview
+  gets, built by `vite.config.harness.mts`.
+- Verified in a browser: both themes render, all three layouts render, 31 icons resolve with
+  none empty, and the console is clean.
+
 ## 2026-07-27 - Preact webview migration
 
 Moved the production webview from manually synchronized DOM code to Preact. The extension

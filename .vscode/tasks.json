@@ -6,7 +6,7 @@
 		{
 			"type": "npm",
 			"script": "watch",
-			"problemMatcher": "$ts-webpack-watch",
+			"problemMatcher": [],
 			"isBackground": true,
 			"presentation": {
 				"reveal": "never",
@@ -28,28 +28,6 @@
 				"panel": "dedicated",
 				"clear": true
 			}
-		},
-		{
-			"type": "npm",
-			"script": "watch:css",
-			"problemMatcher": [],
-			"isBackground": true,
-			"presentation": {
-				"reveal": "never",
-				"group": "watchers"
-			},
-			"group": "build"
-		},
-		{
-			"type": "npm",
-			"script": "watch:webview",
-			"problemMatcher": "$ts-webpack-watch",
-			"isBackground": true,
-			"presentation": {
-				"reveal": "never",
-				"group": "watchers"
-			},
-			"group": "build"
 		},
 		{
 			"type": "npm",

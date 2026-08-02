@@ -1,4 +1,7 @@
 {
+	// The Vite configs are TypeScript too, but Vite type-checks and runs them itself. Leaving
+	// them in the default `**/*` include makes them fight `rootDir`.
+	"include": ["src"],
 	"compilerOptions": {
 		"module": "Node16",
 		"target": "ES2022",

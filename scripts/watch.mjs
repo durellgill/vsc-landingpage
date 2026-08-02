@@ -6,10 +6,12 @@ import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+// The extension build inlines the webview bundle as text, so the webview watcher has to be
+// the one that rebuilds first. Vite writes the bundle, the extension watcher sees the file
+// change and re-inlines it.
 const commands = [
-  [npmCommand, ['run', 'watch:css']],
-  [npmCommand, ['run', 'watch:webview']],
-  [npmCommand, ['exec', '--', 'webpack', '--watch']]
+  [npmCommand, ['run', 'build:webview', '--', '--watch']],
+  [npmCommand, ['run', 'build:extension', '--', '--watch']]
 ];
 const watchers = commands.map(([command, args]) =>
   spawn(command, args, { cwd: root, stdio: 'inherit' })

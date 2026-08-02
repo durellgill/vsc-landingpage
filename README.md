@@ -38,8 +38,8 @@ The watch tasks rebuild in the background, so you never run a build by hand:
 
 | Changed | Rebuilt by |
 |---|---|
-| `.ts` | `npm: watch` (webpack) |
-| `.scss` | `npm: watch:css` (sass) |
+| `.ts` | `npm: watch` (Vite) |
+| `.tsx`, `.scss` | `npm: watch` (Vite) |
 | `.html`, `landingpage2.js` | `npm: watch` |
 
 **To see errors** — the page is a sandboxed webview with its own console, separate from the
