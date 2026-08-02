@@ -78,12 +78,18 @@ import svgFolderOpen from 'lucide-static/icons/folder-open.svg?raw';
  *
  * The webpack build used svg-inline-loader, which removed those attributes for us. Vite's
  * `?raw` import returns the file untouched, so the same normalisation happens here.
+ *
+ * Only the opening `<svg>` tag is touched. Doing this over the whole file also strips the
+ * `width`/`height` of child `<rect>` elements, which are geometry rather than sizing - that
+ * collapsed them to nothing and silently blanked every icon drawn from rects, including both
+ * layout buttons. Eleven of the seventy-four icons here contain such a child.
+ *
  * @param source Raw SVG file contents.
  * @returns SVG markup sized by CSS rather than by its own attributes.
  */
 function icon(source:string):string
 {
-  return source.replace(/\s(?:width|height)="[^"]*"/g, '').trim();
+  return source.replace(/<svg\b[^>]*>/, tag => tag.replace(/\s(?:width|height)="[^"]*"/g, '')).trim();
 }
 
 //TODO: remove unused icons

@@ -183,7 +183,9 @@ Add bookmarks two ways, and they differ by where the bookmark lands:
 
 - The **Add** button on a group header opens a composer beneath *that* group, so the
   destination is implied by where you clicked.
-- The page header's **New** menu is global, so it asks which group to use.
+- The page header's **New** menu is global, so it asks which group to use - except for
+  **Folder on disk**, which opens the native dialog straight away and files the result in
+  your first group.
 
 You can also right-click any file or folder in the **Explorer** and choose *Add to Landing
 Page Group* - that works even if the landing page has never been opened in the window.
@@ -208,9 +210,13 @@ pinned them in.
 
 ### Missing targets
 
-A bookmark whose folder or file has been moved, renamed or deleted is marked with a red spine
-and a **Missing** badge. The check runs when the page opens and whenever **Recent** is
-refreshed, which includes the panel coming back into view. It is marked, never hidden or
+A bookmark in one of *your* groups whose folder or file has been moved, renamed or deleted is
+marked with a red spine and a **Missing** badge. The check runs when the page opens and
+whenever **Recent** is refreshed, which includes the panel coming back into view.
+
+In **Recent** a missing entry is simply dropped instead. Recent mirrors what you have opened
+rather than a list you curate, and the list is rebuilt from VS Code's history on every sync,
+so a dead entry there is noise you have no way to remove. It is marked, never hidden or
 disabled - you may well want to open it anyway, rename it, or remove it, and quietly dropping
 a bookmark you made is not this page's decision.
 

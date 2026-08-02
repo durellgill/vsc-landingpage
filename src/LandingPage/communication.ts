@@ -223,6 +223,25 @@ async function populateVscMru(sharedModel:LandingPageModel):Promise<void>
  * @param webviewPanel Panel to refresh afterwards.
  */
 /**
+ * The group a page-level create lands in when the user was not asked to choose.
+ *
+ * The first user-created group, or a new one if the board has none. Never the generated
+ * `Recent` group, which is rebuilt from VS Code's history and would discard the bookmark.
+ *
+ * @param sharedModel Model to resolve against; a group is appended to it when there is none.
+ * @returns A group that can receive a bookmark.
+ */
+function defaultGroup(sharedModel:LandingPageModel):LandingPageGroup
+{
+  const existing = sharedModel.groups.find(group => group.guid!=='@vsc-mru');
+  if (existing) {return existing;}
+
+  const created:LandingPageGroup = {guid:crypto.randomUUID(), label:'Group', projects:[]};
+  sharedModel.groups.splice(0,0,created);
+  return created;
+}
+
+/**
  * Asks the user which group an item should land in.
  *
  * Used by the page-level create actions, which - unlike the group composer - have no
@@ -464,12 +483,11 @@ export async function cloneRepository(url?:string):Promise<void>
  */
 async function createDirectory(groupGuid:string|undefined, sharedModel:LandingPageModel, webviewPanel:vscode.WebviewPanel):Promise<void>
 {
-  // No guid means the action came from the page-level create menu, which names no destination.
-  const destination = groupGuid
-    ? findFirst(groupGuid, sharedModel)?.target as LandingPageGroup|undefined
-    : await pickDestinationGroup(sharedModel, 'Bookmark the new folder in group');
-  if (!destination) {return;}
-
+  // The dialog comes first, deliberately. This action is about making a folder on disk;
+  // being asked which group to file it under before anything has been created is a question
+  // about bookmarking, asked before the user has said what they are bookmarking. So the
+  // native picker opens straight away and the destination is resolved afterwards, without a
+  // prompt - the group header's own Add button is how you choose a destination explicitly.
   const target = await vscode.window.showSaveDialog({title:'Create a new folder', saveLabel:'Create folder'});
   if (!target) {return;}
 
@@ -483,12 +501,19 @@ async function createDirectory(groupGuid:string|undefined, sharedModel:LandingPa
     return;
   }
 
+  // Resolved only once the folder exists. `defaultGroup()` can append a group to the model,
+  // and doing that before the create could leave a stray empty group behind on failure.
+  const destination = (groupGuid ? findFirst(groupGuid, sharedModel)?.target as LandingPageGroup|undefined : undefined)
+    ?? defaultGroup(sharedModel);
+
   const nameParts = parseURI(target);
   destination.projects.push({guid:crypto.randomUUID(), label:nameParts.basename, path:target.toString(), icon:'folder'});
-  sendMessageToWebview({command:'syncModel',model:sharedModel}, webviewPanel);
+  // forceRebuild: defaultGroup() may have just inserted a group, and the DOM sync is keyed
+  // by GUID so it would not place a new one.
+  sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
   saveModel(sharedModel);
 
-  const open = await vscode.window.showInformationMessage(`Created ${nameParts.basename}.`, 'Open folder');
+  const open = await vscode.window.showInformationMessage(`Created ${nameParts.basename} in "${destination.label}".`, 'Open folder');
   if (open) {vscode.commands.executeCommand('vscode.openFolder', target, {forceNewWindow:false});}
 }
 

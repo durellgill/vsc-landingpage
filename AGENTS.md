@@ -56,7 +56,10 @@ Consequences worth knowing:
   both Vite watchers for F5.
 - **Icon SVGs are imported with `?raw`**, which returns the file untouched - including the
   `width="24" height="24"` the old `svg-inline-loader` stripped. `iconography.ts` strips them
-  itself now, so icons stay sized by the SCSS.
+  itself now, so icons stay sized by the SCSS. **It must only touch the opening `<svg>` tag.**
+  Eleven of the icons are drawn from `<rect>` children whose own `width`/`height` are geometry,
+  not sizing; stripping those collapses them to nothing and the icon renders blank - which is
+  what happened to both layout buttons.
 - **`content/dist/` is generated** and gitignored. Never edit it.
 - `landingpage2.js` is retained as the pre-Preact reference implementation. Do not make
   product changes there unless intentionally maintaining the fallback as well.
@@ -108,6 +111,12 @@ gets.
   own their visible Add and Layout controls; group customisation remains on right-click.
   Bookmarks change group via "Move to group", which shows a native quick pick from the
   extension host - bookmarks themselves are not draggable.
+- **"New folder on disk" opens the native dialog first and never asks for a group.** It is an
+  action about creating a folder; asking which group to file it under before anything exists
+  is a bookmarking question asked too early. The destination falls back to the first
+  user-created group (`defaultGroup()`), resolved only *after* the folder exists so a failed
+  create cannot leave a stray empty group behind. The group header's Add button remains the
+  way to choose a destination explicitly.
 - **Creating has two entry points, and they differ by destination.** The group header's Add
   button opens `.group-composer` beneath that group, so the destination is implied by where
   it was clicked. The page header's **New** menu is global and names no group, so the host
@@ -171,6 +180,10 @@ gets.
   order. Recent entries can be pinned too, which is why `pinned` is in `MruCustomisation` -
   on the project object it would not survive the next `populateVscMru()`. Unpinning sends
   `undefined`, not `false`, so the overlay entry is dropped instead of accumulating.
+- **A missing target is dropped from `Recent` but flagged in a user group.** Recent mirrors
+  what you have opened and is rebuilt every sync, so a dead entry there is noise you have no
+  way to remove - it is filtered out. A bookmark in your own group is one you deliberately
+  made, so it is flagged and left for you to deal with.
 - **A bookmark whose target is gone is marked, never hidden or disabled.** The host stats
   every `file:` target and posts a `bookmarkHealth` message listing the GUIDs it could not
   find. This is observed state and deliberately stays out of the model: persisting it would
@@ -203,6 +216,17 @@ gets.
   indexing an array, because list is a flex column, grid is a width-dependent CSS grid, and
   compact wraps. Anything that adds a new card layout gets this for free; anything that adds
   a new interactive surface must not become a keyboard dead end.
+- **The bookmark label is `.project-label`, and the path line is a flex row.** The SCSS used
+  to hook the label with `[data-field="project.label"]`, an attribute only the pre-Preact page
+  emitted - so every label in all three layouts silently lost its weight, ellipsis and line
+  clamp. Style card internals through real classes, and check a rule actually matches before
+  trusting it. The path line carries inline badges as well as text, so it is `display: flex`
+  with `align-items: center`; baseline alignment left the badges off by a fraction of a pixel.
+- **In grid layout the icon pins to the label's first line**, not the centre of the card.
+  Centring it re-positions the icon whenever a label wraps to two lines, so neighbouring cards
+  in the same grid ended up with icons at different heights. `.textblock` is `display: contents`
+  there, so the label and path need explicit `grid-column`/`grid-row` or the path auto-places
+  underneath the icon.
 - Prefer `outline` over `border` for hover/selection indicators - a border occupies layout
   space and reflows the row when it appears.
 - Never set `overflow` on one axis alone for a container that anything escapes (tooltips,

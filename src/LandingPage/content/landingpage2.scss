@@ -798,9 +798,16 @@
           padding: 12px 14px;
           position: relative;
 
+          // The icon sits on the label's first line, not centred across the whole card.
+          // Spanning both rows re-centres it whenever a label wraps to two lines, so
+          // neighbouring cards in the same grid ended up with their icons at different
+          // heights - the most visible misalignment on the page.
           .pictoral
           {
-            grid-row: 1 / span 2;
+            grid-column: 1;
+            grid-row: 1;
+            align-self: start;
+            margin-top: -3px; // optical centring against the 1.35 line-height of the label
             .icon { display: flex; }
             .lucide { width: 22px; height: 22px; }
           }
@@ -808,10 +815,16 @@
           .textblock
           {
             min-width: 0;
+            // `display: contents` lets the label and path take part in the card's own grid.
+            // Both therefore need explicit placement: auto-placement would drop the path
+            // into column 1, underneath the icon.
             display: contents;
 
-            [data-field="project.label"]
+            .project-label
             {
+              grid-column: 2;
+              grid-row: 1;
+              min-width: 0;
               font-weight: 500;
               line-height: 1.35;
               padding-right: 22px; // clear the "..." button
@@ -821,6 +834,7 @@
               overflow: hidden;
               overflow-wrap: anywhere;
             }
+            .project-path { grid-column: 2; grid-row: 2; }
           }
         }
       }
@@ -853,7 +867,7 @@
             flex-direction: column;
             gap: 1px;
 
-            [data-field="project.label"]
+            .project-label
             {
               font-weight: 500;
               white-space: nowrap;
@@ -894,10 +908,11 @@
 
             // The label keeps its width and the path absorbs the slack, so a long path
             // truncates before the bookmark name does.
-            [data-field="project.label"]
+            .project-label
             {
               flex: 0 1 auto;
               min-width: 0;
+              font-weight: 500; // matches list and grid; compact was the odd one out
               white-space: nowrap;
               overflow: hidden;
               text-overflow: ellipsis;
@@ -984,8 +999,9 @@
         // title row would push labels around as branches are switched.
         .branch-badge
         {
-          display: inline-flex;
+          display: flex;
           align-items: center;
+          flex: none;
           gap: 3px;
           margin-right: 6px;
           max-width: 18ch;
@@ -998,8 +1014,9 @@
 
         .missing-badge
         {
-          display: inline-flex;
+          display: flex;
           align-items: center;
+          flex: none;
           gap: 3px;
           margin-right: 6px;
           font-family: var(--vscode-font-family);
@@ -1057,15 +1074,28 @@
 
         // Paths are set in the editor's own monospace face - it is the vernacular of the
         // thing being bookmarked, and it makes directory segments line up between rows.
+        // Paths share this line with the branch and missing badges, so it is a flex row
+        // rather than a run of inline elements: inline layout aligns an inline-flex badge on
+        // its baseline, which left the badges sitting a fraction of a pixel off the text.
         .project-path
         {
+          display: flex;
+          align-items: center;
+          min-width: 0;
           font-family: var(--mono);
           font-size: .8em;
           color: var(--vscode-descriptionForeground);
           white-space: nowrap;
           overflow: hidden;
-          text-overflow: ellipsis;
           &:empty { display: none; }
+
+          // The path itself is the only part allowed to shrink; the badges stay legible.
+          > .path-text
+          {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
         }
 
         // The type icon picks up the paint colour, tying the row to its spine.
