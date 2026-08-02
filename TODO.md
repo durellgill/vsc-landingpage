@@ -27,6 +27,6 @@ Working list for turning this into the start page I actually want. One commit pe
 - [x] **6. Collapsible groups, persisted.** A board with eight groups needs to fold.
 - [x] **7. Flag bookmarks whose target is gone.** A dead bookmark currently looks identical
       to a live one until you click it.
-- [ ] **8. Pin bookmarks to the top of their group.**
+- [x] **8. Pin bookmarks to the top of their group.**
 - [ ] **9. Show git branch on folder bookmarks.**
 - [ ] **10. Empty-state and first-run polish** once the above have settled.

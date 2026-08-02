@@ -155,6 +155,13 @@ gets.
   - **Stop the drop event at the group.** `.content` carries a drop handler for the gaps
     between groups, so a drop on a group that bubbles fires both handlers and posts
     `moveGroup` twice.
+- **Pinning sorts, it does not reorder.** `LandingPageProject.pinned` moves a bookmark to
+  the top of its group through a stable sort in `pinnedFirst()`; the stored order is left
+  untouched, so unpinning returns it to where it was rather than to wherever the pin dropped
+  it. Two pinned bookmarks keep their stored order relative to each other, not their pin
+  order. Recent entries can be pinned too, which is why `pinned` is in `MruCustomisation` -
+  on the project object it would not survive the next `populateVscMru()`. Unpinning sends
+  `undefined`, not `false`, so the overlay entry is dropped instead of accumulating.
 - **A bookmark whose target is gone is marked, never hidden or disabled.** The host stats
   every `file:` target and posts a `bookmarkHealth` message listing the GUIDs it could not
   find. This is observed state and deliberately stays out of the model: persisting it would

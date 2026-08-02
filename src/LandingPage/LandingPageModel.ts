@@ -74,6 +74,13 @@ export interface LandingPageProject extends LandingPageItem
    * from {@link icon} instead, i.e. the file/folder/workspace type.
    */
   glyph?:string;
+  /**
+   * Whether this bookmark is held at the top of its group.
+   *
+   * Pinning sorts rather than reorders: the underlying order is left alone, so unpinning
+   * puts a bookmark back where it was instead of leaving it wherever the pin dropped it.
+   */
+  pinned?:boolean;
   /** Color theming for this bookmark. */
   shade?:'red'|'orange'|'yellow'|'green'|'teal'|'pink'|'purple'|'blue'|'cyan'|'gray'|'silver'|'brown'|'white'|'black';
 }

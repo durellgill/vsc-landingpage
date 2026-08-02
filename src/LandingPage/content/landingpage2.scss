@@ -963,6 +963,22 @@
           .pictoral, .textblock > div:first-child { opacity: .6; }
         }
 
+        // A pinned bookmark says so quietly. The pin sits beside the row menu rather than in
+        // the text, so it stays put across all three layouts and never reflows the label.
+        .pin-marker
+        {
+          position: absolute;
+          top: 6px;
+          right: 6px;
+          display: flex;
+          color: var(--shade-color, var(--vscode-descriptionForeground));
+          opacity: .75;
+          pointer-events: none;
+          .lucide { width: 12px; height: 12px; stroke-width: 2.5px; }
+        }
+        // The row menu appears on hover in the same corner, so the pin yields to it.
+        &:hover .pin-marker, &:focus .pin-marker { opacity: 0; }
+
         .missing-badge
         {
           display: inline-flex;

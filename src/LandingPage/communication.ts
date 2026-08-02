@@ -32,7 +32,7 @@ interface MessageFromWebview
   toIndex?:number;
 
   /** For command 'patch' the name of the field to update. */
-  field?:'shade'|'layout'|'glyph'|'collapsed';
+  field?:'shade'|'layout'|'glyph'|'collapsed'|'pinned';
   /** For command 'patch' the new value to assign, or the text from the inline rename editor. */
   value?:any;
 }
@@ -92,6 +92,7 @@ interface MruCustomisation
 {
   shade?:LandingPageProject['shade'];
   glyph?:string;
+  pinned?:boolean;
 }
 
 function hiddenMruGuids():Set<string>
@@ -149,6 +150,7 @@ function applyMruCustomisation(project:LandingPageProject, custom:MruCustomisati
   if (!custom) {return;}
   if (custom.shade) {project.shade = custom.shade;}
   if (custom.glyph) {project.glyph = custom.glyph;}
+  if (custom.pinned) {project.pinned = true;}
 }
 
 async function hideMru(guid:string|undefined):Promise<void>
@@ -780,6 +782,14 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       else if (message.field==='layout')
       {
         (found.target as LandingPageGroup).layout=message.value;
+      }
+      else if (message.field==='pinned')
+      {
+        // Unpinning passes `undefined` rather than `false` so the MRU overlay entry is
+        // dropped entirely instead of accumulating `pinned:false` for every entry ever
+        // pinned and then unpinned.
+        const pinned = message.value===true ? true : undefined;
+        if (!await customiseMru(message.guid,'pinned',pinned,sharedModel)) {(found.target as LandingPageProject).pinned = pinned;}
       }
       else if (message.field==='collapsed')
       {

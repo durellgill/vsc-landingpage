@@ -77,6 +77,18 @@ function groupMatches(group:LandingPageGroup, needles:string[]):boolean {
  */
 function opensInWindow(project:LandingPageProject):boolean {return project.icon==='folder' || project.icon==='workspace';}
 
+/**
+ * Puts pinned bookmarks first, leaving everything else in its stored order.
+ *
+ * A stable sort rather than a reorder of the model: unpinning has to return a bookmark to
+ * where it was, which it cannot do if pinning has already destroyed that position.
+ */
+function pinnedFirst(projects:LandingPageProject[]):LandingPageProject[] {
+  return projects.map((project,index) => ({project,index}))
+    .sort((a,b) => (Number(!!b.project.pinned) - Number(!!a.project.pinned)) || (a.index - b.index))
+    .map(entry => entry.project);
+}
+
 /** Every bookmark card currently on the page, in document order. */
 // Array.from rather than spread: tsconfig's `lib` is ES2022 with no DOM.Iterable, so a
 // NodeList is not iterable as far as the compiler is concerned.
@@ -295,7 +307,7 @@ function App() {
 function GroupShelf({group,index,needles,composer,setComposer,openMenu,refreshing,refresh,missing,dragging,drop,onDragStart,onDragOver,onDrop}:{group:LandingPageGroup;index:number;total:number;needles:string[];composer:boolean;setComposer:(id:string|null)=>void;openMenu:(event:MouseEvent,guid:string)=>void;refreshing:boolean;refresh:()=>void;missing:string[];dragging:boolean;drop:'before'|'after'|null;onDragStart:()=>void;onDragOver:(event:DragEvent,index:number)=>void;onDrop:()=>void}) {
   const sealed=group.guid==='@vsc-mru';
   // Naming the group shows all of it; otherwise each bookmark is matched on its own.
-  const projects=groupMatches(group,needles) ? group.projects : group.projects.filter(project=>matches(project,needles));
+  const projects=pinnedFirst(groupMatches(group,needles) ? group.projects : group.projects.filter(project=>matches(project,needles)));
   const layout=group.layout||'list';
   // A filter overrides the stored fold. Searching a board and being shown a collapsed group
   // that silently contains the hit is the worst of both - the query is a temporary intent,
@@ -316,7 +328,7 @@ function GroupShelf({group,index,needles,composer,setComposer,openMenu,refreshin
 function BookmarkCard({project,missing,openMenu}:{project:LandingPageProject;missing:boolean;openMenu:(event:MouseEvent,guid:string)=>void}) {
   const type=project.icon||'file'; const shade=project.shade||typeShades[type];
   const path=project.path?.replace(/^file:\/\//,'')||''; const parent=path.slice(0,path.lastIndexOf('/'));
-  return <article class="project interactable" tabIndex={0} role="button" aria-label={project.label} data-guid={project.guid} data-shade={shade} data-kind={type} data-missing={missing?'yes':undefined} title={missing?`${path}\n\nThis target no longer exists.`:path} onClick={event=>{if (!(event.target as Element).closest('button')) {post('open',{guid:project.guid, newWindow:(event.ctrlKey||event.metaKey) && opensInWindow(project)});}}} onContextMenu={event=>openMenu(event,project.guid)}><div class="spine"/><div class="pictoral"><Svg name={iconFor(project)}/></div><div class="textblock"><div>{project.label}</div><div class="project-path">{missing ? <><span class="missing-badge"><Svg name="triangleAlert"/>Missing</span>{parent}</> : parent}</div></div><button class="rowmenu" title="More actions" onClick={event=>openMenu(event,project.guid)}><Svg name="ellipsis"/></button></article>;
+  return <article class="project interactable" tabIndex={0} role="button" aria-label={project.label} data-guid={project.guid} data-shade={shade} data-kind={type} data-missing={missing?'yes':undefined} data-pinned={project.pinned?'yes':undefined} title={missing?`${path}\n\nThis target no longer exists.`:path} onClick={event=>{if (!(event.target as Element).closest('button')) {post('open',{guid:project.guid, newWindow:(event.ctrlKey||event.metaKey) && opensInWindow(project)});}}} onContextMenu={event=>openMenu(event,project.guid)}><div class="spine"/><div class="pictoral"><Svg name={iconFor(project)}/></div><div class="textblock"><div>{project.label}</div><div class="project-path">{missing ? <><span class="missing-badge"><Svg name="triangleAlert"/>Missing</span>{parent}</> : parent}</div></div>{project.pinned && <span class="pin-marker" title="Pinned to the top of this group"><Svg name="pin"/></span>}<button class="rowmenu" title="More actions" onClick={event=>openMenu(event,project.guid)}><Svg name="ellipsis"/></button></article>;
 }
 
 function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,picker,setPicker,close,renameTarget,chooseShade,chooseGlyph}:any) {
@@ -327,6 +339,7 @@ function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,picker,setP
   return <div id="ctxmenu" class="ctxmenu" data-renaming={rename!==null ? 'yes' : undefined} style={style}>
     {project && <button onClick={()=>{post('open',{guid:target.item.guid});close();}}><Svg name="arrowRightIcon"/><span>Open</span></button>}
     {project && opensInWindow(target.item) && <button onClick={()=>{post('open',{guid:target.item.guid,newWindow:true});close();}}><Svg name="appWindow"/><span>Open in new window</span></button>}
+    {project && <button onClick={()=>{post('patch',{guid:target.item.guid,field:'pinned',value:!target.item.pinned});close();}}><Svg name={target.item.pinned?'pinOff':'pin'}/><span>{target.item.pinned?'Unpin':'Pin to top'}</span></button>}
     {!sealed && <>{rename!==null ? <div class="ctxrename"><input autoFocus value={rename} onInput={(event:any)=>setRename(event.currentTarget.value)} onKeyDown={(event:any)=>{if(event.key==='Enter')renameTarget();if(event.key==='Escape')close();}}/><button onClick={renameTarget}>Save</button><button onClick={close}>Cancel</button></div> : <button onClick={()=>setRename(target.item.label)}><Svg name="textCursorInput"/><span>Rename</span></button>}</>}
     <button onClick={()=>setPicker('shade')}><Svg name="paintbrush"/><span>Accent colour</span></button>
     <button onClick={()=>setPicker('glyph')}><Svg name="image"/><span>Custom icon</span></button>

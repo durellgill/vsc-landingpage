@@ -68,6 +68,8 @@ import svgZap from 'lucide-static/icons/zap.svg?raw';
 import svgShoppingBag from 'lucide-static/icons/shopping-bag.svg?raw';
 import svgRefreshCw from 'lucide-static/icons/refresh-cw.svg?raw';
 import svgTriangleAlert from 'lucide-static/icons/triangle-alert.svg?raw';
+import svgPin from 'lucide-static/icons/pin.svg?raw';
+import svgPinOff from 'lucide-static/icons/pin-off.svg?raw';
 import svgSearch from 'lucide-static/icons/search.svg?raw';
 import svgFolderOpen from 'lucide-static/icons/folder-open.svg?raw';
 
@@ -130,6 +132,8 @@ export const icons=
   folderInput : icon(svgFolderInput), // toolbar button for the icon picker
   refreshCw : icon(svgRefreshCw),
   triangleAlert : icon(svgTriangleAlert),
+  pin : icon(svgPin),
+  pinOff : icon(svgPinOff),
 
   //--- glyphs -----------------------------------------------------------------
   // User-selectable bookmark icons. The key after `glyph-` is what gets stored in
