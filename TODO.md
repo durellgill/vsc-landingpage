@@ -17,7 +17,7 @@ Working list for turning this into the start page I actually want. One commit pe
 
 ## The rest of a good start page
 
-- [ ] **3. Keyboard navigation.** Arrow keys move between bookmarks, Enter opens, Escape
+- [x] **3. Keyboard navigation.** Arrow keys move between bookmarks, Enter opens, Escape
       clears the filter, `/` focuses it. A start page you cannot drive from the keyboard is
       a mouse toy.
 - [ ] **4. Filter on paths, not just labels.** Two bookmarks called `src` are

@@ -917,6 +917,23 @@
           background: var(--vscode-list-hoverBackground, var(--vscode-editorWidget-background));
         }
 
+        // Cards are tab stops, so arrow-key navigation needs a focus ring clearly stronger
+        // than hover - it is the only thing telling you what Enter will open.
+        //
+        // Deliberately `:focus`, not `:focus-visible`. Arrow navigation moves focus with a
+        // programmatic .focus(), and whether that counts as focus-visible depends on the
+        // engine's heuristic about the preceding input - too fragile for the one affordance
+        // telling you what Enter will open. The usual reason to prefer :focus-visible does
+        // not apply here anyway: clicking a card opens its project immediately, so a ring is
+        // never left sitting on the page after a click.
+        &:focus
+        {
+          outline: 2px solid var(--vscode-focusBorder, var(--accent-color));
+          outline-offset: 1px;
+          background: var(--vscode-list-hoverBackground, var(--vscode-editorWidget-background));
+          .spine { width: 5px; opacity: 1; }
+        }
+
         // Signature element: a colour spine down the leading edge of every bookmark.
         // Painted bookmarks show their shade at full strength; unpainted ones keep a quiet
         // marker so a group still reads as a shelf rather than a stack of grey boxes.

@@ -17,11 +17,30 @@
  */
 
 import { createServer } from 'node:http';
-import { fileURLToPath } from 'node:url';
+import { stat } from 'node:fs/promises';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const { renderLandingPage } = await import(join(root, 'out', 'harness-render.mjs'));
+const rendererPath = join(root, 'out', 'harness-render.mjs');
+
+/**
+ * Loads the renderer, reloading it whenever the build has produced a newer one.
+ *
+ * Node caches ES modules by specifier for the life of the process, so importing once at
+ * startup means every rebuild is invisible until the server is restarted - and a page that
+ * silently serves the previous build is worse than no harness at all. The mtime query string
+ * is what makes the specifier change.
+ */
+let cached = {mtime: 0, render: null};
+async function renderer() {
+  const {mtimeMs} = await stat(rendererPath);
+  if (mtimeMs !== cached.mtime) {
+    const module = await import(`${pathToFileURL(rendererPath).href}?v=${mtimeMs}`);
+    cached = {mtime: mtimeMs, render: module.renderLandingPage};
+  }
+  return cached.render;
+}
 
 const port = Number(process.env.HARNESS_PORT || 5599);
 
@@ -115,10 +134,10 @@ const stub = `<script>
   window.addEventListener('error', event => { window.__error = String(event.error || event.message); });
 </script>`;
 
-const server = createServer((request, response) => {
+const server = createServer(async (request, response) => {
   const url = new URL(request.url, 'http://localhost');
   const payload = url.searchParams.has('empty') ? {groups: []} : model;
-  let html = renderLandingPage('/assets', "'self'");
+  let html = (await renderer())('/assets', "'self'");
   // The stub must be installed before the bundle runs, so it goes ahead of the page script.
   html = html.replace('<script>', stub.replace('__MODEL__', JSON.stringify(payload)) + '\n<script>');
   // Theme variables go last in <head> so they win over anything the page defines itself.

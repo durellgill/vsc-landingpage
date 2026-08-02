@@ -35,6 +35,20 @@ Things that used to go wrong here and no longer should, because the harness hand
 - **Shut the harness down when you are finished with it.** It holds port 5599, and the next
   run binding a different port means later verification silently targets the wrong page.
 
+Three things about asserting through it that have already cost time:
+
+- **Reload the page between assertions.** Each `eval` runs in the same document, so state
+  left by an earlier one - a filter still set, a stubbed global still patched - makes the
+  next assertion lie. An Escape-clears-the-filter check failed exactly this way and passed
+  on a fresh load.
+- **`:focus` needs `document.hasFocus()`.** In an automated window it is often false, and
+  then no focus rule matches at all. Check `document.hasFocus()` before concluding a focus
+  style is broken.
+- **Transitioned properties freeze when the window is not being painted.** `outline-color`
+  and the spine width are transitioned, so a throttled window reports their *old* values
+  indefinitely, while untransitioned ones like `outline-width` update instantly. A rule that
+  looks half-applied is usually this. Read the untransitioned half, or probe the variable.
+
 ## Editing this codebase
 
 **Do not do index- or regex-based block surgery on these files.** Several bugs came from

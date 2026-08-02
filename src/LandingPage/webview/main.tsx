@@ -1,5 +1,5 @@
 import { render } from 'preact';
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { LandingPageGroup, LandingPageModel, LandingPageProject } from '../LandingPageModel';
 import { icons } from '../iconography';
 
@@ -29,6 +29,58 @@ function iconFor(item:LandingPageProject|LandingPageGroup) {
   return item.icon==='folder' ? 'glyph-folder' : item.icon==='workspace' ? 'fileSliders' : 'fileQuestion';
 }
 
+/** Every bookmark card currently on the page, in document order. */
+// Array.from rather than spread: tsconfig's `lib` is ES2022 with no DOM.Iterable, so a
+// NodeList is not iterable as far as the compiler is concerned.
+function cards():HTMLElement[] {return Array.from(document.querySelectorAll<HTMLElement>('.content .project'));}
+
+/**
+ * Finds the card an arrow key should move focus to, by geometry rather than by index.
+ *
+ * Index arithmetic cannot work here: list layout is a flex column, grid layout is a CSS grid
+ * whose column count depends on the panel width, and compact layout wraps. Measuring where
+ * the cards actually are is the only approach that behaves the same in all three and does
+ * not need to know which layout a group is using.
+ *
+ * @param from Card that currently has focus.
+ * @param key `ArrowUp`, `ArrowDown`, `ArrowLeft` or `ArrowRight`.
+ * @returns The card to focus, or undefined if there is nothing that way.
+ */
+function neighbour(from:HTMLElement, key:string):HTMLElement|undefined {
+  const others = cards().filter(card => card!==from);
+  if (others.length===0) {return undefined;}
+  const origin = from.getBoundingClientRect();
+  const horizontal = key==='ArrowLeft' || key==='ArrowRight';
+  const back = key==='ArrowLeft' || key==='ArrowUp';
+
+  // A row-mate is anything whose vertical span overlaps this card's. Left/Right stay within
+  // the row; Up/Down deliberately ignore row-mates so they never move sideways.
+  const rowMate = (rect:DOMRect) => rect.top < origin.bottom-1 && rect.bottom > origin.top+1;
+
+  const scored = others.map(card => ({card, rect:card.getBoundingClientRect()}))
+    .filter(({rect}) => {
+      if (horizontal) {return rowMate(rect) && (back ? rect.left < origin.left-1 : rect.left > origin.left+1);}
+      return !rowMate(rect) && (back ? rect.top < origin.top-1 : rect.top > origin.top+1);
+    })
+    // Nearest along the axis of travel wins; horizontal distance only breaks ties between
+    // cards on the same new row, which is what makes Up/Down hold a column in grid layout.
+    .map(entry => ({
+      card: entry.card,
+      distance: horizontal
+        ? Math.abs(entry.rect.left - origin.left)
+        : Math.abs(entry.rect.top - origin.top) * 1000 + Math.abs(entry.rect.left - origin.left)
+    }))
+    .sort((a,b) => a.distance - b.distance);
+
+  // Falling back to document order means Left at the start of a row wraps to the previous
+  // row rather than doing nothing, which is what a list of bookmarks should feel like.
+  if (scored.length===0 && horizontal) {
+    const all = cards();
+    return all[all.indexOf(from) + (back ? -1 : 1)];
+  }
+  return scored[0]?.card;
+}
+
 function App() {
   const [model,setModel] = useState<LandingPageModel>({groups:[]});
   const [filter,setFilter] = useState('');
@@ -45,14 +97,59 @@ function App() {
   // one, and a refresh that changed nothing still arrives as a sync.
   const [refreshing,setRefreshing] = useState(false);
 
+  const filterInput = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const receive = (event:MessageEvent) => {
       if (event.data?.command==='syncModel') {setModel(event.data.model); setRefreshing(false);}
+      // Sent by the Ctrl/Cmd+F keybinding, which VS Code handles outside the webview.
+      if (event.data?.command==='setFocusToFilterInput') {filterInput.current?.focus(); filterInput.current?.select();}
     };
     window.addEventListener('message',receive);
     post('documentReady');
     return () => window.removeEventListener('message',receive);
   },[]);
+
+  // Keyboard driving. This listens on `window` rather than on the page element because focus
+  // starts on `document.body`, which is outside the rendered tree - a handler on `<main>`
+  // would not see a key until something inside it had already been focused.
+  useEffect(() => {
+    const onKey = (event:KeyboardEvent) => {
+      const active = document.activeElement as HTMLElement|null;
+      const typing = !!active && (active.tagName==='INPUT' || active.tagName==='TEXTAREA' || active.isContentEditable);
+      const card = active?.closest<HTMLElement>('.project');
+
+      if (event.key==='Escape') {
+        // Innermost thing first: a menu or popover, then the filter, then focus itself.
+        if (menu || popover) {closeMenu(); setPopover(null);}
+        else if (filter) {setFilter(''); filterInput.current?.focus();}
+        else {active?.blur();}
+        event.preventDefault();
+        return;
+      }
+      if (event.key==='/' && !typing) {filterInput.current?.focus(); filterInput.current?.select(); event.preventDefault(); return;}
+
+      if (active===filterInput.current && event.key==='ArrowDown') {cards()[0]?.focus(); event.preventDefault(); return;}
+      if (typing || !card) {return;}
+
+      if (event.key==='Enter' || event.key===' ') {post('open',{guid:card.dataset.guid}); event.preventDefault(); return;}
+      if (event.key==='Home' || event.key==='End') {
+        const all = cards();
+        (event.key==='Home' ? all[0] : all[all.length-1])?.focus();
+        event.preventDefault();
+        return;
+      }
+      if (event.key.startsWith('Arrow')) {
+        const target = neighbour(card, event.key);
+        // ArrowUp off the top card lands in the filter, which is where the eye goes anyway.
+        if (target) {target.focus();}
+        else if (event.key==='ArrowUp') {filterInput.current?.focus();}
+        event.preventDefault();
+      }
+    };
+    window.addEventListener('keydown',onKey);
+    return () => window.removeEventListener('keydown',onKey);
+  });
 
   const target = useMemo(() => {
     if (!menu) {return null;}
@@ -115,7 +212,7 @@ function App() {
       </div></div>
     </header>
     <div class="commandbar">
-      <div class="field field-filter"><span class="field-icon"><Svg name="search"/></span><input value={filter} onInput={event=>setFilter((event.target as HTMLInputElement).value)} placeholder="Filter bookmarks...  Ctrl/Cmd+F"/>{filter && <button class="btn-ghost" title="Clear filter" onClick={()=>setFilter('')}><Svg name="clear"/></button>}</div>
+      <div class="field field-filter"><span class="field-icon"><Svg name="search"/></span><input ref={filterInput} value={filter} onInput={event=>setFilter((event.target as HTMLInputElement).value)} placeholder="Filter bookmarks...  / or Ctrl/Cmd+F"/>{filter && <button class="btn-ghost" title="Clear filter" onClick={()=>setFilter('')}><Svg name="clear"/></button>}</div>
     </div>
     <div class="content col" onDragEnd={()=>setDrag(null)} onDrop={dropGroup}>{visibleGroups.map(group=>{
       const index=userGroups.indexOf(group);
@@ -151,7 +248,7 @@ function GroupShelf({group,index,filter,composer,setComposer,openMenu,refreshing
 function BookmarkCard({project,openMenu}:{project:LandingPageProject;openMenu:(event:MouseEvent,guid:string)=>void}) {
   const type=project.icon||'file'; const shade=project.shade||typeShades[type];
   const path=project.path?.replace(/^file:\/\//,'')||''; const parent=path.slice(0,path.lastIndexOf('/'));
-  return <article class="project interactable" data-guid={project.guid} data-shade={shade} data-kind={type} title={path} onClick={event=>{if (!(event.target as Element).closest('button')) {post('open',{guid:project.guid});}}} onContextMenu={event=>openMenu(event,project.guid)}><div class="spine"/><div class="pictoral"><Svg name={iconFor(project)}/></div><div class="textblock"><div>{project.label}</div><div class="project-path">{parent}</div></div><button class="rowmenu" title="More actions" onClick={event=>openMenu(event,project.guid)}><Svg name="ellipsis"/></button></article>;
+  return <article class="project interactable" tabIndex={0} role="button" aria-label={project.label} data-guid={project.guid} data-shade={shade} data-kind={type} title={path} onClick={event=>{if (!(event.target as Element).closest('button')) {post('open',{guid:project.guid});}}} onContextMenu={event=>openMenu(event,project.guid)}><div class="spine"/><div class="pictoral"><Svg name={iconFor(project)}/></div><div class="textblock"><div>{project.label}</div><div class="project-path">{parent}</div></div><button class="rowmenu" title="More actions" onClick={event=>openMenu(event,project.guid)}><Svg name="ellipsis"/></button></article>;
 }
 
 function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,picker,setPicker,close,renameTarget,chooseShade,chooseGlyph}:any) {

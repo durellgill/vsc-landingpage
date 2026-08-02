@@ -155,6 +155,13 @@ gets.
   - **Stop the drop event at the group.** `.content` carries a drop handler for the gaps
     between groups, so a drop on a group that bubbles fires both handlers and posts
     `moveGroup` twice.
+- **The page is keyboard-drivable and must stay that way.** Bookmark cards are tab stops
+  (`tabindex="0"`); arrow keys move focus, Enter or Space opens, Home/End jump, `/` and
+  Ctrl/Cmd+F reach the filter, Escape unwinds menu then filter then focus. Arrow movement is
+  *geometric* - `neighbour()` in `main.tsx` measures the cards' rectangles rather than
+  indexing an array, because list is a flex column, grid is a width-dependent CSS grid, and
+  compact wraps. Anything that adds a new card layout gets this for free; anything that adds
+  a new interactive surface must not become a keyboard dead end.
 - Prefer `outline` over `border` for hover/selection indicators - a border occupies layout
   space and reflows the row when it appears.
 - Never set `overflow` on one axis alone for a container that anything escapes (tooltips,
