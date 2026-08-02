@@ -250,6 +250,13 @@ gets.
   can be placed by hand; it must be `pointer-events: none`, or it steals the hover that
   opened it and flickers; and one element is shared by the whole board, since only one
   bookmark can be pointed at.
+- **Never set `display` on a `[popover]` outside its open state.** The UA stylesheet hides a
+  closed popover with `[popover]:not(:popover-open) { display: none }`, and *any* author
+  `display` beats it - author rules win over UA rules regardless of specificity. A bare
+  `display: flex` on the hover card left it permanently rendered as an empty bordered box,
+  parked at its last position. Scope the layout to `&:popover-open`. The same applies to the
+  UA's `inset: 0; margin: auto; border; padding`, which must all be undone before a popover
+  can be positioned by hand.
 - **The hover card only opens when something is actually cut off.** `isClipped()` checks the
   label, path and branch; when all three fit, the card would pop up to repeat text already on
   screen. Copy therefore cannot live only in the card - it is also on the bookmark menu and

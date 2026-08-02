@@ -127,6 +127,26 @@ the time and was talked past anyway.
 - **Isolate test fixtures per case.** A `takeExisting` test failed because a later fixture
   recreated directories an earlier one had deliberately left missing. The assertion was wrong,
   not the code - check which one is lying before editing the implementation.
+- **A failed edit script discards every edit in it, not just the failing one.** A Python
+  script that rewrote the SCSS asserted on its last hunk and exited before `write_text`, so an
+  entire block of styles was silently never written. The next round trip was spent debugging
+  "the styles are not applying". After any script that aborts, `grep` for what it was supposed
+  to have written before doing anything else.
+- **Confirm you are talking to the server you just started.** `kill %1` in a fresh shell kills
+  nothing, the replacement harness failed to bind port 5599, its error went to `/dev/null`,
+  and two separate symptoms - a missing tick and wrong button colours - were both just the
+  *old* server serving an old build and an old stub. `lsof -nP -iTCP:5599 -sTCP:LISTEN` says
+  who actually owns the port. Stop background tasks by their task id, and never send a
+  server's output to `/dev/null`.
+- **Look at every state of a thing, not just the interesting one.** The hover card was
+  screenshotted open and shipped; nobody looked at it closed, where it was leaving an empty
+  bordered box on the page from load onwards. When something has an open state and a closed
+  state, both are states.
+- **Deliver the affordance that was asked for.** Asked to make the path copyable from the
+  card, a keyboard shortcut and a menu item were shipped instead of a button, because a
+  clickable card raised a pointer-interaction problem. The problem had an ordinary solution -
+  a grace period - and the user had to ask a second time. A tradeoff worth mentioning is not a
+  reason to substitute a different design.
 - **Verify a doc claim against the source before writing it down.** The README rewrite
   initially stated that Recent entries can be copied with *Move to group*. That action is
   gated behind `!sealed` and never appears there. The host still has a copy-from-Recent
