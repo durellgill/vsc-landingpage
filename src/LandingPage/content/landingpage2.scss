@@ -653,6 +653,24 @@
           transition: color .15s ease-in-out, letter-spacing .15s ease-in-out;
         }
 
+        // The fold control. Sits before the group icon, in the position the disclosure
+        // triangle occupies everywhere else in VS Code, so it reads as one without needing a
+        // label. Sized to the same 28px box as the icon beside it to keep the row aligned.
+        .group-fold
+        {
+          width: 20px;
+          height: 28px;
+          padding: 0;
+          flex: none;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--vscode-descriptionForeground);
+          background: transparent;
+          &:hover { color: var(--vscode-foreground); background: transparent; }
+          .lucide { width: 16px; height: 16px; stroke-width: 2px; }
+        }
+
         .group-icon
         {
           width: 28px;

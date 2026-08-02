@@ -32,7 +32,7 @@ interface MessageFromWebview
   toIndex?:number;
 
   /** For command 'patch' the name of the field to update. */
-  field?:'shade'|'layout'|'glyph';
+  field?:'shade'|'layout'|'glyph'|'collapsed';
   /** For command 'patch' the new value to assign, or the text from the inline rename editor. */
   value?:any;
 }
@@ -734,6 +734,13 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       else if (message.field==='layout')
       {
         (found.target as LandingPageGroup).layout=message.value;
+      }
+      else if (message.field==='collapsed')
+      {
+        // Groups only. Stored on the group object itself, including the generated `Recent`
+        // group - that group is an ordinary model object and only its *children* need the
+        // MRU customisation overlay.
+        (found.target as LandingPageGroup).collapsed = message.value===true;
       }
       else if (message.field==='glyph')
       {

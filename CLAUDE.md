@@ -37,6 +37,12 @@ Things that used to go wrong here and no longer should, because the harness hand
 
 Three things about asserting through it that have already cost time:
 
+- **The stub must `structuredClone` the model, and so must anything else standing in for the
+  host.** `communication.ts` mutates its model in place and posts the same object every time;
+  `webview.postMessage` serialises it, so the page always receives a fresh one. An in-process
+  stub that reposts the same reference makes `useState` bail out on `Object.is`, the page
+  stops re-rendering, and a working feature looks completely dead. Collapsible groups
+  presented exactly this way before the clone was added.
 - **Reload the page between assertions.** Each `eval` runs in the same document, so state
   left by an earlier one - a filter still set, a stubbed global still patched - makes the
   next assertion lie. An Escape-clears-the-filter check failed exactly this way and passed

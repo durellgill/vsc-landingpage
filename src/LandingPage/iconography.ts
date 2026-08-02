@@ -7,6 +7,7 @@ import svgEyeClosed from 'lucide-static/icons/eye-closed.svg?raw';
 import svgPlus from 'lucide-static/icons/plus.svg?raw';
 import svgChevronUp from 'lucide-static/icons/chevron-up.svg?raw';
 import svgChevronDown from 'lucide-static/icons/chevron-down.svg?raw';
+import svgChevronRight from 'lucide-static/icons/chevron-right.svg?raw';
 import svgLink2 from 'lucide-static/icons/link-2.svg?raw';
 import svgCircleX from 'lucide-static/icons/circle-x.svg?raw';
 import svgTextCursorInput from 'lucide-static/icons/text-cursor-input.svg?raw';
@@ -100,6 +101,7 @@ export const icons=
   plus : icon(svgPlus), 
   chevronUp : icon(svgChevronUp),
   chevronDown : icon(svgChevronDown),
+  chevronRight : icon(svgChevronRight),
   link : icon(svgLink2), 
   circleX : icon(svgCircleX), 
   textCursorInput : icon(svgTextCursorInput),

@@ -24,7 +24,7 @@ Working list for turning this into the start page I actually want. One commit pe
       indistinguishable today, and typing a folder name finds nothing.
 - [x] **5. Open in a new window.** The single most common thing to want from a start page
       and it is not offered anywhere.
-- [ ] **6. Collapsible groups, persisted.** A board with eight groups needs to fold.
+- [x] **6. Collapsible groups, persisted.** A board with eight groups needs to fold.
 - [ ] **7. Flag bookmarks whose target is gone.** A dead bookmark currently looks identical
       to a live one until you click it.
 - [ ] **8. Pin bookmarks to the top of their group.**

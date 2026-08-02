@@ -123,13 +123,29 @@ const stub = `<script>
     postMessage(message) {
       window.__posted.push(message);
       if (message.command === 'documentReady' || message.command === 'refreshRecents') { sync(); }
+      // 'patch' is the host's persist-then-resync path. Applying it here means state that
+      // lives in the model - layout, shade, collapsed - actually round-trips in the harness
+      // instead of appearing to do nothing.
+      if (message.command === 'patch') { patch(message); sync(); }
     },
     getState() { return undefined; },
     setState() {}
   });
+  function patch(message) {
+    for (const group of model.groups) {
+      const target = group.guid === message.guid ? group : group.projects.find(p => p.guid === message.guid);
+      if (target) { target[message.field] = message.value; return; }
+    }
+  }
   function sync() {
     // Mirrors communication.ts: the host replies on its own turn, never synchronously.
-    setTimeout(() => window.dispatchEvent(new MessageEvent('message', {data: {command: 'syncModel', model}})), 0);
+    //
+    // structuredClone is not decoration. The host mutates its model in place and posts the
+    // same object every time, but webview.postMessage serialises across a process boundary,
+    // so the page always receives a fresh object. Reposting the same reference in-process
+    // makes useState bail out on Object.is and the page silently stops re-rendering - which
+    // looks exactly like a broken feature.
+    setTimeout(() => window.dispatchEvent(new MessageEvent('message', {data: {command: 'syncModel', model: structuredClone(model)}})), 0);
   }
   window.addEventListener('error', event => { window.__error = String(event.error || event.message); });
 </script>`;

@@ -45,6 +45,15 @@ export interface LandingPageGroup extends LandingPageItem
    * - `compact`: dense multi-column rows, for groups with many bookmarks.
    */
   layout?:'grid'|'list'|'compact';
+
+  /**
+   * Whether the group is folded to its header only.
+   *
+   * Persisted rather than kept in the webview, so a board that has been tidied stays tidy
+   * across reloads and across windows. A collapsed group is still searched: a filter that
+   * matches inside one opens it for the duration of the query.
+   */
+  collapsed?:boolean;
 }
 
 /**

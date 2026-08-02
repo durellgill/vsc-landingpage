@@ -155,6 +155,14 @@ gets.
   - **Stop the drop event at the group.** `.content` carries a drop handler for the gaps
     between groups, so a drop on a group that bubbles fires both handlers and posts
     `moveGroup` twice.
+- **Groups fold, and the fold is model state.** `LandingPageGroup.collapsed` is persisted
+  through `patch`, so a tidied board stays tidy across reloads and windows - including the
+  generated `Recent` group, which is an ordinary model object and only needs the MRU overlay
+  for its *children*. An active filter overrides the stored fold for as long as the query
+  lasts, without writing to it: showing someone a collapsed group that silently contains
+  their search hit is the worst of both. A folded group does not render its cards at all
+  rather than hiding them with CSS, because the cards are tab stops and `cards()` would
+  otherwise still find them.
 - **Opening in a new window is folder- and workspace-only.** `vscode.open` has no
   new-window form for a plain file, so the `newWindow` flag on the `open` message is withheld
   for files rather than sent and quietly ignored. Three entry points, all gated the same way:
