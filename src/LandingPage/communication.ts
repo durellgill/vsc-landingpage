@@ -527,26 +527,68 @@ export async function resetModel(sharedModel:LandingPageModel):Promise<void>
  */
 async function reportBookmarkHealth(webviewPanel:vscode.WebviewPanel, sharedModel:LandingPageModel):Promise<void>
 {
-  const checks:Promise<string|null>[] = [];
-  for (const group of sharedModel.groups)
+  const missing:string[] = [];
+  const branches:Record<string,string> = {};
+
+  const checks = sharedModel.groups.flatMap(group => group.projects.map(async project => {
+    if (!project.path) {return;}
+    let uri:vscode.Uri;
+    try {uri = vscode.Uri.parse(project.path);}
+    catch {return;} //unparseable path is a model problem, not a missing target
+    if (uri.scheme!=='file') {return;}
+
+    try {await vscode.workspace.fs.stat(uri);}
+    catch {missing.push(project.guid); return;}
+
+    if (project.icon!=='folder') {return;} //only a folder can be a working tree
+    const branch = await readGitBranch(uri);
+    if (branch) {branches[project.guid] = branch;}
+  }));
+
+  await Promise.all(checks);
+  webviewPanel.webview.postMessage({command:'bookmarkHealth', missing, branches});
+}
+
+/**
+ * Reads the checked-out branch of a folder by parsing `.git/HEAD` directly.
+ *
+ * Deliberately not via the built-in Git extension: that would make the branch label depend
+ * on an extension the user can disable, and on repositories it has decided to open. Reading
+ * two small files is cheaper than either and works for any folder on disk.
+ *
+ * Handles the three shapes `.git` takes: a directory, a `gitdir:` pointer file (worktrees and
+ * submodules), and a detached HEAD, which has no branch and reports a short commit id.
+ *
+ * @param folder Folder to inspect.
+ * @returns Branch name, short commit id when detached, or undefined when this is not a
+ *          repository - which is the common case and not an error.
+ */
+async function readGitBranch(folder:vscode.Uri):Promise<string|undefined>
+{
+  try
   {
-    for (const project of group.projects)
+    let gitDir = vscode.Uri.joinPath(folder, '.git');
+    const marker = await vscode.workspace.fs.stat(gitDir);
+
+    if (marker.type===vscode.FileType.File)
     {
-      if (!project.path) {continue;}
-      let uri:vscode.Uri;
-      try {uri = vscode.Uri.parse(project.path);}
-      catch {continue;} //unparseable path is a model problem, not a missing target
-      if (uri.scheme!=='file') {continue;}
-
-      // `fs.stat` returns a Thenable, not a Promise, so the result is wrapped before it can
-      // be collected for Promise.all.
-      const guid = project.guid;
-      checks.push(Promise.resolve(vscode.workspace.fs.stat(uri)).then(() => null, () => guid));
+      const pointer = new TextDecoder().decode(await vscode.workspace.fs.readFile(gitDir));
+      const target = /^gitdir:\s*(.+)$/m.exec(pointer)?.[1]?.trim();
+      if (!target) {return undefined;}
+      // The pointer may be absolute or relative to the folder holding the `.git` file.
+      const absolute = target.startsWith('/') || /^[A-Za-z]:[\\/]/.test(target);
+      gitDir = absolute ? vscode.Uri.file(target) : vscode.Uri.joinPath(folder, target);
     }
-  }
 
-  const missing = (await Promise.all(checks)).filter((guid):guid is string => guid!==null);
-  webviewPanel.webview.postMessage({command:'bookmarkHealth', missing});
+    const head = new TextDecoder().decode(await vscode.workspace.fs.readFile(vscode.Uri.joinPath(gitDir, 'HEAD'))).trim();
+    const branch = /^ref:\s*refs\/heads\/(.+)$/.exec(head)?.[1];
+    if (branch) {return branch;}
+    return /^[0-9a-f]{40}$/i.test(head) ? head.slice(0,7) : undefined; //detached HEAD
+  }
+  catch
+  {
+    return undefined; //not a repository, or unreadable
+  }
 }
 
 /**

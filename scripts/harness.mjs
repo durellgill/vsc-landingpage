@@ -136,7 +136,7 @@ const stub = `<script>
   // Stands in for reportBookmarkHealth(): the host stats every file: target and reports the
   // ones it could not find, as a separate message that never enters the model.
   function health() {
-    setTimeout(() => window.dispatchEvent(new MessageEvent('message', {data: {command: 'bookmarkHealth', missing: __MISSING__}})), 0);
+    setTimeout(() => window.dispatchEvent(new MessageEvent('message', {data: {command: 'bookmarkHealth', missing: __MISSING__, branches: __BRANCHES__}})), 0);
   }
   function patch(message) {
     for (const group of model.groups) {
@@ -164,7 +164,10 @@ const server = createServer(async (request, response) => {
   // The stub must be installed before the bundle runs, so it goes ahead of the page script.
   // ?healthy suppresses the missing-target verdict, for checking the undecorated board.
   const missing = url.searchParams.has('healthy') ? [] : ['p-6'];
-  html = html.replace('<script>', stub.replace('__MODEL__', JSON.stringify(payload)).replace('__MISSING__', JSON.stringify(missing)) + '\n<script>');
+  // Branch labels the host would have read from .git/HEAD, including a long one to check
+  // that the badge truncates rather than pushing the path out of the card.
+  const branches = {'p-1': 'main', 'p-2': 'feature/very-long-branch-name-here', 'MRU:a': 'main'};
+  html = html.replace('<script>', stub.replace('__MODEL__', JSON.stringify(payload)).replace('__MISSING__', JSON.stringify(missing)).replace('__BRANCHES__', JSON.stringify(branches)) + '\n<script>');
   // Theme variables go last in <head> so they win over anything the page defines itself.
   html = html.replace('</head>', themeStyle(url.searchParams.get('theme')) + '</head>');
   // The harness is served over http, where the webview CSP meta tag only gets in the way.

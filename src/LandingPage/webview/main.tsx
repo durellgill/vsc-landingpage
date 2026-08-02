@@ -156,9 +156,10 @@ function App() {
   // that something is happening. Any `syncModel` clears it - the host only ever answers with
   // one, and a refresh that changed nothing still arrives as a sync.
   const [refreshing,setRefreshing] = useState(false);
-  // GUIDs the host could not stat. Webview-only: it is observed state, not something the
-  // user set, and a stale verdict must not outlive the file coming back.
-  const [missing,setMissing] = useState<string[]>([]);
+  // What the host observed on disk: GUIDs it could not stat, and the checked-out branch of
+  // each folder that is a repository. Webview-only - none of this is something the user set,
+  // and persisting it would let a stale verdict outlive the thing it describes.
+  const [health,setHealth] = useState<{missing:string[];branches:Record<string,string>}>({missing:[],branches:{}});
 
   const filterInput = useRef<HTMLInputElement>(null);
 
@@ -167,7 +168,7 @@ function App() {
       if (event.data?.command==='syncModel') {setModel(event.data.model); setRefreshing(false);}
       // Sent by the Ctrl/Cmd+F keybinding, which VS Code handles outside the webview.
       if (event.data?.command==='setFocusToFilterInput') {filterInput.current?.focus(); filterInput.current?.select();}
-      if (event.data?.command==='bookmarkHealth') {setMissing(event.data.missing ?? []);}
+      if (event.data?.command==='bookmarkHealth') {setHealth({missing:event.data.missing ?? [], branches:event.data.branches ?? {}});}
     };
     window.addEventListener('message',receive);
     post('documentReady');
@@ -295,7 +296,7 @@ function App() {
         : drag.over===index ? 'before'
         : (drag.over===userGroups.length && index===userGroups.length-1) ? 'after' : null;
       return <GroupShelf key={group.guid} group={group} index={index} total={userGroups.length} needles={needles} composer={composer===group.guid} setComposer={setComposer} openMenu={openMenu}
-        refreshing={refreshing} refresh={()=>{setRefreshing(true); post('refreshRecents');}} missing={missing}
+        refreshing={refreshing} refresh={()=>{setRefreshing(true); post('refreshRecents');}} health={health}
         dragging={drag?.guid===group.guid} drop={drop} onDragStart={()=>setDrag({guid:group.guid,over:null})} onDragOver={dragOver} onDrop={dropGroup}/>;
     })}</div>
     {model.groups.length===0 && <EmptyState/>}
@@ -304,7 +305,7 @@ function App() {
   </main>;
 }
 
-function GroupShelf({group,index,needles,composer,setComposer,openMenu,refreshing,refresh,missing,dragging,drop,onDragStart,onDragOver,onDrop}:{group:LandingPageGroup;index:number;total:number;needles:string[];composer:boolean;setComposer:(id:string|null)=>void;openMenu:(event:MouseEvent,guid:string)=>void;refreshing:boolean;refresh:()=>void;missing:string[];dragging:boolean;drop:'before'|'after'|null;onDragStart:()=>void;onDragOver:(event:DragEvent,index:number)=>void;onDrop:()=>void}) {
+function GroupShelf({group,index,needles,composer,setComposer,openMenu,refreshing,refresh,health,dragging,drop,onDragStart,onDragOver,onDrop}:{group:LandingPageGroup;index:number;total:number;needles:string[];composer:boolean;setComposer:(id:string|null)=>void;openMenu:(event:MouseEvent,guid:string)=>void;refreshing:boolean;refresh:()=>void;health:{missing:string[];branches:Record<string,string>};dragging:boolean;drop:'before'|'after'|null;onDragStart:()=>void;onDragOver:(event:DragEvent,index:number)=>void;onDrop:()=>void}) {
   const sealed=group.guid==='@vsc-mru';
   // Naming the group shows all of it; otherwise each bookmark is matched on its own.
   const projects=pinnedFirst(groupMatches(group,needles) ? group.projects : group.projects.filter(project=>matches(project,needles)));
@@ -321,14 +322,14 @@ function GroupShelf({group,index,needles,composer,setComposer,openMenu,refreshin
     {!collapsed && composer && <div class="group-composer"><span class="composer-label">Add to <b>{group.label}</b></span><button class="btn-secondary" onClick={()=>{setComposer(null);post('createBookmark',{guid:group.guid,pickFolder:true});}}><Svg name="folder"/><span>Folder</span></button><button class="btn-secondary" onClick={()=>{setComposer(null);post('createBookmark',{guid:group.guid,pickFolder:false});}}><Svg name="plus"/><span>File or workspace</span></button><button class="btn-secondary" title="Create a new folder on disk and bookmark it" onClick={()=>{setComposer(null);post('createDirectory',{guid:group.guid});}}><Svg name="folderPlus"/><span>New folder</span></button><button class="btn-ghost" onClick={()=>setComposer(null)}>Cancel</button></div>}
     {/* Not rendered at all when folded, rather than hidden with CSS: the cards are tab stops
         and arrow-key targets, and a display:none body would still be found by `cards()`. */}
-    {!collapsed && <div class={`projects ${layout}`}>{projects.map(project=><BookmarkCard key={project.guid} project={project} missing={missing.includes(project.guid)} openMenu={openMenu}/>)}</div>}
+    {!collapsed && <div class={`projects ${layout}`}>{projects.map(project=><BookmarkCard key={project.guid} project={project} missing={health.missing.includes(project.guid)} branch={health.branches[project.guid]} openMenu={openMenu}/>)}</div>}
   </section>;
 }
 
-function BookmarkCard({project,missing,openMenu}:{project:LandingPageProject;missing:boolean;openMenu:(event:MouseEvent,guid:string)=>void}) {
+function BookmarkCard({project,missing,branch,openMenu}:{project:LandingPageProject;missing:boolean;branch?:string;openMenu:(event:MouseEvent,guid:string)=>void}) {
   const type=project.icon||'file'; const shade=project.shade||typeShades[type];
   const path=project.path?.replace(/^file:\/\//,'')||''; const parent=path.slice(0,path.lastIndexOf('/'));
-  return <article class="project interactable" tabIndex={0} role="button" aria-label={project.label} data-guid={project.guid} data-shade={shade} data-kind={type} data-missing={missing?'yes':undefined} data-pinned={project.pinned?'yes':undefined} title={missing?`${path}\n\nThis target no longer exists.`:path} onClick={event=>{if (!(event.target as Element).closest('button')) {post('open',{guid:project.guid, newWindow:(event.ctrlKey||event.metaKey) && opensInWindow(project)});}}} onContextMenu={event=>openMenu(event,project.guid)}><div class="spine"/><div class="pictoral"><Svg name={iconFor(project)}/></div><div class="textblock"><div>{project.label}</div><div class="project-path">{missing ? <><span class="missing-badge"><Svg name="triangleAlert"/>Missing</span>{parent}</> : parent}</div></div>{project.pinned && <span class="pin-marker" title="Pinned to the top of this group"><Svg name="pin"/></span>}<button class="rowmenu" title="More actions" onClick={event=>openMenu(event,project.guid)}><Svg name="ellipsis"/></button></article>;
+  return <article class="project interactable" tabIndex={0} role="button" aria-label={project.label} data-guid={project.guid} data-shade={shade} data-kind={type} data-missing={missing?'yes':undefined} data-pinned={project.pinned?'yes':undefined} title={missing?`${path}\n\nThis target no longer exists.`:path} onClick={event=>{if (!(event.target as Element).closest('button')) {post('open',{guid:project.guid, newWindow:(event.ctrlKey||event.metaKey) && opensInWindow(project)});}}} onContextMenu={event=>openMenu(event,project.guid)}><div class="spine"/><div class="pictoral"><Svg name={iconFor(project)}/></div><div class="textblock"><div>{project.label}</div><div class="project-path">{missing && <span class="missing-badge"><Svg name="triangleAlert"/>Missing</span>}{branch && <span class="branch-badge" title={`On branch ${branch}`}><Svg name="gitBranch"/>{branch}</span>}{parent}</div></div>{project.pinned && <span class="pin-marker" title="Pinned to the top of this group"><Svg name="pin"/></span>}<button class="rowmenu" title="More actions" onClick={event=>openMenu(event,project.guid)}><Svg name="ellipsis"/></button></article>;
 }
 
 function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,picker,setPicker,close,renameTarget,chooseShade,chooseGlyph}:any) {

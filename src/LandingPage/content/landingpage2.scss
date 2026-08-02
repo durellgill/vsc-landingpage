@@ -979,6 +979,23 @@
         // The row menu appears on hover in the same corner, so the pin yields to it.
         &:hover .pin-marker, &:focus .pin-marker { opacity: 0; }
 
+        // The checked-out branch, when the folder is a repository. Sits in the path line
+        // rather than beside the title: it is context for the target, and putting it in the
+        // title row would push labels around as branches are switched.
+        .branch-badge
+        {
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+          margin-right: 6px;
+          max-width: 18ch;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          color: var(--shade-color, var(--vscode-descriptionForeground));
+          .lucide { width: 11px; height: 11px; stroke-width: 2.5px; flex: none; }
+        }
+
         .missing-badge
         {
           display: inline-flex;

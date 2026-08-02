@@ -155,6 +155,15 @@ gets.
   - **Stop the drop event at the group.** `.content` carries a drop handler for the gaps
     between groups, so a drop on a group that bubbles fires both handlers and posts
     `moveGroup` twice.
+- **The branch label comes from `.git/HEAD`, not from the Git extension.** `readGitBranch()`
+  reads at most two small files. Going through `vscode.git` would make the label depend on an
+  extension the user can disable and on which repositories it has chosen to open. It handles
+  all three shapes `.git` takes: a directory, a `gitdir:` pointer file (worktrees and
+  submodules, absolute or relative), and a detached HEAD, which reports a short commit id.
+  Not being a repository is the common case, not an error.
+- **`bookmarkHealth` carries everything the host observed on disk** - currently missing
+  targets and branches. Add to that message rather than inventing a second one; it is sent
+  unawaited after each sync so the board paints first and gets decorated a moment later.
 - **Pinning sorts, it does not reorder.** `LandingPageProject.pinned` moves a bookmark to
   the top of its group through a stable sort in `pinnedFirst()`; the stored order is left
   untouched, so unpinning returns it to where it was rather than to wherever the pin dropped
