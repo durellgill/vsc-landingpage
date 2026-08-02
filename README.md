@@ -12,7 +12,7 @@
 npm install
 ```
 
-**To work on it — press F5.** That builds, then opens a second VS Code window titled
+**To work on it - press F5.** That builds, then opens a second VS Code window titled
 *[Extension Development Host]* with the extension loaded. It opens with no folder, so the
 landing page appears on its own. If it doesn't, run **Show Landing Page** from the command
 palette (`Cmd+Shift+P`) in that window.
@@ -20,13 +20,13 @@ palette (`Cmd+Shift+P`) in that window.
 The default *Run Extension* launch config gives that window its own extensions directory and
 its own profile:
 
-- **Own extensions dir** — none of your ~33 installed extensions load. That is the difference
+- **Own extensions dir** - none of your ~33 installed extensions load. That is the difference
   between a slow F5 and a fast one. Built-in extensions still load, so Clone still works.
-- **Own profile** — the dev host always starts as an empty window. Without this it inherits
+- **Own profile** - the dev host always starts as an empty window. Without this it inherits
   your window restore state, reopens the last folder you had, and then the landing page does
   *not* auto-open, because it only auto-opens when no folder is present.
 
-The profile also means the dev host keeps its own bookmarks, separate from your real VS Code —
+The profile also means the dev host keeps its own bookmarks, separate from your real VS Code -
 so debugging can't corrupt your actual data.
 
 If you ever need your real setup (a theme, another extension interfering), pick
@@ -34,23 +34,32 @@ If you ever need your real setup (a theme, another extension interfering), pick
 reopens your last folder, so use **Show Landing Page** from the palette to see the page.
 
 **After you edit something:** press `Cmd+R` in the Extension Development Host to reload.
-The watch tasks rebuild in the background, so you never run a build by hand:
+`npm: watch` runs both Vite watchers in the background, so you never run a build by hand -
+`.ts`, `.tsx`, `.scss` and `.html` are all covered by it.
 
-| Changed | Rebuilt by |
-|---|---|
-| `.ts` | `npm: watch` (Vite) |
-| `.tsx`, `.scss` | `npm: watch` (Vite) |
-| `.html`, `landingpage2.js` | `npm: watch` |
+The webview bundle is built first and then inlined into the extension bundle as text, so the
+two watchers are ordered - a stale webview build would otherwise ship an old page silently.
 
-**To see errors** — the page is a sandboxed webview with its own console, separate from the
+**To see errors** - the page is a sandboxed webview with its own console, separate from the
 extension:
 
-- Webview (`landingpage2.js`): in the dev host, `Cmd+Shift+P` → *Developer: Open Webview
+- Webview (`webview/main.tsx`): in the dev host, `Cmd+Shift+P` → *Developer: Open Webview
   Developer Tools*.
 - Extension (`extension.ts`, `communication.ts`): the **Debug Console** in your first
   window. Breakpoints in `.ts` files work there.
 - Slow startup? `Cmd+Shift+P` → *Developer: Show Running Extensions* lists activation time
   per extension.
+
+### The faster loop: `npm run harness`
+
+F5 is not the quickest way to see a UI change. `npm run harness` builds everything and serves
+the *real* page at `http://localhost:5599` with a stubbed extension host - an ordinary browser
+console, an ordinary DOM inspector, and every message the page posts recorded on
+`window.__posted`.
+
+Append `?empty` for the empty state, `?theme=light` for the light theme, or `?healthy` to
+suppress the missing-target markers. It supplies the `--vscode-*` theme variables itself, so
+colours are real rather than missing.
 
 ## Installing my build for daily use
 
@@ -76,7 +85,18 @@ be changed to a real VS Code Marketplace publisher account or `vsce publish` wil
 Note that the extension ID is also the key for stored bookmarks, so this build starts with
 an empty landing page rather than inheriting whatever the marketplace copy had saved.
 
-Build commands: `npm run compile` (build once), `npm run lint`.
+Build commands:
+
+| | |
+|---|---|
+| `npm run compile` | Build once - webview bundle, then extension bundle |
+| `npm run watch` | Both Vite watchers, for F5 |
+| `npm run harness` | Serve the real page in a browser (see above) |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | `tsc --noEmit` |
+
+The build is Vite, not webpack. See [AGENTS.md](AGENTS.md) for how the two bundles fit
+together and why their order matters.
 
 > **Heads up on `npm test`.** It runs `vscode-test`, which **downloads its own standalone
 > copy of VS Code** (~315 MB download, ~1 GB on disk in `.vscode-test/`) and runs the tests
@@ -90,168 +110,188 @@ Build commands: `npm run compile` (build once), `npm run lint`.
 
 ---
 
-Use this extension to create and organise bookmarks to folders, files and workspaces in a personal startup page. VS Code's default *recently used* list is a strict temporal list without reflecting your personal working status. But you might want to keep shortcuts to your currently active projects still in sight even when you work on other things for a while.
+# What it does
 
-Landingpage extension shows both, VS code's recently used files and folders as well as custom bookmarks which can be organised in groups, renamed, ordered and colorized. 
+This extension replaces the start page with a bookmark board: groups of bookmarks pointing at
+folders, workspaces and files, plus a mirror of VS Code's recently-opened list.
 
-## Features
+VS Code's own *recently used* list is strictly temporal and does not reflect how you actually
+work. You want the projects you are currently living in kept in sight, even during a week
+spent somewhere else. So the board shows both: **Recent**, mirrored from VS Code, and your own
+groups, which you name, order, colour and pin.
 
-### Startup: Default List
+## Opening things
 
-Landingpage is automatically opened when a VS Code window is opened without folders or workspace context. This can be enabled/disabled in extension's settings.
+The page opens automatically in a window with no folder open (`autoshowOnStartup`, on by
+default). Otherwise run **Show Landing Page** from the command palette.
 
-By default a list appears which mirrors most recently used files in Visual Studio Code. This is identical to menu items in *File > Open Recent* menu.
+| Action | Result |
+|---|---|
+| Click a bookmark | Opens it in the current window |
+| `Ctrl`/`Cmd`+click | Opens it in a **new window** |
+| `Ctrl`/`Cmd`+`Enter` | Same, from the keyboard |
 
-![Default Landingpage](doc/img/startup.png)
+New-window opening applies to folders and workspaces only. VS Code has no new-window form for
+a plain file, so the option is withheld rather than offered and then ignored.
 
-One item that points to a file, folder or workspace is called **bookmark** in this documentation. 
+If the target is already open in another window, VS Code may focus that window instead.
 
-Click on a bookmark to open the linked file, folder or workspace in the current window. If a target is already already open in another VS Code window, that window may be focussed instead.
+## Driving it from the keyboard
 
-### Use custom groups to pin projects
+The whole board works without a mouse.
 
-To organize your bookmarks in a specific order or thematic collections use **groups**:
+| Key | Does |
+|---|---|
+| `↑` `↓` `←` `→` | Move between bookmarks |
+| `Enter` / `Space` | Open the focused bookmark |
+| `Ctrl`/`Cmd`+`Enter` | Open it in a new window |
+| `Home` / `End` | First / last bookmark on the board |
+| `/` or `Ctrl`/`Cmd`+`F` | Jump to the filter |
+| `Esc` | Close a menu, then clear the filter, then drop focus |
 
-- Create a new group by clicking the plus button in toolbar. 
-- Switch to move tool in toolbar.
-- Drag and drop the bookmarks into your group.
+Arrow movement is geometric rather than positional, so it behaves the same in list, grid and
+compact layouts - `↓` from a card in the right column of a grid lands in the right column of
+whatever is below it.
 
-![Create a group](doc/img/create-group.gif)
+## Filtering
 
-#### Direct import from File System
+Type in the filter field to narrow the board. The query is matched against **labels and full
+paths**, and split on spaces so every term must match somewhere:
 
-You can also add items which are not yet in the MRU list using **file or folder picker**:
+- `documents` finds a file by the folder it lives in, not just by its name.
+- `vsc land` finds `vsc-landingpage`.
+- `dev api` picks one `api` out of several checkouts.
 
-- Switch to Reader Tool.
-- Point to a group header.
-- Click on the file or folder button to add a bookmark to a file, workspace file or directory.
+Naming a **group** shows that entire group. A filter also temporarily opens any collapsed
+group containing a match, without disturbing its stored collapsed state.
 
-![Add from file system](doc/img/add-folder.gif)
+## Groups
 
-> **Group *Recent* is read-only.** Its content is populated from Visual Studio's recently used items. You cannot add any entries here. See also: [Understanding 'Recent'](#recent)
+Create a group from the **New** menu in the page header.
 
+- **Reorder** - drag a group by its title bar. **Recent** is pinned last and is neither
+  draggable nor a drop target.
+- **Collapse** - the chevron beside the group icon folds it to its header. This is remembered
+  across reloads and windows.
+- **Layout** - the layout button cycles `list` → `grid` → `compact`.
+- **Customise** - right-click a group, or use its settings button, for rename, accent colour
+  and custom icon.
 
-### Rearrange bookmarks per Drag and Drop
+## Bookmarks
 
-Use drag and drop in move mode to customize the order to your needs: 
+Add bookmarks two ways, and they differ by where the bookmark lands:
 
-- Switch to Move Tool.
-- Drag bookmarks and drop on other bookmarks to move them forwards or backwards.
-- Drop bookmarks to group labels to add them to the end of that group. This can also be used to move bookmarks into yet empty groups.
+- The **Add** button on a group header opens a composer beneath *that* group, so the
+  destination is implied by where you clicked.
+- The page header's **New** menu is global, so it asks which group to use.
 
-![Rearrange using Drag and Drop](doc/img/move-bookmark.gif)
+You can also right-click any file or folder in the **Explorer** and choose *Add to Landing
+Page Group* - that works even if the landing page has never been opened in the window.
 
-> **Group *Recent* is read-only.** You can drag bookmarks *from* Recent *to* other groups, but not the other way around. The order of bookmarks within Recent group cannot be changed. See also: [Understanding 'Recent'](#recent)
+Right-click a bookmark (or use its `...` button) for:
 
-### Filter View
+| Item | Notes |
+|---|---|
+| Open / Open in new window | New window for folders and workspaces only |
+| Pin to top | Holds it at the top of its group |
+| Rename | Inline, in the menu |
+| Accent colour | Paints the spine and icon, not the card body |
+| Custom icon | Any of the built-in glyphs |
+| Move to group | Native quick pick |
+| Remove | Confirms in place; the linked target is untouched |
 
-Use filter input field to emphasize bookmarks by keyword matching. 
+Entries in **Recent** get a reduced version of this menu - see [Understanding *Recent*](#recent).
 
-![Filter Highlight](doc/img/filter.gif)
+**Pinning sorts, it does not reorder.** Unpinning returns a bookmark to where it was, and two
+pinned bookmarks keep their stored order relative to each other rather than the order you
+pinned them in.
 
+### Missing targets
 
-### Customize Appearance
+A bookmark whose folder or file has been moved, renamed or deleted is marked with a red spine
+and a **Missing** badge. The check runs when the page opens and whenever **Recent** is
+refreshed, which includes the panel coming back into view. It is marked, never hidden or
+disabled - you may well want to open it anyway, rename it, or remove it, and quietly dropping
+a bookmark you made is not this page's decision.
 
-#### Rename Bookmarks and Groups
+Only local (`file:`) targets are checked. A remote or virtual path can be perfectly valid
+while its filesystem provider is not currently registered.
 
-Labels of bookmarks and groups are initialized with the name of the linked file or folder, but they are freely customizable display texts. To rename the display text of bookmarks or groups in Landingpage:
+### Git branch
 
-- Select Rename tool in toolbar.
-- Click on a bookmark or group name.
-- Enter a new name in popup.
+Folder bookmarks that are git repositories show their checked-out branch. This is read from
+`.git/HEAD` directly rather than through the built-in Git extension, so it does not depend on
+that extension being enabled or on which repositories it has decided to open. Linked worktrees
+and submodules work; a detached HEAD shows a short commit id.
 
-![Rename groups or bookmarks](doc/img/rename.gif)
+## Cloning a repository
 
-> **Group *Recent* is read-only.** Labels of bookmarks or the Recent group itself are detected automatically and cannot be changed. See also: [Understanding 'Recent'](#recent)
-
-
-#### Colorizing Bookmarks and Groups
-
-Use paint tool to change the color shade of bookmarks:
-
-- Select Paint tool in toolbar.
-- Pick a color from palette popup. Click outside the popup to close it to keep currently selected color.
-- Click on bookmarks to change their color.
-
-**To remove coloring:**
-
-- From palette popup select lined slot which represents transparency.
-- Click on the bookmarks to remove their coloring.
-
-![Colorize groups](doc/img/paint.gif)
-
-> **Group *Recent* is read-only.** Color of bookmarks in Recent list cannot be changed. See also: [Understanding 'Recent'](#recent)
-
-
-#### Switch List or Grid Layout
-
-Bookmarks can be rendered as big cards or as small list. Cards are visually dominant and may be used for your important favorites. Lists are useful to show a group of many bookmarks in efficient way. To change the layout of a group, use the groups layout button: 
-
-- Hover over a group name.
-- Click Layout button to change the layout of bookmarks in this group.
-
-![Change layout](doc/img/change-layout.gif)
-
-> **Group *Recent* can be changed, too!** It **is** possible to change layout of Recent group, because this is just a view setting independent from the VS Code data source. See also: [Understanding 'Recent'](#recent)
-
-
-### Remove items per Delete Tool
-
-Groups and bookmarks can be removed from Landingpage. The original linked target stays untouched. Note that deletion is not revertable.
-
-- Select Remove tool from toolbar. 
-- Click on bookmarks or groups that you want to delete.
-- Confirm popup to remove the element from Landingpage.
-
-> **Tip:** Hold `Ctrl` while clicking to skip confirmation dialog and delete the element immediately.
-
-![Remove items](doc/img/remove.gif)
-
-> **Group *Recent* is read-only.** Neither bookmarks nor the group itself can be removed. See also: [Understanding 'Recent'](#recent)
+The **clone** button in the page header takes a Git URL. It hands off to VS Code's built-in
+`git.clone`, which owns the destination picker, credentials and the *Open / Add to Workspace*
+prompt. The clone then shows up in **Recent** like anything else.
 
 <a name="recent"></a>
 
-### Understanding *Recent* Group
+## Understanding *Recent*
 
-"Recent" group is a collection of bookmarks that behaves similiar to user created groups, but it is populated automatically. Therefore all changes would be lost on update which is why most editing is locked here. 
+**Recent** mirrors VS Code's own recently-opened list - the same entries as *File > Open
+Recent*. It is generated, so its contents are rebuilt from VS Code on every sync and most
+editing is locked.
 
-"Recent" bookmarks are refreshed whenever Welcome page is reopened or when Reset-Command is called from Landingpage View's "..." menu.
+**It can go stale**, because VS Code's history keeps changing while the page sits in a
+background tab - opening a project in another window is the everyday case. Three ways to
+refresh it:
 
-### Support for Dark Theme
+- the **refresh** button on the Recent group header,
+- automatically, whenever the panel comes back into view,
+- the **Landing Page: Refresh Recent** command.
 
-Landingpage works with light and dark theme:
+What you *can* do to Recent:
 
-![Dark Theme Support](doc/img/darktheme.gif)
+| | |
+|---|---|
+| Change its layout, accent colour and icon | Yes - view settings, independent of the data source |
+| Colour or re-icon an individual entry | Yes - stored as an overlay so it survives each rebuild |
+| Pin an entry | Yes |
+| Rename entries, reorder them, or remove them | No |
+| Copy an entry into one of your own groups | Not currently offered - see below |
+| Hide an entry from this page | Yes - *Hide from Landing Page*, local only; VS Code's own history is never touched. The group menu restores everything hidden. |
 
-## Extension Settings
+To keep a Recent project around permanently, bookmark its folder into one of your own groups
+(**Add** on that group's header, or right-click the folder in the Explorer). The *Move to
+group* action is deliberately not offered on Recent entries.
 
-This extension contributes the following settings:
+## Theming
 
-* `vsc-landingpage.autoshowOnStartup`: Enable/disable automatic opening of Landingpage in empty windows.
+The page adopts your editor theme rather than bringing its own. Every colour resolves to a
+`--vscode-*` theme variable, so light, dark and high-contrast all work. The only fixed colours
+are the accent palette you pick bookmark shades from.
 
-<!-- ## Known Issues
+> **No screenshots here on purpose.** The GIFs in `doc/img/` are upstream's and predate this
+> fork's redesign - they show a toolbar with tool modes that no longer exists. Rather than
+> illustrate the extension with a UI it does not have, there are no images until they are
+> retaken.
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+## Settings
 
-## Release Notes
+| Setting | Default | Meaning |
+|---|---|---|
+| `vsc-landingpage.autoshowOnStartup` | `true` | Open the landing page automatically in empty windows. |
+| `vsc-landingpage.maxRecentItems` | `20` | How many entries the **Recent** group shows. `0` means no limit. |
 
-Users appreciate release notes as you update your extension.
+## Commands
 
-### 1.0.0
+| Command | Notes |
+|---|---|
+| Show Landing Page | Opens or focuses the page |
+| Landing Page: Refresh Recent | Rereads VS Code's recently-opened list |
+| Landing Page: Clone Repository | Same as the clone button |
+| Add to Landing Page Group... | Explorer and editor-tab context menus |
+| Reload Landing Page | Re-syncs the page from the stored model |
+| Reset/Delete Landing Page Contents | Removes all groups and bookmarks. Not undoable. |
 
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z. -->
-
-<!-- 
+<!--
 
 Build notes see DEVELOP.md
-
 
 -->
