@@ -155,6 +155,11 @@ gets.
   - **Stop the drop event at the group.** `.content` carries a drop handler for the gaps
     between groups, so a drop on a group that bubbles fires both handlers and posts
     `moveGroup` twice.
+- **The filter searches labels, paths and group names, and every term must match.** A board
+  has two checkouts called `api`; a label-only search cannot tell them apart, and typing a
+  directory name found nothing at all. `haystack()` in `main.tsx` is label plus decoded path;
+  `terms()` splits the query on whitespace and all terms must hit, so `vsc land` finds
+  `vsc-landingpage`. Naming a group shows that whole group rather than filtering inside it.
 - **The page is keyboard-drivable and must stay that way.** Bookmark cards are tab stops
   (`tabindex="0"`); arrow keys move focus, Enter or Space opens, Home/End jump, `/` and
   Ctrl/Cmd+F reach the filter, Escape unwinds menu then filter then focus. Arrow movement is

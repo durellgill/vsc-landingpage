@@ -20,7 +20,7 @@ Working list for turning this into the start page I actually want. One commit pe
 - [x] **3. Keyboard navigation.** Arrow keys move between bookmarks, Enter opens, Escape
       clears the filter, `/` focuses it. A start page you cannot drive from the keyboard is
       a mouse toy.
-- [ ] **4. Filter on paths, not just labels.** Two bookmarks called `src` are
+- [x] **4. Filter on paths, not just labels.** Two bookmarks called `src` are
       indistinguishable today, and typing a folder name finds nothing.
 - [ ] **5. Open in a new window.** The single most common thing to want from a start page
       and it is not offered anywhere.

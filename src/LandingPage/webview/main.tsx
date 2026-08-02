@@ -29,6 +29,45 @@ function iconFor(item:LandingPageProject|LandingPageGroup) {
   return item.icon==='folder' ? 'glyph-folder' : item.icon==='workspace' ? 'fileSliders' : 'fileQuestion';
 }
 
+/**
+ * The text a filter query is matched against: the label plus the readable path.
+ *
+ * Labels alone are not enough to find anything on a real board. Two checkouts of the same
+ * project are both called `api`, a folder is only identifiable by where it lives, and typing
+ * a directory name used to return nothing at all. The path is decoded and stripped of its
+ * `file://` scheme so what you type is what you see on the card.
+ */
+function haystack(project:LandingPageProject):string {
+  let path = project.path ? project.path.replace(/^file:\/\//,'') : '';
+  try {path = decodeURIComponent(path);} catch {/* a malformed escape is not worth failing a search over */}
+  return `${project.label}\n${path}`.toLocaleLowerCase();
+}
+
+/**
+ * Splits a query into terms. Every term must match, in any order and anywhere in the
+ * haystack, so `vsc land` finds `vsc-landingpage` and `proj api` finds one `api` of several.
+ */
+function terms(filter:string):string[] {return filter.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);}
+
+/** Whether a bookmark survives the filter. An empty query matches everything. */
+function matches(project:LandingPageProject, needles:string[]):boolean {
+  if (needles.length===0) {return true;}
+  const hay = haystack(project);
+  return needles.every(needle => hay.includes(needle));
+}
+
+/**
+ * Whether a group's own label matches, in which case all of its bookmarks are shown.
+ *
+ * Groups are how the board is organised, so filtering by one is filtering to a shelf - and
+ * hiding the members of a group you just named would be perverse.
+ */
+function groupMatches(group:LandingPageGroup, needles:string[]):boolean {
+  if (needles.length===0) {return true;}
+  const label = group.label.toLocaleLowerCase();
+  return needles.every(needle => label.includes(needle));
+}
+
 /** Every bookmark card currently on the page, in document order. */
 // Array.from rather than spread: tsconfig's `lib` is ES2022 with no DOM.Iterable, so a
 // NodeList is not iterable as far as the compiler is concerned.
@@ -160,8 +199,10 @@ function App() {
     }
     return null;
   },[menu,model]);
-  const needle=filter.trim().toLocaleLowerCase();
-  const visibleGroups=model.groups.filter(group => group.projects.some(project => project.label.toLocaleLowerCase().includes(needle)) || !needle);
+  const needles=useMemo(()=>terms(filter),[filter]);
+  // A group survives if its own label matches or any of its bookmarks do. Note this is
+  // 'filtered to nothing', not 'empty' - an untouched board still shows its empty groups.
+  const visibleGroups=model.groups.filter(group => groupMatches(group,needles) || group.projects.some(project => matches(project,needles)));
   const userGroups=model.groups.filter(group => group.guid!=='@vsc-mru');
 
   function openMenu(event:MouseEvent,guid:string) {
@@ -221,19 +262,20 @@ function App() {
       const drop = !drag || drag.over===null || index<0 ? null
         : drag.over===index ? 'before'
         : (drag.over===userGroups.length && index===userGroups.length-1) ? 'after' : null;
-      return <GroupShelf key={group.guid} group={group} index={index} total={userGroups.length} filter={needle} composer={composer===group.guid} setComposer={setComposer} openMenu={openMenu}
+      return <GroupShelf key={group.guid} group={group} index={index} total={userGroups.length} needles={needles} composer={composer===group.guid} setComposer={setComposer} openMenu={openMenu}
         refreshing={refreshing} refresh={()=>{setRefreshing(true); post('refreshRecents');}}
         dragging={drag?.guid===group.guid} drop={drop} onDragStart={()=>setDrag({guid:group.guid,over:null})} onDragOver={dragOver} onDrop={dropGroup}/>;
     })}</div>
     {model.groups.length===0 && <EmptyState/>}
-    {needle && visibleGroups.length===0 && <div class="placeholder"><h2>No bookmarks match your filter</h2><button class="btn-secondary" onClick={()=>setFilter('')}>Clear filter</button></div>}
+    {needles.length>0 && visibleGroups.length===0 && <div class="placeholder"><h2>No bookmarks match your filter</h2><button class="btn-secondary" onClick={()=>setFilter('')}>Clear filter</button></div>}
     {menu && target && <ActionMenu menu={menu} target={target} rename={rename} setRename={setRename} confirm={confirm} setConfirm={setConfirm} picker={picker} setPicker={setPicker} close={closeMenu} renameTarget={renameTarget} chooseShade={chooseShade} chooseGlyph={chooseGlyph}/>} 
   </main>;
 }
 
-function GroupShelf({group,index,filter,composer,setComposer,openMenu,refreshing,refresh,dragging,drop,onDragStart,onDragOver,onDrop}:{group:LandingPageGroup;index:number;total:number;filter:string;composer:boolean;setComposer:(id:string|null)=>void;openMenu:(event:MouseEvent,guid:string)=>void;refreshing:boolean;refresh:()=>void;dragging:boolean;drop:'before'|'after'|null;onDragStart:()=>void;onDragOver:(event:DragEvent,index:number)=>void;onDrop:()=>void}) {
+function GroupShelf({group,index,needles,composer,setComposer,openMenu,refreshing,refresh,dragging,drop,onDragStart,onDragOver,onDrop}:{group:LandingPageGroup;index:number;total:number;needles:string[];composer:boolean;setComposer:(id:string|null)=>void;openMenu:(event:MouseEvent,guid:string)=>void;refreshing:boolean;refresh:()=>void;dragging:boolean;drop:'before'|'after'|null;onDragStart:()=>void;onDragOver:(event:DragEvent,index:number)=>void;onDrop:()=>void}) {
   const sealed=group.guid==='@vsc-mru';
-  const projects=group.projects.filter(project=>project.label.toLocaleLowerCase().includes(filter));
+  // Naming the group shows all of it; otherwise each bookmark is matched on its own.
+  const projects=groupMatches(group,needles) ? group.projects : group.projects.filter(project=>matches(project,needles));
   const layout=group.layout||'list';
   const next:Record<Layout,Layout>={list:'grid',grid:'compact',compact:'list'};
   return <section class={`group${sealed?' sealed':''}${dragging?' dragging':''}`} data-guid={group.guid} data-shade={shadeForGroup(group)} data-drop={drop||undefined}
