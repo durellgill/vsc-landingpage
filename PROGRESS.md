@@ -2,6 +2,36 @@
 
 Fork of `renebuehling/vsc-landingpage`. Tracks work done in this fork and what is still open.
 
+## 2026-08-02 - Start page features
+
+Seven features on top of the Vite migration, one commit each. Everything was verified in
+the browser harness by asserting on posted messages and DOM state rather than by eye.
+
+- **Recent can be refreshed.** `refreshRecents()` in `communication.ts`, reached from the
+  Recent group header, from `onDidChangeViewState` when the panel becomes visible, and from
+  the *Landing Page: Refresh Recent* palette command.
+- **The board is keyboard-drivable.** Cards are tab stops; arrows move by geometry so all
+  three layouts behave the same, Enter opens, Home/End jump, `/` reaches the filter, Escape
+  unwinds. This also fixed Ctrl/Cmd+F, which had been posting `setFocusToFilterInput` to a
+  webview that never handled it.
+- **The filter searches paths and group names**, and every whitespace-separated term must
+  match.
+- **Open in a new window**, via Ctrl/Cmd+click, Ctrl/Cmd+Enter and the bookmark menu. Folders
+  and workspaces only - `vscode.open` has no new-window form for a file.
+- **Groups fold**, persisted as `LandingPageGroup.collapsed`. An active filter overrides the
+  fold without writing to it.
+- **Bookmarks whose target is gone are flagged**, from a `bookmarkHealth` message that never
+  enters the model. Marked, not hidden or disabled.
+- **Bookmarks can be pinned** to the top of their group. A stable sort, so unpinning returns
+  a bookmark to where it was.
+- **Folder bookmarks show their branch**, read from `.git/HEAD` directly rather than through
+  the Git extension. Worktrees and detached HEAD included.
+
+Two of these turned up problems in the harness rather than the product, both now fixed
+there: it reposted the host's model object by reference, which made `useState` bail out on
+`Object.is` and any model-state feature look dead; and it cached the built renderer for the
+life of the process, so rebuilds were invisible until it was restarted.
+
 ## 2026-08-02 - Vite build, and a permanent browser harness
 
 Replaced webpack with two Vite builds: the webview (`vite.config.webview.mts`, IIFE) and the
