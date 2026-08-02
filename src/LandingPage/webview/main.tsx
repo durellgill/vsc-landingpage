@@ -43,6 +43,12 @@ function haystack(project:LandingPageProject):string {
   return `${project.label}\n${path}`.toLocaleLowerCase();
 }
 
+/** The bookmark's target as a reader would write it: no `file://`, no percent-escapes. */
+function displayPath(project:LandingPageProject):string {
+  const raw = project.path ? project.path.replace(/^file:\/\//,'') : '';
+  try {return decodeURIComponent(raw);} catch {return raw;}
+}
+
 /**
  * Splits a query into terms. Every term must match, in any order and anywhere in the
  * haystack, so `vsc land` finds `vsc-landingpage` and `proj api` finds one `api` of several.
@@ -162,6 +168,11 @@ function App() {
   const [health,setHealth] = useState<{missing:string[];branches:Record<string,string>}>({missing:[],branches:{}});
 
   const filterInput = useRef<HTMLInputElement>(null);
+  // The hover detail card. One element for the whole page - only one bookmark can be under
+  // the pointer at a time, and a popover per card would be hundreds of top-layer elements.
+  const [hover,setHover] = useState<{guid:string;left:number;top:number;bottom:number}|null>(null);
+  const hovercard = useRef<HTMLDivElement>(null);
+  const hoverTimer = useRef<number>(0);
 
   useEffect(() => {
     const receive = (event:MessageEvent) => {
@@ -174,6 +185,29 @@ function App() {
     post('documentReady');
     return () => window.removeEventListener('message',receive);
   },[]);
+
+  // Shows and places the hover card. The Popover API puts it in the top layer, so it escapes
+  // every `overflow` and stacking context on the page without z-index games - which is the
+  // whole reason for using it here rather than an absolutely positioned div.
+  useEffect(() => {
+    const card = hovercard.current;
+    if (!card) {return;}
+    if (!hover) {
+      if (card.matches(':popover-open')) {card.hidePopover();}
+      return;
+    }
+    if (!card.matches(':popover-open')) {card.showPopover();}
+
+    // Measured only once it is open; a closed popover has no box to measure.
+    const box = card.getBoundingClientRect();
+    const margin = 8;
+    // Below the bookmark by default, flipped above when it would run off the bottom.
+    let top = hover.bottom + 6;
+    if (top + box.height > window.innerHeight - margin) {top = hover.top - box.height - 6;}
+    const left = Math.max(margin, Math.min(hover.left, window.innerWidth - box.width - margin));
+    card.style.left = `${left}px`;
+    card.style.top = `${Math.max(margin, top)}px`;
+  },[hover]);
 
   // Keyboard driving. This listens on `window` rather than on the page element because focus
   // starts on `document.body`, which is outside the rendered tree - a handler on `<main>`
@@ -233,6 +267,14 @@ function App() {
     return null;
   },[menu,model]);
   const needles=useMemo(()=>terms(filter),[filter]);
+  const hovered = useMemo(() => {
+    if (!hover) {return null;}
+    for (const group of model.groups) {
+      const project = group.projects.find(project => project.guid===hover.guid);
+      if (project) {return project;}
+    }
+    return null; //hovered card was removed from the model while pointed at
+  },[hover,model]);
   // A group survives if its own label matches or any of its bookmarks do. Note this is
   // 'filtered to nothing', not 'empty' - an untouched board still shows its empty groups.
   const visibleGroups=model.groups.filter(group => groupMatches(group,needles) || group.projects.some(project => matches(project,needles)));
@@ -250,6 +292,33 @@ function App() {
   function chooseGlyph(glyph:string) {if (target) {post('patch',{guid:target.item.guid,field:'glyph',value:glyph});} closeMenu();}
 
   function create(command:string, data:Record<string,unknown>={}) {setPopover(null); post(command,data);}
+
+  /**
+   * Hover and focus are delegated from the board rather than bound per card, so adding a
+   * layout or a card variant cannot forget to wire it up. `mouseover`/`mouseout` are used
+   * because `mouseenter`/`mouseleave` do not bubble and so cannot be delegated at all.
+   */
+  function pointerInto(event:MouseEvent|FocusEvent) {
+    const card = (event.target as Element|null)?.closest?.<HTMLElement>('.project');
+    const from = (event as MouseEvent).relatedTarget as Element|null;
+    // Moving between children of the same card is not a new hover.
+    if (!card || (from && card.contains(from))) {return;}
+    window.clearTimeout(hoverTimer.current);
+    const show = () => {
+      const rect = card.getBoundingClientRect();
+      setHover({guid:card.dataset.guid ?? '', left:rect.left, top:rect.top, bottom:rect.bottom});
+    };
+    // A delay on pointer only. Keyboard focus is deliberate, so it shows at once.
+    if (event.type==='focusin') {show();}
+    else {hoverTimer.current = window.setTimeout(show, 350);}
+  }
+  function pointerOut(event:MouseEvent|FocusEvent) {
+    const card = (event.target as Element|null)?.closest?.<HTMLElement>('.project');
+    const to = (event as MouseEvent).relatedTarget as Element|null;
+    if (!card || (to && card.contains(to))) {return;}
+    window.clearTimeout(hoverTimer.current);
+    setHover(null);
+  }
 
   // Drag reorder. `index` is the position among user-created groups; the sealed Recent group
   // reports -1 and is neither draggable nor a drop target.
@@ -288,7 +357,8 @@ function App() {
     <div class="commandbar">
       <div class="field field-filter"><span class="field-icon"><Svg name="search"/></span><input ref={filterInput} value={filter} onInput={event=>setFilter((event.target as HTMLInputElement).value)} placeholder="Filter bookmarks...  / or Ctrl/Cmd+F"/>{filter && <button class="btn-ghost" title="Clear filter" onClick={()=>setFilter('')}><Svg name="clear"/></button>}</div>
     </div>
-    <div class="content col" onDragEnd={()=>setDrag(null)} onDrop={dropGroup}>{visibleGroups.map(group=>{
+    <div class="content col" onMouseOver={pointerInto} onMouseOut={pointerOut} onFocusIn={pointerInto} onFocusOut={pointerOut}
+      onDragEnd={()=>{setDrag(null); setHover(null);}} onDrop={dropGroup}>{visibleGroups.map(group=>{
       const index=userGroups.indexOf(group);
       // Only one indicator is ever drawn: 'before' the group at the insertion point, or
       // 'after' the last one when dropping at the very end.
@@ -301,6 +371,7 @@ function App() {
     })}</div>
     {model.groups.length===0 && <EmptyState/>}
     {needles.length>0 && visibleGroups.length===0 && <div class="placeholder"><h2>No bookmarks match your filter</h2><button class="btn-secondary" onClick={()=>setFilter('')}>Clear filter</button></div>}
+    <HoverCard reference={hovercard} project={hovered} branch={hovered ? health.branches[hovered.guid] : undefined} missing={!!hovered && health.missing.includes(hovered.guid)}/>
     {menu && target && <ActionMenu menu={menu} target={target} rename={rename} setRename={setRename} confirm={confirm} setConfirm={setConfirm} picker={picker} setPicker={setPicker} close={closeMenu} renameTarget={renameTarget} chooseShade={chooseShade} chooseGlyph={chooseGlyph}/>} 
   </main>;
 }
@@ -331,8 +402,8 @@ function GroupShelf({group,index,needles,composer,setComposer,openMenu,refreshin
 
 function BookmarkCard({project,missing,branch,openMenu}:{project:LandingPageProject;missing:boolean;branch?:string;openMenu:(event:MouseEvent,guid:string)=>void}) {
   const type=project.icon||'file'; const shade=project.shade||typeShades[type];
-  const path=project.path?.replace(/^file:\/\//,'')||''; const parent=path.slice(0,path.lastIndexOf('/'));
-  return <article class="project interactable" tabIndex={0} role="button" aria-label={project.label} data-guid={project.guid} data-shade={shade} data-kind={type} data-missing={missing?'yes':undefined} data-pinned={project.pinned?'yes':undefined} title={missing?`${path}\n\nThis target no longer exists.`:path} onClick={event=>{if (!(event.target as Element).closest('button')) {post('open',{guid:project.guid, newWindow:(event.ctrlKey||event.metaKey) && opensInWindow(project)});}}} onContextMenu={event=>openMenu(event,project.guid)}><div class="spine"/><div class="pictoral"><Svg name={iconFor(project)}/></div><div class="textblock"><div class="project-label">{project.label}</div><div class="project-path">{missing && <span class="missing-badge"><Svg name="triangleAlert"/>Missing</span>}{branch && <span class="branch-badge" title={`On branch ${branch}`}><Svg name="gitBranch"/><span class="branch-name">{branch}</span></span>}<span class="path-text">{parent}</span></div></div>{project.pinned && <span class="pin-marker" title="Pinned to the top of this group"><Svg name="pin"/></span>}<button class="rowmenu" title="More actions" onClick={event=>openMenu(event,project.guid)}><Svg name="ellipsis"/></button></article>;
+  const path=displayPath(project); const parent=path.slice(0,path.lastIndexOf('/'));
+  return <article class="project interactable" tabIndex={0} role="button" aria-label={project.label} data-guid={project.guid} data-shade={shade} data-kind={type} data-missing={missing?'yes':undefined} data-pinned={project.pinned?'yes':undefined} onClick={event=>{if (!(event.target as Element).closest('button')) {post('open',{guid:project.guid, newWindow:(event.ctrlKey||event.metaKey) && opensInWindow(project)});}}} onContextMenu={event=>openMenu(event,project.guid)}><div class="spine"/><div class="pictoral"><Svg name={iconFor(project)}/></div><div class="textblock"><div class="project-label">{project.label}</div><div class="project-path">{missing && <span class="missing-badge"><Svg name="triangleAlert"/>Missing</span>}{branch && <span class="branch-badge"><Svg name="gitBranch"/><span class="branch-name">{branch}</span></span>}<span class="path-text">{parent}</span></div></div>{project.pinned && <span class="pin-marker" title="Pinned to the top of this group"><Svg name="pin"/></span>}<button class="rowmenu" title="More actions" onClick={event=>openMenu(event,project.guid)}><Svg name="ellipsis"/></button></article>;
 }
 
 function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,picker,setPicker,close,renameTarget,chooseShade,chooseGlyph}:any) {
@@ -351,6 +422,30 @@ function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,picker,setP
     {!project && sealed && <button onClick={()=>{post('restoreHiddenRecents');close();}}>Restore hidden recents</button>}
     <div class="ctxsep"/>
     {sealed&&project ? (confirm==='hide'?<button class="danger" onClick={()=>{post('hideRecent',{guid:target.item.guid});close();}}>Hide?</button>:<button class="danger" onClick={()=>setConfirm('hide')}><Svg name="trash2"/><span>Hide from Landing Page</span></button>) : !sealed && (confirm==='remove'?<><button class="danger" onClick={()=>{post('remove',{guid:target.item.guid});close();}}>Remove?</button><button onClick={close}>Cancel</button></>:<button class="danger" onClick={()=>setConfirm('remove')}><Svg name="trash2"/><span>Remove</span></button>)}
+  </div>;
+}
+
+/**
+ * The detail shown while a bookmark is hovered or focused: the full path, plus branch and
+ * missing state when they apply.
+ *
+ * The card truncates its path to fit, so this is the only place the whole target is legible.
+ * A native `title` tooltip cannot show the branch alongside it, cannot be styled to match the
+ * editor, and appears on its own schedule.
+ *
+ * Always rendered, empty when nothing is hovered: `showPopover()` needs an element already in
+ * the document, and mounting one on hover would mean measuring it before it had been laid out.
+ */
+function HoverCard({reference,project,branch,missing}:{reference:any;project:LandingPageProject|null;branch?:string;missing:boolean}) {
+  return <div class="hovercard" popover="manual" ref={reference}>
+    {project && <>
+      <div class="hovercard-name">{project.label}</div>
+      <div class="hovercard-path">{displayPath(project) || 'No target set'}</div>
+      {(branch || missing) && <div class="hovercard-meta">
+        {branch && <span class="hovercard-branch"><Svg name="gitBranch"/>{branch}</span>}
+        {missing && <span class="hovercard-missing"><Svg name="triangleAlert"/>This target no longer exists</span>}
+      </div>}
+    </>}
   </div>;
 }
 

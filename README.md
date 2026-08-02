@@ -136,6 +136,10 @@ a plain file, so the option is withheld rather than offered and then ignored.
 
 If the target is already open in another window, VS Code may focus that window instead.
 
+Hovering a bookmark - or reaching it with the keyboard - opens a small detail card showing
+the **full path**, the branch, and a warning if the target has gone. Cards truncate long
+paths to stay scannable, so this is where you read the whole thing.
+
 ## Driving it from the keyboard
 
 The whole board works without a mouse.

@@ -241,6 +241,23 @@ gets.
   in the same grid ended up with icons at different heights. `.textblock` is `display: contents`
   there, so the label and path need explicit `grid-column`/`grid-row` or the path auto-places
   underneath the icon.
+- **Hovering a bookmark opens a detail popover, built on the Popover API.** The card
+  truncates its path, so this is the only place the whole target is legible; it also carries
+  the branch and the missing-target notice. `popover` puts it in the **top layer**, which is
+  the reason to use it here - it escapes every `overflow` and stacking context on the page
+  without a z-index, and this page has a history of exactly that bug. Three things it needs:
+  the UA stylesheet's `inset: 0; margin: auto; border; padding` must all be undone before it
+  can be placed by hand; it must be `pointer-events: none`, or it steals the hover that
+  opened it and flickers; and one element is shared by the whole board, since only one
+  bookmark can be pointed at.
+- **Hover and focus are delegated from `.content`, not bound per card.** `mouseenter` and
+  `mouseleave` do not bubble and cannot be delegated at all, so it listens for
+  `mouseover`/`mouseout` and ignores moves between children of the same card. Pointer hover
+  is delayed; keyboard focus is not, because focusing something is deliberate.
+- **Group hover must not change size.** Growing the accent bar and tracking the title out
+  shoved the count badge and divider sideways and made the group appear to swell as the
+  pointer crossed it. Hover feedback belongs in colour and opacity - things that do not
+  occupy layout.
 - **`text-overflow: ellipsis` does nothing on a flex item.** It styles a block container's
   own text, so a badge that becomes `display: flex` to align its icon stops truncating and
   starts cutting mid-word instead. Give the text its own block inside - that is what

@@ -638,7 +638,7 @@
           border-radius: 99px;
           background-color: var(--group-accent);
           opacity: .8;
-          transition: height .16s ease-out, opacity .16s ease-out;
+          transition: opacity .16s ease-out;
         }
 
         .group-label //h1
@@ -650,7 +650,7 @@
           color: var(--vscode-foreground);
           border-radius: var(--radius-s);
           flex: none;
-          transition: color .15s ease-in-out, letter-spacing .15s ease-in-out;
+          transition: color .15s ease-in-out;
         }
 
         // The fold control. Sits before the group icon, in the position the disclosure
@@ -737,11 +737,15 @@
           }
           [data-role="refresh"]:disabled { cursor: default; }
         }
+        // Hover changes colour only. Growing the accent bar and tracking the title out both
+        // changed the header's size, which shoved the count badge and divider sideways and
+        // made the whole group appear to swell as the pointer crossed it. Feedback here has
+        // to be something that does not occupy layout.
         &:hover
         {
-          .group-label { color: var(--group-accent); letter-spacing: .1em; }
+          .group-label { color: var(--group-accent); }
           .rule { background-size: 100% 100%; }
-          &::before { height: 30px; opacity: 1; }
+          &::before { opacity: 1; }
         }
         &:not(:hover) .hover-only button {visibility: hidden;}
       }
@@ -1189,6 +1193,70 @@
   @media (prefers-reduced-motion: reduce)
   {
     *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  }
+
+  //--- hover detail ----------------------------------------------------------
+  // Shown while a bookmark is hovered or keyboard-focused. Uses the Popover API, so the
+  // browser puts it in the top layer: it escapes every `overflow` and stacking context on
+  // the page without a z-index, which is exactly the class of bug that has bitten the
+  // tooltips here before.
+  //
+  // The UA stylesheet gives [popover] `inset: 0; margin: auto; border: solid; padding: .25em`
+  // to centre it on screen. All four have to be undone before it can be placed by hand.
+  .hovercard
+  {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    padding: 8px 10px;
+    max-width: min(520px, 80vw);
+    width: max-content;
+
+    border: 1px solid var(--vscode-editorHoverWidget-border, var(--hairline));
+    border-radius: var(--radius);
+    background-color: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
+    color: var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.28);
+
+    font-size: var(--vscode-font-size);
+    // Purely informational, and it can sit under the pointer. Without this it would steal
+    // the hover it was opened by and flicker itself in and out.
+    pointer-events: none;
+
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+
+    .hovercard-name { font-weight: 600; }
+
+    // The path is the reason this exists, so it gets the monospace treatment and is allowed
+    // to wrap rather than truncate - truncating here would defeat the point.
+    .hovercard-path
+    {
+      font-family: var(--mono);
+      font-size: .9em;
+      color: var(--vscode-descriptionForeground);
+      overflow-wrap: anywhere;
+    }
+
+    .hovercard-meta
+    {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px 10px;
+      margin-top: 2px;
+      font-size: .9em;
+    }
+    .hovercard-branch, .hovercard-missing
+    {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      .lucide { width: 12px; height: 12px; stroke-width: 2.5px; }
+    }
+    .hovercard-branch { color: var(--vscode-descriptionForeground); font-family: var(--mono); }
+    .hovercard-missing { color: var(--vscode-errorForeground); font-weight: 600; }
   }
 
 } //.landingpage
