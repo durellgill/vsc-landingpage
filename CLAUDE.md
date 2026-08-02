@@ -50,6 +50,11 @@ Three things about asserting through it that have already cost time:
 - **`:focus` needs `document.hasFocus()`.** In an automated window it is often false, and
   then no focus rule matches at all. Check `document.hasFocus()` before concluding a focus
   style is broken.
+- **Take screenshots as well as measurements, and restart the browser if they stall.** The
+  driver wedges after a long run of `eval` calls and `screenshot` starts timing out;
+  `agent-browser close --all` followed by a fresh `open` fixes it. This is worth the trouble:
+  measuring found the card alignment problems, but only *looking* at the page caught a branch
+  name being clipped mid-word, because the geometry was correct and the rendering was not.
 - **Transitioned properties freeze when the window is not being painted.** `outline-color`
   and the spine width are transitioned, so a throttled window reports their *old* values
   indefinitely, while untransitioned ones like `outline-width` update instantly. A rule that

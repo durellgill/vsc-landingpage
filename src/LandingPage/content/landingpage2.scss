@@ -1006,10 +1006,19 @@
           margin-right: 6px;
           max-width: 18ch;
           overflow: hidden;
-          text-overflow: ellipsis;
           white-space: nowrap;
           color: var(--shade-color, var(--vscode-descriptionForeground));
           .lucide { width: 11px; height: 11px; stroke-width: 2.5px; flex: none; }
+
+          // The name needs its own block to truncate in. `text-overflow` styles a block
+          // container's own text and does nothing on a flex item, so with the badge itself
+          // as the flex container a long branch was cut mid-word with no ellipsis.
+          > .branch-name
+          {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
         }
 
         .missing-badge
