@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { findFirst, LandingPageGroup, LandingPageModel, LandingPageProject, ScanResult } from './LandingPageModel';
-import { importVscRecentList } from './history';
+import { importVscRecentList, recentLimit } from './history';
 import { parseURI } from './utils';
 
 /** 
@@ -206,9 +206,65 @@ async function populateVscMru(sharedModel:LandingPageModel):Promise<void>
   }
   const hidden = hiddenMruGuids();
   const custom = mruCustomisations();
-  const freshProjects = (await importVscRecentList()).filter(project => !hidden.has(project.guid));
+  const candidates = (await importVscRecentList()).filter(project => !hidden.has(project.guid));
+  const freshProjects = await takeExisting(candidates, recentLimit());
   for(const project of freshProjects) {applyMruCustomisation(project, custom[project.guid]);}
   mruGroup.projects=freshProjects;
+}
+
+/**
+ * Takes the first `limit` entries whose target still exists on disk.
+ *
+ * `maxRecentItems` is a count of what the user actually sees, so both exclusions - hidden
+ * entries and vanished targets - have to be applied before the cap, and the list has to be
+ * walked further down to make up the difference. Capping first meant hiding five entries left
+ * fifteen on screen.
+ *
+ * VS Code's history runs to hundreds of entries, so this stats in batches and stops as soon
+ * as the quota is filled: the common case checks barely more than `limit` paths, not the
+ * whole history. Only `file:` targets are checked; anything else is kept, since a remote or
+ * virtual path can be valid while its filesystem provider is not registered.
+ *
+ * @param projects Candidates, most recent first.
+ * @param limit How many to keep. `0` means no limit, which does stat the whole history.
+ * @returns The surviving entries, in order.
+ */
+async function takeExisting(projects:LandingPageProject[], limit:number):Promise<LandingPageProject[]>
+{
+  const kept:LandingPageProject[] = [];
+  // Enough per round to fill the quota in one pass when nothing is missing, and never so
+  // few that a run of dead entries costs a round trip each.
+  const batchSize = Math.max(limit || 0, 10);
+
+  for (let start=0; start<projects.length; start+=batchSize)
+  {
+    const batch = projects.slice(start, start+batchSize);
+    const alive = await Promise.all(batch.map(project => targetExists(project)));
+
+    for (let index=0; index<batch.length; index++)
+    {
+      if (alive[index]) {kept.push(batch[index]);}
+      if (limit>0 && kept.length>=limit) {return kept;}
+    }
+  }
+  return kept;
+}
+
+/**
+ * Whether a bookmark's target is still on disk.
+ * @param project Bookmark to check.
+ * @returns False only when a local target is confirmed gone.
+ */
+async function targetExists(project:LandingPageProject):Promise<boolean>
+{
+  if (!project.path) {return true;}
+  let uri:vscode.Uri;
+  try {uri = vscode.Uri.parse(project.path);}
+  catch {return true;}
+  if (uri.scheme!=='file') {return true;}
+
+  try {await vscode.workspace.fs.stat(uri); return true;}
+  catch {return false;}
 }
 
 /**

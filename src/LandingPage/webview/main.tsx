@@ -308,13 +308,10 @@ function App() {
 function GroupShelf({group,index,needles,composer,setComposer,openMenu,refreshing,refresh,health,dragging,drop,onDragStart,onDragOver,onDrop}:{group:LandingPageGroup;index:number;total:number;needles:string[];composer:boolean;setComposer:(id:string|null)=>void;openMenu:(event:MouseEvent,guid:string)=>void;refreshing:boolean;refresh:()=>void;health:{missing:string[];branches:Record<string,string>};dragging:boolean;drop:'before'|'after'|null;onDragStart:()=>void;onDragOver:(event:DragEvent,index:number)=>void;onDrop:()=>void}) {
   const sealed=group.guid==='@vsc-mru';
   // Naming the group shows all of it; otherwise each bookmark is matched on its own.
-  const visible=groupMatches(group,needles) ? group.projects : group.projects.filter(project=>matches(project,needles));
-  // A missing target is dropped from Recent rather than flagged. Recent is a mirror of what
-  // you have opened, not a list you curate - an entry whose folder is gone is just noise you
-  // cannot remove, since the list is rebuilt from VS Code's history on every sync. In a
-  // user-created group the opposite holds: you put that bookmark there, so it is flagged and
-  // left for you to deal with.
-  const projects=pinnedFirst(sealed ? visible.filter(project=>!health.missing.includes(project.guid)) : visible);
+  // Missing entries are excluded from Recent by the host, not here - the count in the header
+  // has to agree with what is rendered, and `maxRecentItems` is a count of visible entries,
+  // so the exclusion has to happen before the cap. See takeExisting() in communication.ts.
+  const projects=pinnedFirst(groupMatches(group,needles) ? group.projects : group.projects.filter(project=>matches(project,needles)));
   const layout=group.layout||'list';
   // A filter overrides the stored fold. Searching a board and being shown a collapsed group
   // that silently contains the hit is the worst of both - the query is a temporary intent,

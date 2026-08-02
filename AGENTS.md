@@ -184,6 +184,14 @@ gets.
   what you have opened and is rebuilt every sync, so a dead entry there is noise you have no
   way to remove - it is filtered out. A bookmark in your own group is one you deliberately
   made, so it is flagged and left for you to deal with.
+- **`maxRecentItems` counts what is *shown*, so both Recent exclusions happen before the
+  cap.** Hidden entries and vanished targets are removed first, and `takeExisting()` reaches
+  further down VS Code's history to fill the quota - otherwise hiding five entries left
+  fifteen on screen, and the group's count badge disagreed with the list. Both exclusions
+  belong in the host for that reason: the badge renders `projects.length`, so anything the
+  webview filtered out would desync it. `takeExisting()` stats in batches and stops once the
+  quota is full, so the common case checks barely more than `limit` paths, not the hundreds
+  of entries the history can hold.
 - **A bookmark whose target is gone is marked, never hidden or disabled.** The host stats
   every `file:` target and posts a `bookmarkHealth` message listing the GUIDs it could not
   find. This is observed state and deliberately stays out of the model: persisting it would

@@ -214,7 +214,9 @@ A bookmark in one of *your* groups whose folder or file has been moved, renamed 
 marked with a red spine and a **Missing** badge. The check runs when the page opens and
 whenever **Recent** is refreshed, which includes the panel coming back into view.
 
-In **Recent** a missing entry is simply dropped instead. Recent mirrors what you have opened
+In **Recent** a missing entry is simply dropped instead, and the list reaches further back
+into VS Code's history to make up the number - `maxRecentItems` counts entries you can
+actually see, so hiding or losing a few never shrinks the list below it. Recent mirrors what you have opened
 rather than a list you curate, and the list is rebuilt from VS Code's history on every sync,
 so a dead entry there is noise you have no way to remove. It is marked, never hidden or
 disabled - you may well want to open it anyway, rename it, or remove it, and quietly dropping

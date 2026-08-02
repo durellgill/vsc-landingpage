@@ -135,6 +135,9 @@ const stub = `<script>
   });
   // Stands in for reportBookmarkHealth(): the host stats every file: target and reports the
   // ones it could not find, as a separate message that never enters the model.
+  //
+  // Only user bookmarks appear here in practice. Recent entries that no longer exist are
+  // dropped by the host before the model is built, so they never reach the page at all.
   function health() {
     setTimeout(() => window.dispatchEvent(new MessageEvent('message', {data: {command: 'bookmarkHealth', missing: __MISSING__, branches: __BRANCHES__}})), 0);
   }

@@ -106,8 +106,19 @@ export async function importVscRecentList():Promise<LandingPageProject[]>
 
     // console.log("👽 :=",result);
 
-  // VS Code's history can run to hundreds of entries. Showing all of them buries the
-  // custom groups below the fold, so cap it (0 = no limit).
-  const limit = workspace.getConfiguration('vsc-landingpage').get<number>('maxRecentItems') ?? 20;
-  return limit>0 ? result.slice(0,limit) : result;
+  // Deliberately uncapped. `maxRecentItems` limits how many entries are *shown*, and
+  // capping here applied it before hidden and missing entries were removed - so a user who
+  // had hidden five entries saw fifteen rather than twenty. The cap belongs after the
+  // exclusions, in populateVscMru(), which needs to reach further down this list to fill
+  // the quota. See {@link recentLimit}.
+  return result;
+}
+
+/**
+ * How many `Recent` entries to show. `0` means no limit.
+ * @returns The configured `maxRecentItems`.
+ */
+export function recentLimit():number
+{
+  return workspace.getConfiguration('vsc-landingpage').get<number>('maxRecentItems') ?? 20;
 }
