@@ -57,8 +57,8 @@ function stillness() {return window.matchMedia('(prefers-reduced-motion: reduce)
  * first call happening before the element is mounted - the tokens themselves always exist.
  */
 const motionTokens = new Map<string,{duration:number; easing:string}>();
-const motionFallback:Record<string,number> = {'--dur-move':220, '--dur-hover':150};
-function motion(token:'--dur-move'|'--dur-hover'='--dur-move') {
+const motionFallback:Record<string,number> = {'--dur-move':220, '--dur-hover':150, '--dur-arm':300};
+function motion(token:'--dur-move'|'--dur-hover'|'--dur-arm'='--dur-move') {
   const cached = motionTokens.get(token);
   if (cached) {return cached;}
   const fallback = {duration:motionFallback[token], easing:'cubic-bezier(.2, .7, .3, 1)'};
@@ -809,6 +809,17 @@ function App() {
     })}</div>
     {model.groups.length===0 && <EmptyState/>}
     {needles.length>0 && visibleGroups.length===0 && <div class="placeholder" data-transient><h2>No bookmarks match your filter</h2><button class="btn-secondary" onClick={()=>setFilter('')}>Clear filter</button></div>}
+    {/* Only while a bookmark is actually being carried. A permanently visible delete target is
+        a permanent invitation to destroy something, and it would occupy page width that the
+        board itself does not use. */}
+    {carry && <DeleteZone from={carry.from} onRelease={armed=>{
+      const {guid,from} = carry;
+      setCarry(null); setDrag(null); setHover(null);
+      if (!armed) {return;}
+      // Recent is generated and cannot be edited, so its entries are hidden rather than
+      // removed - exactly as the action menu does for the same two cases.
+      post(from==='@vsc-mru' ? 'hideRecent' : 'remove', {guid});
+    }}/>}
     <div class="sr-only" role="status" aria-live="polite">{announcement}</div>
     <HoverCard reference={hovercard} project={hovered} branch={hovered ? health.branches[hovered.guid] : undefined} missing={!!hovered && health.missing.includes(hovered.guid)}/>
     {menu && target && <ActionMenu menu={menu} target={target} rename={rename} setRename={setRename} confirm={confirm} setConfirm={setConfirm} picker={picker} setPicker={setPicker} close={closeMenu} renameTarget={renameTarget} chooseShade={chooseShade} chooseGlyph={chooseGlyph} groupIndex={userGroups.indexOf(target.group)} groupCount={userGroups.length}/>}
@@ -1037,6 +1048,55 @@ function Palette({type,x,y,choose,close}:any) {
     </div>
   </div>;
 }
+/**
+ * The place a bookmark goes to be got rid of. Rendered only while one is being carried.
+ *
+ * It exists because removing a bookmark was a two-step trip through the `...` menu, which is a
+ * lot of ceremony for tidying up a board - but a drag is a much easier gesture to make by
+ * accident than a menu item is to click, so it cannot simply post `remove` the moment something
+ * lands on it. It is **armed by dwell**: entering the zone starts a `--dur-arm` timer and only
+ * a drop after that timer has run does anything at all. That is the same safeguard, and the
+ * same duration, as the menu's `Remove?` confirmation, which is held non-interactive while it
+ * fades in so a double-click cannot carry through onto it. A flick across the zone on the way
+ * somewhere else releases nothing.
+ *
+ * The label says which of the two things will happen, because they are genuinely different
+ * actions. Recent is generated from VS Code's history and cannot be edited, so an entry dragged
+ * here is *hidden* from this page through `hideRecent` - reversible from the Recent group's own
+ * menu - while a bookmark in a user group is removed. This is the same split the action menu
+ * already makes, and the reason the zone reads the carried bookmark's origin rather than
+ * assuming.
+ *
+ * `aria-hidden`, and deliberately so: it is a drop target and nothing else, it cannot be
+ * operated from a keyboard at all, and both actions it offers are already on the bookmark's
+ * menu, which is reachable. Exposing an inoperable control would be worse than omitting it.
+ */
+function DeleteZone({from,onRelease}:{from:string;onRelease:(armed:boolean)=>void}) {
+  const [over,setOver] = useState(false);
+  const [armed,setArmed] = useState(false);
+  const timer = useRef<number>(0);
+  useEffect(()=>()=>window.clearTimeout(timer.current),[]);
+  const sealed = from==='@vsc-mru';
+  const verb = sealed ? 'hide' : 'remove';
+  return <div class="dropbin" data-over={over?'yes':undefined} data-armed={armed?'yes':undefined} aria-hidden="true"
+    onDragOver={event=>{
+      // The zone has to accept the drag to receive a drop at all, but it advertises `none`
+      // until it is armed, so the cursor itself says the release will not do anything yet.
+      event.preventDefault();
+      if (event.dataTransfer) {event.dataTransfer.dropEffect = armed ? 'move' : 'none';}
+    }}
+    onDragEnter={()=>{
+      setOver(true);
+      window.clearTimeout(timer.current);
+      timer.current = window.setTimeout(()=>setArmed(true), motion('--dur-arm').duration);
+    }}
+    onDragLeave={()=>{setOver(false); setArmed(false); window.clearTimeout(timer.current);}}
+    onDrop={event=>{event.preventDefault(); event.stopPropagation(); window.clearTimeout(timer.current); onRelease(armed);}}>
+    <Svg name="trash2"/>
+    <span class="dropbin-label">{armed ? `Release to ${verb}` : `Drop here to ${verb}`}</span>
+  </div>;
+}
+
 function EmptyState() {return <div class="placeholder"><h2>Nothing bookmarked yet</h2><p>Create a group, clone a repository, or open a folder to start building your board.</p><button class="btn-secondary" onClick={()=>post('createGroup')}><Svg name="plus"/>New group</button></div>}
 
 render(<App/>,document.getElementById('root')!);

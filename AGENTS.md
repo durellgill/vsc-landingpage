@@ -167,6 +167,19 @@ gets.
     clips away a landing line drawn in the gap outside it - hence `overflow: visible` while
     `[data-drop]` is set. The line is horizontal in list layout and vertical in the two
     wrapping ones, matching how `insertionPoint()` measures.
+- **The delete zone is armed by dwell, and that is a safeguard rather than an animation.** It
+  is rendered only while a bookmark is being carried - a permanently visible delete target is a
+  permanent invitation - and pinned to the right edge, which is the one part of the window the
+  board never uses because `.page` is capped at `--page-max` and left-aligned. A drag is far
+  easier to make by accident than a menu item is to click, so a drop does nothing until the
+  pointer has rested in the zone for `--dur-arm`: the same duration and the same reasoning as
+  the menu's `Remove?` confirmation, which is held non-interactive while it fades in. The
+  middle state matters as much as the other two - hovered-but-not-armed stays dashed and muted
+  and advertises `dropEffect: 'none'`, so neither the panel nor the cursor claims a release
+  will do something it will not. **Recent is hidden, never removed**, exactly as the action
+  menu already splits those two cases, and the label says which one will happen. The zone is
+  `aria-hidden`: it is a drop target that cannot be operated from a keyboard at all, and both
+  actions it offers are already on the bookmark's menu.
 - **"New folder on disk" opens the native dialog first and never asks for a group.** It is an
   action about creating a folder; asking which group to file it under before anything exists
   is a bookmarking question asked too early. The destination falls back to the first

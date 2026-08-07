@@ -218,6 +218,13 @@ and cannot be edited; and nothing can be dropped *into* Recent, so it is never o
 *Move to group* on the menu below does the same thing through a quick pick, which is easier
 when the destination is off screen and is the only route from the keyboard.
 
+**To get rid of a bookmark**, drag it to the panel that appears on the right while you are
+dragging. It will not act on a card flicked across it on the way somewhere else: rest on it for
+a moment and it turns red and says *Release to remove*, and only then does letting go do
+anything. Dragging a **Recent** entry there hides it from this page rather than removing it,
+since Recent is VS Code's own history - the Recent group's menu restores everything hidden.
+Both actions are also on the bookmark's own menu, which is the keyboard route.
+
 Right-click a bookmark (or use its `...` button) for:
 
 | Item | Notes |
