@@ -17,6 +17,18 @@ Three strands, driven by a review of the running page rather than by the build.
   62ms after the movement had visibly stopped and the board appeared to settle twice. Measured
   at 150ms against 212ms; both now settle on the same frame. `motion()` takes the duration
   token as an argument for this.
+- **The jitter the user actually meant was a different bug entirely, and a worse one.** Reported
+  as "the page just randomly jumps a little bit, and when I right-click the context menu it
+  sometimes shifts when I scroll". `getBoundingClientRect()` is viewport-relative and the FLIP
+  effect compares its results across renders, so a scroll between two renders was
+  indistinguishable from every element on the board having moved by the scroll distance. No
+  layout change was needed: scroll 150px, then re-render by any means - right-click, hover, one
+  character in the filter - and the whole board flew 150px and settled. Reproduced at exactly
+  that, three flights of `translate(0px, 150px)` from opening a menu. Stored positions are now
+  document-relative.
+- **A delete zone.** Dragging a bookmark to the right edge removes it, or hides it if it came
+  from Recent. Armed by dwell over `--dur-arm` rather than acting on contact, because a drag is
+  far easier to make by accident than a menu item is to click.
 - **Three load-jitter hypotheses were tested and rejected before that one was found**: the
   `bookmarkHealth` badges arriving do not change any card's height, the layout switch is
   monotonic with no direction reversals across 29 sampled frames, and the interleaved
