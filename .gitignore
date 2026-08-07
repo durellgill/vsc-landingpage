@@ -58,3 +58,13 @@ yarn.lock
 # Optional build cache
 .cache/
 *.afphoto~lock~
+
+# Coding-agent tooling. Local to this checkout, not part of the extension, and `.claude/skills/*`
+# are symlinks to directories outside the repo - committing them would publish broken links.
+.agents/
+.claude/
+skills-lock.json
+
+# Scratch screenshots taken while working on the page. Referenced by nothing.
+board.png
+board-*.png

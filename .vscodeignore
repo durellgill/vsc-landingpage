@@ -16,3 +16,25 @@ vsc-extension-quickstart.md
 **/*.ts
 **/.vscode-test.*
 DEVELOP.md
+
+# Agent tooling. `.claude/skills/*` are symlinks *to directories*; vsce enumerates them as
+# files and its secret scanner then read()s them, which fails with EISDIR and aborts the
+# package. None of this belongs in a VSIX regardless.
+.claude/**
+.agents/**
+skills-lock.json
+
+# Scratch screenshots taken while working on the page. Referenced by nothing.
+board.png
+
+# Working notes for contributors and coding agents. README.md and CHANGELOG.md still ship,
+# because the marketplace renders those; these four are internal and were only being packaged
+# by accident.
+AGENTS.md
+CLAUDE.md
+PROGRESS.md
+TODO.md
+
+# Upstream's demo GIFs, which were the whole size of the extension. Nothing embeds them - the
+# readme only mentions the folder in passing - so shipping them cost 1.4 MB for no benefit.
+doc/**
