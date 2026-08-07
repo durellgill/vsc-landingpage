@@ -2,7 +2,7 @@
 /**
  * Motion regression check.
  *
- * Six things on this page were broken in ways a build, a typecheck and a lint all pass through
+ * Seven things on this page were broken in ways a build, a typecheck and a lint all pass through
  * happily, because every one of them is a *behaviour* rather than a value. Each check below is a
  * bug that actually shipped here, reduced to the smallest assertion that would have caught it:
  *
@@ -19,7 +19,10 @@
  *   5. focus-instant       the focus ring eased its colour over 150ms on every arrow-key move,
  *                          and the spine stopped responding to focus entirely when it moved
  *                          from `width` to `transform`.
- *   6. reduced-motion      entrances must downgrade to opacity-only, and `confirm-arm` must
+ *   6. scroll-not-movement a scroll between two renders looked like every element having moved,
+ *                          because the FLIP effect compared viewport-relative rects across
+ *                          renders - so the board jumped by the scroll distance on any render.
+ *   7. reduced-motion      entrances must downgrade to opacity-only, and `confirm-arm` must
  *                          survive, because it is a safeguard rather than an animation.
  *
  * Usage:
@@ -320,6 +323,63 @@ function scrimStacking() {
 // The chevron rotation and the group's height are one gesture expressed twice, and they are
 // timed from the same token for that reason. When they drifted apart the arrow settled early and
 // sat there while the group was still closing.
+// A scroll is not a movement. `getBoundingClientRect()` is viewport-relative and the FLIP
+// effect compares its results across renders, so scrolling between two renders looked exactly
+// like every element on the board having moved. Scroll 150px, then re-render by any means at
+// all - right-click a card, hover one, type a character in the filter - and the whole board
+// flew 150px and settled. This is the reported "the page randomly jumps a little bit", and it
+// needed no layout change to happen, only a scroll and a render.
+//
+// Both halves matter: a scroll must produce no flights, and a real layout change must still
+// produce them, or the fix could be "never animate anything" and pass.
+function scrollIsNotMovement() {
+  open();
+  evaluate(`
+    const spacer=document.createElement('div');
+    spacer.style.cssText='height:1200px';
+    document.body.appendChild(spacer);
+    window.__f=[];
+    const real=Element.prototype.animate;
+    Element.prototype.animate=function(frames,opts){
+      if(this.classList&&(this.classList.contains('project')||this.classList.contains('group'))){
+        window.__f.push(1);
+      }
+      return real.apply(this,arguments);
+    };
+    return JSON.stringify('armed');
+  `);
+  sleep(400);
+  const result = evaluate(`
+    const el=document.scrollingElement;
+    el.scrollTop=150;
+    return JSON.stringify({scrollable: el.scrollHeight>el.clientHeight, top: el.scrollTop});
+  `);
+  sleep(300);
+  const scrolled = evaluate(`
+    window.__f=[];
+    document.querySelector('.project').dispatchEvent(
+      new MouseEvent('contextmenu',{bubbles:true,clientX:300,clientY:200}));
+    return JSON.stringify('rendered');
+  `);
+  sleep(200);
+  const afterScroll = evaluate(`return JSON.stringify(window.__f.length);`);
+  check('scroll-not-movement  a render while scrolled starts no flights',
+    result.scrollable && afterScroll === 0,
+    `scrolled ${result.top}px, ${afterScroll} flights`);
+
+  const afterMove = evaluate(`
+    window.__f=[];
+    const btn=[...document.querySelectorAll('.group button')].find(b=>/click to change layout/.test(b.title||''));
+    btn.click();
+    return JSON.stringify('switched');
+  `);
+  sleep(200);
+  const moves = evaluate(`return JSON.stringify(window.__f.length);`);
+  check('scroll-not-movement  a real layout change still flies',
+    moves > 0, `${moves} flights`);
+  void scrolled; void afterMove;
+}
+
 function foldSync() {
   open();
   evaluate(`
@@ -404,6 +464,7 @@ menuClamping();
 focusChecks();
 spineHover();
 scrimStacking();
+scrollIsNotMovement();
 foldSync();
 reducedMotion();
 

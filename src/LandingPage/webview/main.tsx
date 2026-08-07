@@ -573,12 +573,23 @@ function App() {
    * `boxes` clean, so the next render compares against a layout position rather than a
    * half-finished animation.
    */
-  const boxes = useRef(new Map<string,DOMRect>());
+  const boxes = useRef(new Map<string,{left:number; top:number}>());
   const flights = useRef(new Map<string,Animation>());
   useLayoutEffect(()=>{
     if (carry) {return;}
-    const next = new Map<string,DOMRect>();
+    const next = new Map<string,{left:number; top:number}>();
     const quiet = stillness();
+    // `getBoundingClientRect()` is relative to the viewport, and `boxes` is compared across
+    // renders - so scrolling between two renders was indistinguishable from every element on
+    // the board having moved. Scroll down 150px, then do anything at all that re-renders
+    // (right-click a card, hover one, type in the filter) and the whole board flew 150px and
+    // settled: `translate(0px, 150px)` on every group, measured. That is the page "randomly
+    // jumping", and it needed no layout change to happen, only a scroll and a render.
+    //
+    // Stored positions are therefore document-relative. The `seen`/`now` pair below stays in
+    // viewport terms because both are read in this same pass, so the scroll cancels between
+    // them and only the in-flight transform is left, which is exactly what that pair is for.
+    const sx = window.scrollX, sy = window.scrollY;
 
     // Measure everything before animating anything. A group's transform displaces the cards
     // inside it, so starting one group's flight partway through the loop would corrupt the
@@ -593,7 +604,9 @@ function App() {
       if (flight) {flight.cancel(); flights.current.delete(part.key);}
       // With the flight gone, this is the element's true layout box.
       const now = part.element.getBoundingClientRect();
-      next.set(part.key, now);
+      // Document-relative, so the next render compares like with like however far the page has
+      // been scrolled since.
+      next.set(part.key, {left:now.left+sx, top:now.top+sy});
       return {...part, seen, now};
     });
 
@@ -602,9 +615,12 @@ function App() {
       for (const part of measured) {
         const was = boxes.current.get(part.key);
         if (!was) {continue;}
+        // `was` is document-relative, so `now` is put back into the same frame of reference
+        // before the two are compared. The second term stays in viewport terms: `seen` and
+        // `now` were both read in this pass, so the scroll offset cancels out of it.
         moved.set(part.key, {
-          dx: (was.left-part.now.left) + (part.seen.left-part.now.left),
-          dy: (was.top-part.now.top) + (part.seen.top-part.now.top),
+          dx: (was.left-(part.now.left+sx)) + (part.seen.left-part.now.left),
+          dy: (was.top-(part.now.top+sy)) + (part.seen.top-part.now.top),
         });
       }
       for (const part of measured) {
