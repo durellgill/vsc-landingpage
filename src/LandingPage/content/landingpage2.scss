@@ -27,6 +27,55 @@
   // The editor's own monospace face, used for paths and counts.
   --mono: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, Menlo, monospace);
 
+  //--- motion tokens ---------------------------------------------------------
+  // Three curves and four durations, because the page only does four kinds of motion. They were
+  // hand-typed at each call site before, which had drifted to six durations and three curves that
+  // almost matched - the sort of difference nobody can see one at a time and everybody feels
+  // across a page.
+  //
+  // Curve, chosen by what the motion is doing rather than by what element it is on:
+  //   --ease-out    something arriving, leaving, or responding to the pointer. Starts fast, so
+  //                 the frame the user is actually watching is the one that has already moved.
+  //   --ease-move   something travelling between two places it both occupies (the FLIP card
+  //                 flight, a group's height, the gap opening under a drag). Eased at both ends
+  //                 because there is no moment of arrival to sell, only continuity.
+  //   --ease-hover  colour under the pointer. Deliberately the browser's plain `ease`: a hover is
+  //                 not an event, and a strong curve on one reads as the page twitching.
+  //
+  // `--ease-out` is stronger than the built-in `ease-out`, which is too shallow to register at
+  // the durations below - under 200ms it is nearly a linear fade.
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-move: cubic-bezier(.2, .7, .3, 1);
+  --ease-hover: ease;
+
+  --dur-press: .1s;   // press and release feedback, the fastest thing on the page
+  --dur-hover: .15s;  // anything tracking the pointer: hover colour, the spine, drag feedback
+  --dur-enter: .18s;  // something appearing: a card, a menu, a tick, the hover popover
+  --dur-move: .22s;   // something travelling: FLIP, group height, the fold chevron
+
+  // Two invariants worth keeping, because both were broken before they were written down:
+  //
+  // `--dur-enter` appears only on `animation`, never on `transition`. Everything it times is an
+  // element arriving. When it started creeping onto transitions it collected a hover effect (the
+  // group hairline) and a drag response (the gap under a carried bookmark), and both were then
+  // running at a different speed from the identical gestures beside them.
+  //
+  // Anything that follows the pointer takes `--dur-hover`, whether it is a colour, a growth or a
+  // movement - the spine, the hairline, the drag gap, the drop indicator. That is why the drop
+  // indicators are entrances timed on `--dur-hover` rather than `--dur-enter`: they retarget
+  // continuously while a drag is in flight, and a pointer that has to wait for its own feedback
+  // feels like lag no matter how good the curve is.
+  //
+  // The clone spinner is the one thing outside this scale entirely (`.8s linear infinite`).
+  // Constant motion is not a transition and has no arrival to time.
+
+  // The one duration here that is not a matter of taste. A destructive confirmation appears
+  // exactly where the row that summoned it was, so it is held non-interactive this long to stop
+  // a double-click carrying through onto it. Chosen against the interval a double-click actually
+  // spans - a fast one is well under 250ms - rather than against how the fade looks. Anyone
+  // shortening this is removing a safeguard, not tightening an animation.
+  --dur-arm: .3s;
+
   --accent-color: var(--vscode-focusBorder);
   --danger-color: var(--vscode-errorForeground);
   --hairline: var(--vscode-editorWidget-border, var(--vscode-panel-border));
@@ -42,6 +91,25 @@
   user-select: none;
 
   h1, h2, p { margin: 0; padding: 0; font-weight: 400; }
+
+  // Text for screen readers only: the live region that announces a copied path, a finished
+  // Recent refresh and the filter's result count, plus the pinned state, which is otherwise
+  // carried by an icon alone. Clipped to a 1px box rather than hidden with `display: none` or
+  // `visibility: hidden`, both of which take it out of the accessibility tree along with the
+  // layout - which would defeat the entire point. `white-space: nowrap` stops a long
+  // announcement being wrapped into a tall invisible column that still scrolls the page.
+  .sr-only
+  {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
 
   div[data-prototype]
   {
@@ -67,6 +135,28 @@
   *[data-shade="brown"]   { --shade-color: #795548; --shade-foreground:white; }
   *[data-shade="white"]   { --shade-color: #FAFAFA; --shade-foreground:black; }
   *[data-shade="black"]   { --shade-color: #212121; --shade-foreground:white; }
+
+  // The same accent, made safe to write *text* in.
+  //
+  // The fourteen literals above are chosen to be painted as fills, against a background. Several
+  // are illegible when used as a foreground instead, and the palette offers all fourteen with no
+  // hint that half of them will disappear on the theme the user happens to be running. Measured
+  // against the page background, worst case per theme: white 1.04:1 on light, black 1.02:1 on
+  // dark, black 1.30:1 on high contrast - where small text needs 4.5:1.
+  //
+  // Mixing toward the theme's own foreground keeps the hue recognisable, which is the entire
+  // point of an accent, while pinning the lightness to something the theme already guarantees is
+  // readable against its own background. 30% is the measured floor: it clears 4.5:1 for all
+  // fourteen shades in all three themes, worst case 4.65:1 (white on light). 40% does not -
+  // white lands at 3.57:1 there.
+  //
+  // Fills keep the literal. The spine, the group's header tab and the icon container all sit
+  // *against* the background rather than on it, and they are where AGENTS.md puts the paint
+  // colour in the first place. This variable is only for the places that draw glyphs and words.
+  *[data-shade]:not([data-shade=""])
+  {
+    --shade-readable: color-mix(in srgb, var(--shade-color) 30%, var(--vscode-foreground));
+  }
 
   .sealed .ifn-sealed
   {
@@ -104,10 +194,15 @@
     border: none;
     border-radius: var(--radius-s);
 
-    transition: background-color .15s ease-in-out, outline-color .15s ease-in-out;
+    transition: background-color var(--dur-hover) var(--ease-hover),
+                outline-color var(--dur-hover) var(--ease-hover),
+                transform var(--dur-press) var(--ease-out);
 
     &:hover { background-color: var(--vscode-toolbar-hoverBackground); }
     &:focus-visible { outline: 1px solid var(--accent-color); outline-offset: 1px; }
+    // Press feedback. `scale` under 1 shrinks inward, so it can never reach outside the
+    // button's own box, and `transform` does not participate in layout - nothing reflows.
+    &:active:not(:disabled) { transform: scale(.96); }
     &:disabled { cursor: default; opacity: .28; }
   }
 
@@ -177,6 +272,11 @@
     top: 20px;
     left: 20px;
     border-radius: var(--radius);
+    // Replaces the menu at the same coordinates when a colour or icon is picked, so it gets the
+    // same entrance from the same corner - it is a new surface arriving, not the menu resizing.
+    // It is measured and clamped by the same `useAnchored`, hence the same origin variables.
+    transform-origin: var(--origin-x, left) var(--origin-y, top);
+    animation: menu-in var(--dur-enter) var(--ease-out);
     // One row. The palette is opened from a row's menu, so it reads as a single strip of
     // choices rather than a block you have to scan in two dimensions.
     display: flex;
@@ -185,14 +285,24 @@
     gap: 6px;
     padding: var(--gapspace-s);
 
-    div[data-shade]
+    // Buttons, not divs. These were bare `<div>`s with a click handler: unreachable by keyboard,
+    // nameless to a screen reader, and with no focus style anywhere - and because `ActionMenu`
+    // returns the palette *instead of* the menu, activating "Accent colour" without a mouse
+    // landed in a modal containing nothing focusable at all. The tag is also what scopes this
+    // rule safely: `data-shade` is model state carried on groups and bookmark cards, so a
+    // selector loose enough to reach those would turn a whole group into a patterned circle.
+    button[data-shade]
     {
       width: 18px;
       height: 18px;
       flex: none;
+      padding: 0;
       cursor: pointer;
-      transition: transform .1s ease-out;
+      transition: transform var(--dur-press) var(--ease-out);
       &:hover { transform: scale(1.18); }
+      // The swatch is the whole control, so the ring has to sit outside it rather than on the
+      // edge it is describing.
+      &:focus-visible { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
     }
   }
 
@@ -206,6 +316,10 @@
     padding: var(--gapspace-s);
     top: 20px;
     left: 20px;
+    // Same entrance and same clamping as the colour palette above - this is the taller of the
+    // two and the one most likely to be flipped, since it is a seven-column grid of glyphs.
+    transform-origin: var(--origin-x, left) var(--origin-y, top);
+    animation: menu-in var(--dur-enter) var(--ease-out);
 
     background-color: var(--vscode-menu-background);
     border: 1px solid var(--vscode-menu-border, var(--hairline));
@@ -249,6 +363,17 @@
     // the picker itself at 60% too - a child `opacity: 1` cannot undo it.
     background-color: color-mix(in srgb, var(--vscode-editor-background) 60%, transparent);
     z-index: 98;
+
+    // The dim fades in rather than snapping on, and it fades by animating `background-color`
+    // for the same reason the alpha lives there in the first place. Animating `opacity` would
+    // create the stacking context described above for the length of the animation, so the
+    // palette sitting inside would be dimmed by its own scrim on the way in - a child
+    // `opacity: 1` cannot escape it.
+    //
+    // Only a `from` is declared: a keyframe that names one end takes the element's own computed
+    // value for the other, so the target stays whatever the `color-mix` above resolves to and
+    // there is no second copy of that expression to keep in step.
+    animation: scrim-in var(--dur-enter) var(--ease-out);
   }
 
   //--- action menu -----------------------------------------------------------
@@ -269,6 +394,18 @@
     border: 1px solid var(--vscode-menu-border, var(--hairline));
     border-radius: var(--radius);
     box-shadow: 0 4px 12px rgb(0 0 0 / 0.28);
+
+    // Opens out of the click. `useAnchored` in main.tsx places this, flipping it to the other
+    // side of the pointer when it would not fit, and writes the corner it ended up growing from
+    // into `--origin-x`/`--origin-y` - so the scale always expands away from the click rather
+    // than towards it, whichever way the menu had to go.
+    //
+    // A menu is the right frequency for this. It is reached by right-click or the row's `...`
+    // button, a handful of times in a session, so it is squarely in the range where an entrance
+    // is worth its cost. The board's own controls - filter, card clicks, keyboard navigation -
+    // are hit constantly and deliberately have nothing like it.
+    transform-origin: var(--origin-x, left) var(--origin-y, top);
+    animation: menu-in var(--dur-enter) var(--ease-out);
 
     button
     {
@@ -333,8 +470,31 @@
     &[data-renaming="yes"]
     {
       [data-act="rename"] { display:none; }
-      .ctxrename { display:flex; }
+      // Fades in where the Rename row was. Nothing destructive here, so it is armed immediately -
+      // unlike the two confirmations below.
+      .ctxrename { display:flex; animation: card-in var(--dur-enter) var(--ease-out); }
     }
+
+    // The destructive confirmations, and the one place on this page where an animation is
+    // load-bearing rather than decorative.
+    //
+    // `Remove?` replaces `Remove` in place, at exactly the same coordinates and the same size -
+    // both sit at y=439. So a double-click on Remove landed its second click on the confirmation
+    // and destroyed the bookmark without the confirmation ever having been seen. The dialog was
+    // there; it just could not be read in time to matter.
+    //
+    // `confirm-arm` holds the button non-interactive while it fades, so the earliest a click can
+    // land on it is `--dur-arm` after it appeared. That is the asymmetric timing a destructive
+    // action wants: the deliberate half is slowed, and everything else on the page stays quick.
+    // Cancel is *not* armed - the safe way out should never be the slower one.
+    //
+    // Keyed off `data-confirm`, which the Preact menu puts on the two confirm buttons. Note the
+    // `[data-act=...]` rules below are the *pre-Preact* page's markup, kept for the
+    // `landingpage2.js` fallback: this page's menu buttons carry no attributes at all, so a rule
+    // written against those selectors silently does nothing here. This safeguard was written
+    // that way first and tested as a no-op.
+    button[data-confirm] { animation: confirm-arm var(--dur-arm) var(--ease-out); }
+
     &[data-confirming-remove="yes"]
     {
       [data-act="remove"] { display:none; }
@@ -347,30 +507,53 @@
     }
   }
 
-  // The "..." affordance on each row. Present but quiet until the row is hovered.
-  .rowmenu
+  // The "..." affordance on each row, and the copy button beside it on bookmarks. Present but
+  // quiet until the row is hovered.
+  .rowmenu, .rowcopy
   {
     flex: none;
     opacity: 0;
     color: var(--vscode-descriptionForeground);
+    // Fade rather than appear. They are out of flow, so this costs no layout.
+    transition: opacity var(--dur-hover) var(--ease-out),
+                background-color var(--dur-hover) var(--ease-hover),
+                color var(--dur-hover) var(--ease-hover),
+                transform var(--dur-press) var(--ease-out);
     &:hover, &:focus-visible { color: var(--vscode-foreground); }
   }
 
-  // On a bookmark it is pinned to the top-right corner and taken out of flow. In the card
+  // On a bookmark they are pinned to the top-right corner and taken out of flow. In the card
   // layout the row is a flex *column*, so an in-flow button landed under the text and added
   // its own height to every card.
-  .project .rowmenu
+  .project .rowmenu, .project .rowcopy
   {
     position: absolute;
     top: 4px;
-    right: 4px;
     z-index: 2;
     background-color: var(--vscode-editorWidget-background);
     &:hover { background-color: var(--vscode-toolbar-hoverBackground); }
   }
-  .project:hover .rowmenu,
+  .project .rowmenu { right: 4px; }
+  .project .rowcopy { right: 26px; }
+
+  // Copy is the point of the button, so the result has to be visible on the button itself -
+  // the tick is driven by the host's `pathCopied` reply and stays up while it is shown, even
+  // after the pointer has left the card.
+  .project .rowcopy[data-copied]
+  {
+    --tick: var(--vscode-terminal-ansiGreen, var(--vscode-charts-green));
+    opacity: 1;
+    color: var(--tick);
+    &:hover { color: var(--tick); }
+    // The tick arrives from the host a moment after the click, so it needs to announce
+    // itself. Scaling up from .6 stays inside the button's box at every frame.
+    .icon { animation: tick-pop var(--dur-enter) var(--ease-out); }
+  }
+
+  .project:hover .rowmenu, .project:hover .rowcopy,
   .titlebar:hover .rowmenu,
-  .rowmenu:focus-visible { opacity: 1; }
+  .project:focus-within .rowmenu, .project:focus-within .rowcopy,
+  .rowmenu:focus-visible, .rowcopy:focus-visible { opacity: 1; }
 
   //--- page shell ------------------------------------------------------------
   // Normal document flow to the right of the rail. Previously .searchbar and .content were
@@ -398,6 +581,15 @@
       justify-content: space-between;
       gap: var(--gapspace);
       flex-wrap: wrap;
+    }
+    // The title block is what gives way when the row runs out of width, not the actions.
+    // Without this it takes its natural width, the subtitle refuses to wrap, and the whole
+    // action group is pushed onto a second line - where it reads as a toolbar sitting on top
+    // of the filter rather than as page actions in the top-right corner.
+    .titletext
+    {
+      flex: 1 1 260px;
+      min-width: 0;
     }
     .header-actions
     {
@@ -437,6 +629,13 @@
       outline: 1px solid var(--hairline);
       box-shadow: 0 6px 18px rgba(0,0,0,.36);
 
+      // Grows out of the button that opened it. Unlike the context menu this one needs no
+      // measuring: it is positioned in CSS against its `.menu-anchor` at `top: 100%; right: 0`,
+      // so it always hangs below the trigger and aligned to its right edge, and the corner it
+      // should come from is that same top-right - a constant.
+      transform-origin: top right;
+      animation: menu-in var(--dur-enter) var(--ease-out);
+
       > button
       {
         justify-content: flex-start;
@@ -475,6 +674,8 @@
       }
     }
 
+    // The clone popover is a one-field form rather than a list of actions.
+
     h1
     {
       font-size: 1.75rem;
@@ -489,6 +690,7 @@
       font-size: .9em;
     }
   }
+
 
   //--- command bar: the filter --------------------------------------------------
   // Filtering is the only thing prominent enough to earn a full-width row here. Creating and
@@ -514,14 +716,16 @@
       outline: 1px solid var(--hairline);
       padding: 4px 4px 4px 10px;
 
-      transition: outline-color .15s ease-in-out;
+      transition: outline-color var(--dur-hover) var(--ease-hover);
       &:hover, &:focus-within { outline-color: var(--accent-color); }
 
       .field-icon
       {
         display: flex;
         color: var(--vscode-input-placeholderForeground);
+        transition: color var(--dur-hover) var(--ease-hover);
       }
+      &:focus-within .field-icon { color: var(--accent-color); }
 
       input
       {
@@ -558,6 +762,31 @@
   //--- empty states ----------------------------------------------------------
   .placeholder
   {
+    // The one place on the page with any delight budget. An empty board is a first-run state:
+    // rare by definition, seen once or twice ever, and never in the middle of getting something
+    // done - which is the whole test for whether motion is allowed to be more than functional.
+    // Everywhere else here, a stagger would be decoration on something the user is trying to
+    // read past.
+    //
+    // Which is exactly why `[data-transient]` is excluded below. The same `.placeholder` markup
+    // is reused for "No bookmarks match your filter", and that one fails every part of the test
+    // above: it appears *while the user is typing*, mid-task, and can come and go on successive
+    // keystrokes. It fades, and nothing more.
+    //
+    // Staggered across the children rather than fading the block as one, so the heading is
+    // legible before the button under it resolves and the eye is walked down to the only action
+    // on the page. 60ms apart: below about 30 it is not perceptible as sequence, and past ~80 it
+    // stops reading as one movement and starts reading as three things loading slowly.
+    //
+    // The parent no longer animates. Fading a fading child inside a fading parent multiplies the
+    // two opacities, so the children would have arrived on a curve neither of them describes.
+    > * { animation: card-in var(--dur-enter) var(--ease-out) backwards; }
+    &:not([data-transient])
+    {
+      > *:nth-child(2) { animation-delay: 60ms; }
+      > *:nth-child(3) { animation-delay: 120ms; }
+    }
+
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -601,8 +830,20 @@
     .group
     {
       position: relative; //required for dropzones
+      // Two accents, and the split is the same one as on the bookmark card: `--group-accent` is
+      // painted as a fill (the header tab, the divider, the drop line), `--group-accent-text` is
+      // written in (the count badge, the title on hover, the composer's group name). A group can
+      // be given any of the fourteen shades from the palette, so the text form has to go through
+      // `--shade-readable` or a yellow group's title becomes invisible the moment it is hovered.
       --group-accent: var(--vscode-descriptionForeground);
-      &[data-shade]:not([data-shade=""]) { --group-accent: var(--shade-color); }
+      --group-accent-text: var(--vscode-descriptionForeground);
+      &[data-shade]:not([data-shade=""]) { --group-accent: var(--shade-color); --group-accent-text: var(--shade-readable); }
+
+      // Groups settle in on load, slightly staggered. `backwards` and not `both` on purpose:
+      // a forwards fill would pin opacity to 1 and beat the `.dragging` rule below, because
+      // animation values outrank normal declarations. Backwards only fills the delay.
+      animation: card-in var(--dur-move) var(--ease-out) backwards;
+      @for $i from 1 through 6 { &:nth-child(#{$i}) { animation-delay: #{($i - 1) * 30}ms; } }
 
       // Drag to reorder. The group being carried fades; the landing position is drawn as a
       // line in the gap it would open up. The indicator is a pseudo-element on the group so
@@ -618,10 +859,54 @@
         border-radius: 2px;
         background-color: var(--vscode-focusBorder, var(--group-accent));
         pointer-events: none;
+        // The pseudo-element is created when the attribute is set, so there is no previous
+        // value for a transition to run from - it has to be an animation.
+        animation: line-in-x var(--dur-hover) var(--ease-out);
       }
       // Half the row gap, so the line sits centred in the space between two groups.
       &[data-drop="before"]::after { top: calc(var(--gapspace) / -2); }
       &[data-drop="after"]::after  { bottom: calc(var(--gapspace) / -2); }
+
+      // Dragging a bookmark. The group it would land in is outlined rather than bordered, so
+      // nothing on the board reflows as the pointer crosses from one group to the next.
+      // Recent is never outlined - it takes no drops.
+      &[data-receiving]
+      {
+        outline: 1px dashed var(--vscode-focusBorder);
+        outline-offset: 6px;
+        border-radius: var(--radius);
+      }
+
+      // The card being carried, and the line showing where it would land. The card clips its
+      // own children so the spine follows its rounded corners, which also clips away a line
+      // drawn in the gap outside it - hence the overflow override while it is a landing point.
+      .project.dragging { opacity: .4; }
+      .project[data-drop] { overflow: visible; }
+      .project[data-drop]::before
+      {
+        content: '';
+        position: absolute;
+        border-radius: 2px;
+        background-color: var(--vscode-focusBorder);
+        pointer-events: none;
+      }
+
+      // The line runs across the gap the bookmark would open up, so it is horizontal in the
+      // single-column list layout and vertical in the two wrapping ones - matching how
+      // insertionPoint() measures.
+      .projects.list .project[data-drop]
+      {
+        &::before { left: 0; right: 0; height: 2px; animation: line-in-x var(--dur-hover) var(--ease-out); }
+        &[data-drop="before"]::before { top: calc(var(--gapspace-s) / -2); }
+        &[data-drop="after"]::before  { bottom: calc(var(--gapspace-s) / -2); }
+      }
+      .projects.grid .project[data-drop],
+      .projects.compact .project[data-drop]
+      {
+        &::before { top: 0; bottom: 0; width: 2px; animation: line-in-y var(--dur-hover) var(--ease-out); }
+        &[data-drop="before"]::before { left: calc(var(--gapspace) / -2); }
+        &[data-drop="after"]::before  { right: calc(var(--gapspace) / -2); }
+      }
 
       .draghandle { cursor: grab; }
       .titlebar[draggable="true"]:active .draghandle { cursor: grabbing; }
@@ -642,7 +927,7 @@
           border-radius: 99px;
           background-color: var(--group-accent);
           opacity: .8;
-          transition: opacity .16s ease-out;
+          transition: opacity var(--dur-hover) var(--ease-out);
         }
 
         .group-label //h1
@@ -654,7 +939,7 @@
           color: var(--vscode-foreground);
           border-radius: var(--radius-s);
           flex: none;
-          transition: color .15s ease-in-out;
+          transition: color var(--dur-hover) var(--ease-hover);
         }
 
         // The fold control. Sits before the group icon, in the position the disclosure
@@ -673,6 +958,16 @@
           background: transparent;
           &:hover { color: var(--vscode-foreground); background: transparent; }
           .lucide { width: 16px; height: 16px; stroke-width: 2px; }
+
+          // One icon, rotated, rather than swapping chevronDown for chevronRight - a swap
+          // has no previous value to animate from. The rotation lives on the .icon span so
+          // it does not fight the button's own :active scale.
+          // Timed with `--dur-move`, not with the entrances: this rotation and the group's
+          // height animation are two halves of the same fold, and the height is animated from
+          // GroupShelf at `--dur-move`. At different speeds the chevron finished early and sat
+          // there while the group was still closing.
+          .icon { display: flex; transition: transform var(--dur-move) var(--ease-move); }
+          &[aria-expanded="false"] .icon { transform: rotate(-90deg); }
         }
 
         .group-icon
@@ -683,7 +978,7 @@
           align-items: center;
           justify-content: center;
           flex: none;
-          color: var(--group-accent);
+          color: var(--group-accent-text);
           background-color: color-mix(in srgb, var(--group-accent) 18%, transparent);
           border-radius: var(--radius-s);
           .lucide { width: 18px; height: 18px; stroke-width: 2px; }
@@ -713,11 +1008,24 @@
           height: 1px;
           min-width: var(--gapspace-s);
           background: linear-gradient(to right, var(--group-accent), transparent);
-          transition: background-size .18s ease-out;
-          background-size: 35% 100%;
           background-repeat: no-repeat;
-        }
 
+          // The hairline runs further along the row as the pointer enters the group. Expressed
+          // as a scale rather than the `background-size: 35% -> 100%` this used to be: squeezing
+          // the gradient into 35% of the box and scaling a full-width one down to 35% put the
+          // same pixels on screen, but `background-size` repaints the element on every frame
+          // while a transform is handed to the compositor.
+          //
+          // Safe on a flex item because `transform` does not participate in layout, so the rule
+          // still measures its full `flex: 1 1 auto` width and nothing beside it moves - which
+          // is the constraint the group header cares about most, per the hover note below.
+          transform: scaleX(.35);
+          transform-origin: left center;
+          // `--dur-hover`, matching the spine. Both are the same gesture - something growing
+          // under the pointer - and they are often on screen together, so a hairline running at
+          // a different speed from the spine below it reads as one of them being wrong.
+          transition: transform var(--dur-hover) var(--ease-out);
+        }
 
         .tools
         {
@@ -747,8 +1055,8 @@
         // to be something that does not occupy layout.
         &:hover
         {
-          .group-label { color: var(--group-accent); }
-          .rule { background-size: 100% 100%; }
+          .group-label { color: var(--group-accent-text); }
+          .rule { transform: scaleX(1); }
           &::before { opacity: 1; }
         }
         &:not(:hover) .hover-only button {visibility: hidden;}
@@ -756,6 +1064,13 @@
 
       .group-composer
       {
+        // Opening this pushes every card below it down the page. That half is already covered -
+        // the FLIP effect in main.tsx measures the cards on every render and flies them from
+        // where they were - so the only thing left for the composer itself to do is appear,
+        // which is the same division of labour `card-in` was written for. Fading it in while the
+        // cards glide keeps the two halves of one layout change reading as a single movement.
+        animation: card-in var(--dur-enter) var(--ease-out) backwards;
+
         display: flex;
         align-items: center;
         flex-wrap: wrap;
@@ -771,7 +1086,7 @@
         {
           color: var(--vscode-descriptionForeground);
           margin-right: 2px;
-          b { color: var(--group-accent); font-weight: 600; }
+          b { color: var(--group-accent-text); font-weight: 600; }
         }
 
         .btn-secondary { padding: 5px 9px; }
@@ -779,11 +1094,42 @@
       }
 
 
+    }
 
+    // Wrapper that gives the fold something to animate. A group renders no cards at all when
+    // collapsed - they are tab stops, so hiding them with CSS would leave them focusable -
+    // which means the height has to come from a container that survives the unmount. The
+    // animation itself is driven from GroupShelf, because the cards appear and disappear in
+    // the same commit that flips the class and a CSS transition has nothing to run from.
+    //
+    // All this rule owns is the clip. `overflow` is named on *both* axes deliberately: give
+    // CSS one axis and it computes the other as `auto`, which would put a scrollbar on every
+    // group and clip anything escaping it.
+    .foldable
+    {
+      overflow-x: hidden;
+      overflow-y: hidden;
+    }
+    // A group receiving a drop slides its cards down to open a gap, and the clip above would
+    // eat the one that ends up past the bottom edge. Same override, and for the same reason,
+    // as `.project[data-drop] { overflow: visible }`. Both axes again, deliberately: naming
+    // one lets CSS compute the other as `auto`. A group is never folding and receiving a drop
+    // at the same time, so nothing is given up by lifting the clip here.
+    .group[data-receiving] .foldable
+    {
+      overflow-x: visible;
+      overflow-y: visible;
     }
 
     .projects
     {
+      // Bookmarks settle in on load, on a layout change and whenever the filter narrows the
+      // board. `backwards`, not `both`: a forwards fill would hold opacity at 1 and outrank
+      // the `.project.dragging` fade, since animation values beat normal declarations.
+      .project { animation: card-in var(--dur-enter) var(--ease-out) backwards; }
+      // Capped at eight so a long group does not crawl in one card at a time.
+      @for $i from 1 through 8 { .project:nth-child(#{$i}) { animation-delay: #{($i - 1) * 22}ms; } }
+
       // Card layout. auto-fill/minmax so cards reflow with the window instead of sitting
       // at a fixed 150x120 regardless of how much room there is.
       &.grid
@@ -817,7 +1163,7 @@
             align-self: start;
             margin-top: -3px; // optical centring against the 1.35 line-height of the label
             .icon { display: flex; }
-            .lucide { width: 22px; height: 22px; }
+            .lucide { width: 19px; height: 19px; }
           }
 
           .textblock
@@ -835,7 +1181,7 @@
               min-width: 0;
               font-weight: 500;
               line-height: 1.35;
-              padding-right: 22px; // clear the "..." button
+              padding-right: 44px; // clear the copy and "..." buttons
               display: -webkit-box;
               -webkit-line-clamp: 2;
               -webkit-box-orient: vertical;
@@ -862,7 +1208,8 @@
           align-items: center;
           flex-wrap: nowrap;
           gap: 10px;
-          padding: 10px 14px;
+          // As in compact: the right end is reserved for the two out-of-flow buttons.
+          padding: 10px 46px 10px 14px;
           position: relative;
 
           .pictoral .icon { display: flex; }
@@ -900,7 +1247,9 @@
           align-items: center;
           flex-wrap: nowrap;
           gap: var(--gapspace-s);
-          padding: 6px 10px;
+          // Room at the right end for the copy and "..." buttons, which are out of flow and
+          // would otherwise sit on top of the truncated path.
+          padding: 6px 46px 6px 10px;
           position: relative;
 
           .pictoral .icon { display: flex; }
@@ -930,10 +1279,12 @@
         }
       }
 
-      // all layouts:
+      // all layouts. `.layout-changing` is only ever set by landingpage2.js, the pre-Preact
+      // fallback page; the Preact webview animates every card on mount instead (above). The
+      // selector is kept so the fallback keeps its rearrange animation.
       &.layout-changing .project
       {
-        animation: bookmark-rearrange .2s ease-out both;
+        animation: card-in var(--dur-move) var(--ease-out) backwards;
       }
 
       .project
@@ -950,13 +1301,41 @@
         background: var(--vscode-editorWidget-background);
         color: var(--vscode-foreground);
 
-        transition: outline-color .15s ease-in-out, background-color .15s ease-in-out, transform .12s ease-out;
+        // The card's two movements are separate CSS properties, not one `transform`, because
+        // they want different speeds and used to have to compromise on one: the press scale
+        // wants to be immediate, and the slide that opens a gap under a dragged bookmark wants
+        // to be smooth. A single `transform` transition covered both, so the press was pinned to
+        // the slower of the two and felt soft.
+        //
+        // `scale` and `translate` are independent transitionable properties and compose into the
+        // same matrix, so this costs nothing and each gets its own budget. Note they apply
+        // *before* any `transform`, which is what the FLIP effect animates - the two never
+        // collide in practice because a card is never mid-flight and mid-drag at once.
+        // `translate` is the gap that opens under a dragged bookmark. It is timed at
+        // `--dur-hover` rather than `--dur-move` because it is not a considered transition
+        // between two states - it retargets continuously as the pointer crosses the board, and a
+        // gap that takes the full move duration to open is a gap that is always behind the
+        // pointer. The curve stays `--ease-move`, because what it is doing is still travelling.
+        transition: outline-color var(--dur-hover) var(--ease-hover),
+                    background-color var(--dur-hover) var(--ease-hover),
+                    scale var(--dur-press) var(--ease-out),
+                    translate var(--dur-hover) var(--ease-move);
+
+        // How far the spine is drawn, as a fraction of its 5px box. Both declarations sit here on
+        // the card rather than on `.spine` so that the only thing separating them is `:hover` -
+        // see the note on `.spine` below for what happens when they are not.
+        --spine-scale: var(--spine-rest, .6);
 
         &:hover
         {
           outline-color: var(--accent-color);
           background: var(--vscode-list-hoverBackground, var(--vscode-editorWidget-background));
+          --spine-scale: 1;
         }
+
+        // Press feedback. Inward only, and `scale` is out of layout, so a pressed card cannot
+        // push its neighbours or reach past its own box.
+        &:active { scale: .99; }
 
         // Cards are tab stops, so arrow-key navigation needs a focus ring clearly stronger
         // than hover - it is the only thing telling you what Enter will open.
@@ -972,7 +1351,32 @@
           outline: 2px solid var(--vscode-focusBorder, var(--accent-color));
           outline-offset: 1px;
           background: var(--vscode-list-hoverBackground, var(--vscode-editorWidget-background));
-          .spine { width: 5px; opacity: 1; }
+
+          // The ring arrives instantly. Arrow-key navigation is the most frequently repeated
+          // action on this page - the catalog's "no animation, ever" band - and the ring is the
+          // only thing telling you what Enter will open, so it should be at its final colour
+          // before the next key press rather than easing towards it.
+          //
+          // It was also visibly wrong: `outline-width` is not transitioned but `outline-color`
+          // was, so each move drew a full-thickness 2px ring in the *old* colour and eased it
+          // over 150ms - and while it did, the card being left behind was fading out on the same
+          // curve, briefly showing two half-lit cards.
+          //
+          // The whole transition is restated rather than zeroing `transition-duration`, which
+          // would also snap `scale` and `translate` - and `translate` is the drag gap, which a
+          // focused card can be part of.
+          transition: outline-color 0s,
+                      background-color 0s,
+                      scale var(--dur-press) var(--ease-out),
+                      translate var(--dur-hover) var(--ease-move);
+          .spine { transition-duration: 0s; }
+          // Same spine response as hover. This said `width: 5px` until the spine became a
+          // scale, at which point it silently stopped doing anything - the box is always 5px
+          // now and the drawn width comes from `--spine-scale`. Keyboard focus is the one path
+          // that has no pointer to fall back on, so losing this was losing the feedback
+          // entirely for anyone driving the board with arrow keys.
+          --spine-scale: 1;
+          .spine { opacity: 1; }
         }
 
         // A bookmark whose target is gone. Marked, never hidden or disabled: the user may
@@ -983,7 +1387,12 @@
         &[data-missing]
         {
           .spine { background-color: var(--vscode-errorForeground); opacity: 1; }
-          .pictoral, .textblock > div:first-child { opacity: .6; }
+          // The icon dims; the label does not. `.textblock > div:first-child` is the label, and
+          // at 60% over the Light+ editor background it composites to roughly 2.3:1 - under the
+          // 4.5:1 floor for body text. Dimming it punished exactly the card the user most needs
+          // to read in order to fix it, and the state is already carried three other ways: the
+          // red spine, the `Missing` text badge, and the notice in the hover detail.
+          .pictoral { opacity: .6; }
         }
 
         // A pinned bookmark says so quietly. The pin sits beside the row menu rather than in
@@ -994,13 +1403,27 @@
           top: 6px;
           right: 6px;
           display: flex;
-          color: var(--shade-color, var(--vscode-descriptionForeground));
-          opacity: .75;
+          // `--shade-readable`, not the raw literal - this draws a glyph, not a fill. The .75
+          // opacity that used to quieten a fully saturated accent goes with it: the mixed colour
+          // is already calm, and stacking the two put the icon back under the 3:1 floor.
+          color: var(--shade-readable, var(--vscode-descriptionForeground));
           pointer-events: none;
           .lucide { width: 12px; height: 12px; stroke-width: 2.5px; }
         }
         // The row menu appears on hover in the same corner, so the pin yields to it.
         &:hover .pin-marker, &:focus .pin-marker { opacity: 0; }
+
+        // Both badges arrive late by design. `bookmarkHealth` is sent unawaited after each sync
+        // so the board paints before anything has been stat-ed on disk, which means these two
+        // land on an already-settled page a beat after the user has started reading it - the
+        // textbook case for a transition that exists only to stop something appearing out of
+        // nowhere. They fade rather than move, because they are flex items in the path line and
+        // anything that changed their box would shove the path text along with it.
+        //
+        // Runs once, on the frame the badge is created: a CSS animation does not replay when the
+        // card re-renders, only when the element is inserted, and the element only exists once
+        // the host has reported a branch or a missing target.
+        .branch-badge, .missing-badge { animation: card-in var(--dur-enter) var(--ease-out); }
 
         // The checked-out branch, when the folder is a repository. Sits in the path line
         // rather than beside the title: it is context for the target, and putting it in the
@@ -1015,7 +1438,10 @@
           max-width: 18ch;
           overflow: hidden;
           white-space: nowrap;
-          color: var(--shade-color, var(--vscode-descriptionForeground));
+          // Real text, at .8em, so this is the one place on the card that needs the full 4.5:1
+          // - hence `--shade-readable` rather than the raw accent. Eight of the fourteen shades
+          // failed here on the light theme, yellow at 1.63:1 and white at 1.04:1.
+          color: var(--shade-readable, var(--vscode-descriptionForeground));
           .lucide { width: 11px; height: 11px; stroke-width: 2.5px; flex: none; }
 
           // The name needs its own block to truncate in. `text-overflow` styles a block
@@ -1051,21 +1477,41 @@
         {
           position: absolute;
           left: 0; top: 0; bottom: 0;
-          width: 3px;
           background-color: var(--shade-color, var(--vscode-descriptionForeground));
           opacity: var(--shade-presence, .35);
-          // The one piece of motion on the page, and it belongs to the signature element:
-          // the spine thickens as you point at a bookmark.
-          transition: width .12s ease-out, opacity .12s ease-out;
+
+          // The spine thickens as you point at a bookmark - the page's signature bit of motion,
+          // and the one it runs most often, since it fires on every pointer crossing of every
+          // card. So it is a scale, not a width.
+          //
+          // The box is always the full hovered 5px and `scaleX` expresses the resting fraction:
+          // .6 = the 3px unpainted spine, .8 = the 4px painted one, 1 = hovered.
+          // Transitioning `width` instead put a layout pass and a repaint on the hot path of a
+          // pointer sweep across a full board; a scale is composited and touches nothing else.
+          //
+          // Two variables rather than one, and the reason is specificity. `--spine-scale` is the
+          // value actually used, and it is only ever declared on the card itself - once at rest
+          // and once on `:hover`, so the hover reliably wins. Declaring the painted width as a
+          // third `--spine-scale` would put it on `.project[data-shade]:not([data-shade=""])`,
+          // which outranks `.project:hover`, and painted spines would then be the only ones on
+          // the board that never responded to the pointer.
+          //
+          // `transform-origin: left` keeps it pinned to the card's leading edge - the default
+          // centre origin would grow it in both directions, and the half reaching past the card
+          // would be clipped by the card's own `overflow: hidden`.
+          width: 5px;
+          transform: scaleX(var(--spine-scale));
+          transform-origin: left center;
+          transition: transform var(--dur-hover) var(--ease-out), opacity var(--dur-hover) var(--ease-out);
         }
-        &:hover .spine { width: 5px; opacity: 1; }
+        &:hover .spine { opacity: 1; }
         // Painted bookmarks get a full-strength, slightly wider spine. Deliberately no
         // background wash: mixing a warm shade (yellow, orange) into a dark editor
         // background turns muddy brown. The spine and the icon carry the colour instead.
         &[data-shade]:not([data-shade=""])
         {
           --shade-presence: 1;
-          .spine { width: 4px; }
+          --spine-rest: .8; // 4px of the spine's 5px box - see .spine above
         }
 
         .textblock { overflow:hidden; }
@@ -1077,8 +1523,8 @@
         &[data-kind="file"] { --type-color: var(--vscode-charts-green, var(--accent-color)); }
         .pictoral
         {
-          width: 32px;
-          height: 32px;
+          width: 28px;
+          height: 28px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -1086,7 +1532,7 @@
           color: var(--type-color, var(--vscode-descriptionForeground));
           background-color: color-mix(in srgb, var(--type-color, var(--vscode-descriptionForeground)) 16%, transparent);
           border-radius: var(--radius-s);
-          .lucide { width: 20px; height: 20px; stroke-width: 1.8px; }
+          .lucide { width: 17px; height: 17px; stroke-width: 1.8px; }
         }
 
         // Paths are set in the editor's own monospace face - it is the vernacular of the
@@ -1120,7 +1566,6 @@
         {
           .pictoral { color: var(--shade-color); background-color: color-mix(in srgb, var(--shade-color) 16%, transparent); }
         }
-
 
 
 
@@ -1187,16 +1632,145 @@
     }
   }
 
-  //--- reduced motion --------------------------------------------------------
-  @keyframes bookmark-rearrange
+  //--- motion ----------------------------------------------------------------
+  // Everything here travels *inward*: from a small positive translateY, or from a scale
+  // below 1, to the element's own resting box. Nothing moves outward or sideways, so no
+  // animation can escape a clipping ancestor - the card sets `overflow: hidden` to clip its
+  // spine - or widen the page and flash a horizontal scrollbar mid-flight.
+  // Deliberately opacity only. This used to travel 4px upward as well, which read as the whole
+  // board shoving itself down every time anything changed. Repositioning is not this
+  // animation's job any more: cards that *move* are animated from where they were by the FLIP
+  // effect in main.tsx, so the only thing left for an arriving card to do is appear.
+  @keyframes card-in
   {
-    from { opacity: .65; transform: translateY(4px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; }
+    to   { opacity: 1; }
   }
 
+  // The drop indicators. Scaled along their own long axis from the centre outwards, which
+  // stays within the line's box because the box is already its full length.
+  @keyframes line-in-x
+  {
+    from { opacity: 0; transform: scaleX(.4); }
+    to   { opacity: 1; transform: scaleX(1); }
+  }
+  @keyframes line-in-y
+  {
+    from { opacity: 0; transform: scaleY(.4); }
+    to   { opacity: 1; transform: scaleY(1); }
+  }
+
+  // The context menu and the colour/icon palette, which open at the pointer. Both are placed
+  // by hand at the click coordinates and always extend down and to the right of it, so the
+  // origin is the top-left corner in every case and does not need to be computed - see the
+  // note on `.ctxmenu`. Scaling from the middle would have the menu grow up and left, away
+  // from the click that asked for it.
+  @keyframes menu-in
+  {
+    from { opacity: 0; transform: scale(.96); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  // The bookmark detail popover. Scaled from the corner nearest the bookmark, set as
+  // `transform-origin` on the element - see `.hovercard` below. Deliberately not translated:
+  // the card is placed by hand at a measured position, and a translate here would fight it.
+  @keyframes hovercard-in
+  {
+    from { opacity: 0; transform: scale(.97); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  // A destructive confirmation arriving under the pointer that just clicked. The button fades in
+  // and is held non-interactive until the very end, so the click that opened it cannot also
+  // press it - see `[data-confirming-remove]` above for what that was costing.
+  //
+  // `pointer-events` is not interpolatable, so it animates discretely: a discrete property holds
+  // the `from` value until the next keyframe is reached, which is why the release sits at 99%
+  // rather than being left to flip halfway. The opacity curve is unaffected by that stop.
+  @keyframes confirm-arm
+  {
+    from { opacity: 0; pointer-events: none; }
+    99%  { pointer-events: none; }
+    to   { opacity: 1; pointer-events: auto; }
+  }
+
+  // The palette scrim. `background-color`, never `opacity` - see the note on `.modal`.
+  @keyframes scrim-in
+  {
+    from { background-color: transparent; }
+  }
+
+  @keyframes tick-pop
+  {
+    from { transform: scale(.6); }
+    60%  { transform: scale(1.06); }
+    to   { transform: scale(1); }
+  }
+
+  //--- reduced motion --------------------------------------------------------
+  // Reduced motion means less movement, not less feedback. A blanket
+  // `transition-duration: 0.01ms` on everything - which is what this used to be - also kills the
+  // hover and focus colours, so the board stops acknowledging the pointer at all and reads as
+  // broken rather than as calm. What actually bothers people is things travelling and growing.
+  //
+  // So: the transition *property list* is rewritten to the non-moving half. Anything transitioning
+  // only `transform` simply never fires, while the colour and opacity halves of the same
+  // declaration keep working at their usual duration. Then the three keyframes that translate or
+  // scale are switched off by name.
+  //
+  // `card-in` is left running - it is opacity only by design (see the motion block above), so it
+  // is already what a reduced-motion entrance should be. `landingpage-spin` stays too: it is the
+  // only thing telling the user a clone is still going, and it has no static equivalent.
+  // The JS half of this decision lives in `stillness()` in main.tsx.
+  //
+  // `!important` on both, and not for the usual bad reason: these rules are a blanket `*` and a
+  // bare attribute selector, while the declarations they override sit four classes deep
+  // (`.landingpage .content .group[data-drop]::after`). Raising the specificity to match would
+  // mean restating every selector on the page.
   @media (prefers-reduced-motion: reduce)
   {
-    *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+    *, *::before, *::after
+    {
+      transition-property: opacity, color, background-color, border-color, outline-color, box-shadow !important;
+      // The duration list has to be replaced too, not just the property list. Durations are
+      // matched to properties by position and repeat cyclically, so a declaration that said
+      // `background-color .15s, transform .1s` would hand its second duration to whichever
+      // property now sits second - the press duration would end up driving a colour. One value
+      // applies to all six.
+      transition-duration: var(--dur-hover) !important;
+    }
+    [data-drop]::before,
+    [data-drop]::after,
+    [data-copied] .icon { animation: none !important; }
+
+    // The focus ring is exempt from the duration above, for the same reason it is exempt from
+    // the normal one - see `.project:focus`. Arrow-key navigation is the most repeated action
+    // on this page and the ring is the only thing saying what Enter will open, so it has to be
+    // at its final colour before the next keypress rather than easing over 150ms behind it.
+    // The blanket `transition-duration` in this block was silently handing the defect that rule
+    // exists to prevent straight back to reduced-motion users, who are the least likely to want
+    // it. `scale` and `translate` need no protection here: the property list above has already
+    // dropped them.
+    .project:focus { transition-duration: 0s !important; }
+    .project:focus .spine { transition-duration: 0s !important; }
+
+    // The three surfaces that open at the pointer keep an entrance, downgraded to the
+    // opacity-only one. Switching them off entirely would make them snap into existence under
+    // the cursor, which is more startling than the scale it replaces, not less - and the fade
+    // is what tells you the menu is new rather than something that was already there.
+    .hovercard:popover-open,
+    .ctxmenu,
+    .palette,
+    .glyphpalette,
+    .popover { animation: card-in var(--dur-enter) var(--ease-out) !important; }
+
+    // `confirm-arm` is deliberately left running, and must stay that way. It reads as an
+    // animation but it is a safeguard: it holds a destructive confirmation non-interactive so a
+    // double-click cannot carry through onto it. Reduced motion is a request for less movement,
+    // not for fewer protections, and this one moves nothing - it only fades. Restated here
+    // rather than merely omitted so that a future blanket `animation: none` in this block does
+    // not disarm it by accident.
+    .ctxmenu button[data-confirm] { animation: confirm-arm var(--dur-arm) var(--ease-out) !important; }
   }
 
   //--- hover detail ----------------------------------------------------------
@@ -1223,10 +1797,9 @@
     box-shadow: 0 2px 8px rgb(0 0 0 / 0.28);
 
     font-size: var(--vscode-font-size);
-    // Interactive, because it carries the copy button. That means it can be entered with the
-    // pointer, so leaving a bookmark closes it after a short grace period rather than at
-    // once, and entering the card itself cancels that.
-    pointer-events: auto;
+    // Never interactive: it would otherwise steal the hover that opened it and flicker.
+    // Copy lives on the bookmark card itself, so there is nothing in here to click.
+    pointer-events: none;
 
     // Setting `display` on a popover at all is a trap: the UA stylesheet hides a closed one
     // with `[popover]:not(:popover-open) { display: none }`, and *any* author `display` beats
@@ -1238,7 +1811,23 @@
       display: flex;
       flex-direction: column;
       gap: 3px;
+      // Scoped to the open state along with `display`, for the same reason: a `transform`
+      // left on the closed popover would be one more author declaration hanging off an
+      // element the UA is trying to hide.
+      //
+      // It grows very slightly out of the edge nearest the bookmark it describes, rather than
+      // fading in place. The card is anchored to the bookmark's left edge and sits below it
+      // unless it was flipped above, so `data-side` - written by the positioning effect in
+      // main.tsx, the only place that knows - picks which corner it comes from. Scaling from
+      // the middle instead would have it expand away from its trigger in one direction, which
+      // is the thing that makes a popover read as unrelated to what opened it.
+      //
+      // .97, not something smaller: this is a 500px-wide panel, and a scale that reads as
+      // gentle on a button is a visible lurch at this size.
+      transform-origin: left top;
+      animation: hovercard-in var(--dur-enter) var(--ease-out);
     }
+    &[data-side="above"]:popover-open { transform-origin: left bottom; }
 
     .hovercard-head
     {
@@ -1253,28 +1842,6 @@
     // point of it - the accent says "this does something", the green says "it worked" without
     // having to be read. The generic `button` rule paints every button in icon-foreground on
     // transparent, so both have to be restated here to win.
-    .hovercard-copy
-    {
-      flex: none;
-      gap: 5px;
-      padding: 3px 8px;
-      font-size: .9em;
-      color: var(--vscode-button-foreground);
-      background-color: var(--vscode-button-background);
-      &:hover { background-color: var(--vscode-button-hoverBackground); }
-
-      // Terminal green is the nearest thing VS Code themes have to a defined success colour.
-      &[data-copied]
-      {
-        --tick: var(--vscode-terminal-ansiGreen, var(--vscode-charts-green));
-        color: var(--tick);
-        background-color: color-mix(in srgb, var(--tick) 20%, transparent);
-        &:hover { background-color: color-mix(in srgb, var(--tick) 20%, transparent); }
-      }
-
-      .lucide { width: 13px; height: 13px; stroke-width: 2.2px; }
-    }
-
     // The path is the reason this exists, so it gets the monospace treatment and is allowed
     // to wrap rather than truncate - truncating here would defeat the point.
     .hovercard-path

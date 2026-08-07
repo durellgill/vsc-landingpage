@@ -71,9 +71,14 @@ const model = {
 };
 
 /**
- * The `--vscode-*` variables the SCSS resolves against, taken from Dark Modern and Light
- * Modern. Without these every colour in the page falls back to nothing and a visual check is
- * worthless. `?theme=light` renders the light set.
+ * The `--vscode-*` variables the SCSS resolves against, taken from Dark Modern, Light Modern
+ * and Dark High Contrast. Without these every colour in the page falls back to nothing and a
+ * visual check is worthless. `?theme=light` and `?theme=hc` render the other two sets.
+ *
+ * High contrast is not decoration here: the repo's own convention is that every colour must
+ * resolve to a `--vscode-*` variable and be checked in all three themes, and that theme is the
+ * one that punishes anything relying on a subtle fill or a low-contrast border. It is also the
+ * theme where a hover effect built from opacity alone stops being visible at all.
  */
 const themes = {
   dark: {
@@ -109,6 +114,25 @@ const themes = {
     'menu-background': '#ffffff', 'menu-border': '#cecece', 'menu-foreground': '#3b3b3b',
     'menu-selectionBackground': '#005fb8', 'menu-selectionForeground': '#ffffff', 'menu-separatorBackground': '#d4d4d4',
     'panel-border': '#e5e5e5', 'toolbar-hoverBackground': '#b8b8b850', 'terminal-ansiGreen': '#0dbc79'
+  },
+  // Dark High Contrast. Pure black ground, white text, and a bright focus colour - the theme
+  // that shows up anything depending on a faint outline or a translucent fill.
+  hc: {
+    'editor-background': '#000000', foreground: '#ffffff', 'descriptionForeground': '#ffffff',
+    'font-family': 'system-ui, sans-serif', 'font-size': '13px', 'editor-font-family': 'ui-monospace, monospace',
+    'activityBar-background': '#000000', 'activityBar-foreground': '#ffffff',
+    'badge-background': '#000000', 'badge-foreground': '#ffffff',
+    'button-background': '#0078d4', 'button-foreground': '#ffffff', 'button-hoverBackground': '#0078d4',
+    'button-secondaryBackground': '#3c3c3c', 'button-secondaryForeground': '#ffffff', 'button-secondaryHoverBackground': '#3c3c3c',
+    'charts-blue': '#3794ff', 'charts-green': '#89d185', 'charts-purple': '#b180d7',
+    'editorHoverWidget-background': '#0c141f', 'editorHoverWidget-border': '#6fc3df', 'editorHoverWidget-foreground': '#ffffff',
+    'editorWidget-background': '#0c141f', 'editorWidget-border': '#6fc3df',
+    errorForeground: '#f48771', focusBorder: '#f38518', 'icon-foreground': '#ffffff',
+    'input-background': '#000000', 'input-border': '#6fc3df', 'input-foreground': '#ffffff', 'input-placeholderForeground': '#ffffff',
+    'list-hoverBackground': '#000000',
+    'menu-background': '#000000', 'menu-border': '#6fc3df', 'menu-foreground': '#ffffff',
+    'menu-selectionBackground': '#0078d4', 'menu-selectionForeground': '#ffffff', 'menu-separatorBackground': '#6fc3df',
+    'panel-border': '#6fc3df', 'toolbar-hoverBackground': '#3c3c3c', 'terminal-ansiGreen': '#23d18b'
   }
 };
 
@@ -133,6 +157,14 @@ const stub = `<script>
       if (message.command === 'copyPath') {
         setTimeout(() => window.dispatchEvent(new MessageEvent('message', {data: {command: 'pathCopied', guid: message.guid}})), 0);
       }
+      // Stands in for moveBookmark(): a card dragged to another group, or to a new position in
+      // its own. Applying it here means a drop that lands in the wrong place is visible on the
+      // board rather than only in the message log.
+      if (message.command === 'moveBookmark') { moveBookmark(message); sync(); }
+      // Stands in for moveGroup(). Without it a group drag was a no-op here and the reorder
+      // could only be read off the message log, which is exactly the sort of thing that hides a
+      // rendering problem.
+      if (message.command === 'moveGroup') { moveGroup(message); sync(); }
       if (message.command === 'documentReady' || message.command === 'refreshRecents') { health(); }
     },
     getState() { return undefined; },
@@ -151,6 +183,35 @@ const stub = `<script>
       const target = group.guid === message.guid ? group : group.projects.find(p => p.guid === message.guid);
       if (target) { target[message.field] = message.value; return; }
     }
+  }
+  // toIndex is measured before the dragged group is lifted out, so a downward move loses one
+  // place as the gap closes behind it. That adjustment lives in the host's moveGroup(), not the
+  // webview, so it has to live here too or the stub disagrees with the real thing.
+  // (No backticks anywhere in this function: it sits inside a template literal.)
+  function moveGroup(message) {
+    const from = model.groups.findIndex(g => g.guid === message.guid);
+    if (from < 0) { return; }
+    let to = typeof message.toIndex === 'number'
+      ? (message.toIndex > from ? message.toIndex - 1 : message.toIndex)
+      : from + (message.direction === 'up' ? -1 : 1);
+    const [group] = model.groups.splice(from, 1);
+    // Generated Recent is pinned to the end and is neither draggable nor a drop target.
+    const limit = model.groups.findIndex(g => g.guid === '@vsc-mru');
+    const ceiling = limit < 0 ? model.groups.length : limit;
+    to = Math.max(0, Math.min(to, ceiling));
+    model.groups.splice(to, 0, group);
+  }
+  function moveBookmark(message) {
+    const destination = model.groups.find(g => g.guid === message.toGroup);
+    const source = model.groups.find(g => g.projects.some(p => p.guid === message.guid));
+    if (!destination || !source || destination.guid === '@vsc-mru') { return; }
+    const project = source.projects.find(p => p.guid === message.guid);
+    // Recent is a source only: dragging out of it copies, as the host does.
+    const copy = source.guid === '@vsc-mru';
+    if (!copy) { source.projects.splice(source.projects.indexOf(project), 1); }
+    const landed = copy ? {...project, guid: 'copy-' + Math.random().toString(36).slice(2, 8)} : project;
+    const at = message.beforeGuid ? destination.projects.findIndex(p => p.guid === message.beforeGuid) : -1;
+    destination.projects.splice(at < 0 ? destination.projects.length : at, 0, landed);
   }
   function sync() {
     // Mirrors communication.ts: the host replies on its own turn, never synchronously.

@@ -128,7 +128,8 @@
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test",
-    "harness": "npm run compile && npm run build:harness && node scripts/harness.mjs"
+    "harness": "npm run compile && npm run build:harness && node scripts/harness.mjs",
+    "motion-check": "node scripts/motion-check.mjs"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.6",
