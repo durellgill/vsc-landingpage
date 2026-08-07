@@ -2,6 +2,47 @@
 
 Fork of `renebuehling/vsc-landingpage`. Tracks work done in this fork and what is still open.
 
+## 2026-08-07 - Motion tokens, accessibility, and the colour palette
+
+Three strands, driven by a review of the running page rather than by the build.
+
+- **The motion is on seven tokens** - three curves, four durations - and the two JS animations
+  read theirs out of the computed style instead of restating them. `npm run motion-check`
+  asserts fourteen behaviours against a running harness; every one of them is a behaviour
+  rather than a value, which is why all fourteen were invisible to the build, the lint and the
+  typecheck.
+- **One real jitter, found by measuring rather than by eye.** The space that opens under a
+  dragged bookmark: the cards slide into it at `--dur-hover` while the group box containing
+  them grew at `--dur-move`, so everything below the group carried on being pushed down for
+  62ms after the movement had visibly stopped and the board appeared to settle twice. Measured
+  at 150ms against 212ms; both now settle on the same frame. `motion()` takes the duration
+  token as an argument for this.
+- **Three load-jitter hypotheses were tested and rejected before that one was found**: the
+  `bookmarkHealth` badges arriving do not change any card's height, the layout switch is
+  monotonic with no direction reversals across 29 sampled frames, and the interleaved
+  read/cancel in the FLIP effect is not measurable at this board size. Recording them so they
+  are not re-investigated.
+- **The board is genuinely keyboard-usable now.** The colour palette was fifteen bare `<div>`s
+  with a click handler, and because the menu renders the palette *in place of* itself, choosing
+  "Accent colour" without a mouse landed in a surface holding nothing focusable at all.
+  Reordering groups had no keyboard route. Enter on a card's Copy button opened the bookmark
+  instead of copying. Keyboard-opened menus were pinned to the viewport's top-left corner.
+- **Colour was carrying meaning it could not carry.** The fourteen accent literals are picked
+  to be painted as fills and several are illegible as text - white 1.04:1 on light, black
+  1.02:1 on dark. `--shade-readable` mixes 30% accent into the theme foreground wherever the
+  accent is drawn as a glyph or a word; fills keep the literal. The palette itself was then
+  redesigned in OKLCH: its lightness ran .248 to .985, which at a 5px spine reads as painted
+  versus unpainted rather than as two hues, and four of its entries sat in a 38 degree warm arc
+  while nothing sat between 131 and 183.
+
+**Open**, and deliberately not acted on. `typeShades` in `main.tsx` gives every unpainted
+bookmark a type-based accent, which is documented intent - but it means `data-shade` is never
+empty, so three SCSS branches written for unpainted bookmarks can never match:
+`--type-color` (the `--vscode-charts-*` fallbacks), `--shade-presence: .35`, and
+`--spine-rest: .6`. Either the defaults should come from the theme's chart colours or the dead
+branches should go; it is a product decision, not a cleanup. `--shade-foreground` is likewise
+declared fourteen times and read only by the retained pre-Preact `landingpage2.js`.
+
 ## 2026-08-02 - Hover detail, copying, and two open bugs
 
 Follow-up work after the feature run, driven by review of the running page.

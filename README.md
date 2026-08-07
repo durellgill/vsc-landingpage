@@ -138,7 +138,13 @@ If the target is already open in another window, VS Code may focus that window i
 
 Hovering a bookmark - or reaching it with the keyboard - opens a small detail card showing
 the **full path**, the branch, and a warning if the target has gone. Cards truncate long
-paths to stay scannable, so this is where you read the whole thing.
+paths to stay scannable, so this is where you read the whole thing. It is display only: it
+appears only when something is actually cut off, so nothing you need to click lives in it.
+
+**Copying a path** is on the bookmark itself - a copy button appears beside the `...` button
+when you hover or focus a card, and turns into a tick once the path is on the clipboard. It is
+also on the bookmark menu and on `Ctrl`/`Cmd`+`C` for the focused card. Paths are shell-quoted
+only when they contain something a shell would mangle.
 
 ## Driving it from the keyboard
 
@@ -157,6 +163,16 @@ Arrow movement is geometric rather than positional, so it behaves the same in li
 compact layouts - `↓` from a card in the right column of a grid lands in the right column of
 whatever is below it.
 
+Everything reachable by dragging is reachable without one. *Move to group* on a bookmark's
+menu is the keyboard route for moving a bookmark; *Move group up* and *Move group down* on a
+group's menu are the route for reordering groups. Opening a menu moves focus into it and
+closing it hands focus back to whatever opened it, so `Esc` always returns you to where you
+were rather than to the top of the page.
+
+Screen reader users get the path, the branch and the missing-target warning read out with each
+bookmark, and a polite live region announces a copied path, a finished **Recent** refresh, and
+how many bookmarks the current filter matches.
+
 ## Filtering
 
 Type in the filter field to narrow the board. The query is matched against **labels and full
@@ -174,7 +190,7 @@ group containing a match, without disturbing its stored collapsed state.
 Create a group from the **New** menu in the page header.
 
 - **Reorder** - drag a group by its title bar. **Recent** is pinned last and is neither
-  draggable nor a drop target.
+  draggable nor a drop target for groups.
 - **Collapse** - the chevron beside the group icon folds it to its header. This is remembered
   across reloads and windows.
 - **Layout** - the layout button cycles `list` → `grid` → `compact`.
@@ -193,6 +209,14 @@ Add bookmarks two ways, and they differ by where the bookmark lands:
 
 You can also right-click any file or folder in the **Explorer** and choose *Add to Landing
 Page Group* - that works even if the landing page has never been opened in the window.
+
+**Drag a bookmark** to move it - onto another group, or to a new position inside its own. The
+destination group is outlined while you drag, and a line shows exactly where the card will
+land. Dragging one **out of Recent copies it**, since Recent is rebuilt from VS Code's history
+and cannot be edited; and nothing can be dropped *into* Recent, so it is never outlined.
+
+*Move to group* on the menu below does the same thing through a quick pick, which is easier
+when the destination is off screen and is the only route from the keyboard.
 
 Right-click a bookmark (or use its `...` button) for:
 

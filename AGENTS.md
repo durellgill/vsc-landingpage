@@ -85,8 +85,25 @@ Consequences worth knowing:
 with a stubbed extension host. This is the fast loop: an ordinary browser console, an
 ordinary DOM inspector, and every message the page posts recorded on `window.__posted`.
 
-- `?empty` renders the empty state, `?theme=light` the light theme. The harness supplies the
-  `--vscode-*` variables itself, so colours are real rather than missing.
+- `?empty` renders the empty state, `?theme=light` the light theme and `?theme=hc` Dark High
+  Contrast. The harness supplies the `--vscode-*` variables itself, so colours are real rather
+  than missing. The convention above says to check all three themes, and `hc` existed nowhere
+  until it was needed - it is the theme that punishes anything leaning on a faint outline or a
+  translucent fill, so it is the one worth opening after a visual change.
+- `npm run motion-check` asserts the six motion behaviours that have actually broken here, against
+  a running harness: interrupted card flights keeping their direction, a group and its cards
+  moving as one body, the destructive confirmation refusing a double-click but accepting a
+  deliberate one, the action menu staying on screen both when opened and when it grows, the focus
+  ring not easing, and reduced motion downgrading every entrance to opacity while leaving the
+  confirmation safeguard armed. All six were invisible to the build, the typecheck and the lint,
+  because every one is a behaviour rather than a value. The checks were validated by
+  reintroducing two of the bugs and confirming they fail - a check that has never been seen to
+  fail is not evidence of anything, which this repo already learned the hard way from a CSS rule
+  that tested green while matching no element at all.
+- The stub applies `moveGroup` as well as `moveBookmark` and `patch`, so a group drag actually
+  reorders the board here. Until it did, a group reorder could only be read off the message log,
+  which is precisely the kind of gap that hides a rendering bug - the group chrome teleporting
+  while its cards glided was invisible for exactly that reason.
 - The stub replies to `documentReady` before sending `syncModel`, exactly as
   `communication.ts` does. Dispatching earlier races the Preact listener, which is installed
   in an effect.
@@ -112,11 +129,44 @@ gets.
   user's theme.
 - Bookmark paint colour belongs on the `.spine` and the type icon, not the card background.
   A wash of a warm shade over a dark editor background goes muddy brown.
-- **There are no tool modes, and dragging reorders groups only.** Click opens;
-  bookmark-specific actions live on the row's `...` menu or right-click menu. Group headers
-  own their visible Add and Layout controls; group customisation remains on right-click.
-  Bookmarks change group via "Move to group", which shows a native quick pick from the
-  extension host - bookmarks themselves are not draggable.
+- **An accent that is painted as a fill cannot be written as text.** The fourteen `data-shade`
+  literals are chosen to sit *against* a background. Used as a foreground they are frequently
+  illegible: measured against the page background, white is 1.04:1 on the light theme, black
+  1.02:1 on dark and 1.30:1 on high contrast, where small text needs 4.5:1 - and the palette
+  offers all fourteen with no hint that half of them vanish on the current theme. Anything
+  drawing a glyph or a word in the accent therefore takes `--shade-readable`
+  (`color-mix(in srgb, var(--shade-color) 30%, var(--vscode-foreground))`), or
+  `--group-accent-text`, which is the group-scoped form of the same thing. 30% is a measured
+  floor, not a taste call: it clears 4.5:1 for all fourteen shades in all three themes, worst
+  case 4.65:1, and 40% does not - white lands at 3.57:1 on light. Fills keep the raw literal:
+  the spine, the group's header tab, the divider and the icon container are all backgrounds.
+  `--shade-foreground` is a different, older variable that is declared fourteen times and
+  consumed nowhere; it is not this.
+- **There are no tool modes.** Click opens; bookmark-specific actions live on the row's `...`
+  menu or right-click menu. Group headers own their visible Add and Layout controls; group
+  customisation remains on right-click.
+- **Bookmarks are dragged, and "Move to group" stays.** A card can be dropped on another group
+  or at a new position inside its own; the menu item, which shows a native quick pick, is the
+  keyboard-reachable route and the sane one on a long board where the destination is off
+  screen. Both end in the model change described below. Four things the drag needs:
+  - **Recent is a source, never a destination.** `@vsc-mru` is rebuilt from VS Code's history
+    on almost every message, so a bookmark moved into it would vanish on the next sync and one
+    moved out of it would come straight back. Dragging out of Recent therefore *copies*, which
+    is what `moveToGroup()` already does from the menu. Recent is left undecorated during a
+    drag so this is visible before the pointer is released.
+  - **`beforeGuid` names the landing point, not an index.** Pinned bookmarks are rendered
+    first, so a rendered position is not a stored one. `moveBookmark()` resolves the index
+    against the destination array *after* the bookmark has been lifted out, so moving one down
+    inside its own group does not lose a place as the gap closes behind it - the opposite of
+    `moveGroup()`, which is given a `toIndex` measured before the lift and adjusts for it.
+  - **The drop path must not read rendered state.** Which group receives the drop comes from
+    the carried GUID, set at dragstart, and the insertion point is measured again in the drop
+    handler. A drag that ends in the same frame as the dragover before it would otherwise use
+    a `carry` state Preact has not painted. The highlight is state; the decision is geometry.
+  - **The card clips its own children** so the spine follows its rounded corners, which also
+    clips away a landing line drawn in the gap outside it - hence `overflow: visible` while
+    `[data-drop]` is set. The line is horizontal in list layout and vertical in the two
+    wrapping ones, matching how `insertionPoint()` measures.
 - **"New folder on disk" opens the native dialog first and never asks for a group.** It is an
   action about creating a folder; asking which group to file it under before anything exists
   is a bookmarking question asked too early. The destination falls back to the first
@@ -230,6 +280,35 @@ gets.
   indexing an array, because list is a flex column, grid is a width-dependent CSS grid, and
   compact wraps. Anything that adds a new card layout gets this for free; anything that adds
   a new interactive surface must not become a keyboard dead end.
+  Four things that were dead ends and are now load-bearing rules:
+  - **The window key handler must not treat focus inside a card as focus on the card.** The
+    row's Copy and More-actions buttons live inside `.project`, and the handler is on `window`
+    at bubble phase - so its `preventDefault()` cancelled the synthetic click the button was
+    about to receive. Enter on Copy opened the bookmark, Space did both, and the arrow keys
+    jumped away from inside the button. `active?.closest('button')` bails out before the
+    card branch; Ctrl/Cmd+C is deliberately checked above it and stays reachable.
+  - **Anything that opens takes focus, and gives it back.** The action menu renders at the end
+    of `<main>`, after every group, so a menu opened from the first card was thirty tab stops
+    away. Both palettes are worse: `ActionMenu` returns the palette *in place of* itself, so
+    without a focus move the keyboard user was left in a surface with nothing focusable in it
+    at all. `menuTrigger` holds the opener and `closeMenu()` restores to it.
+  - **A click synthesised from the keyboard reports its coordinates as 0.** `useAnchored` was
+    then pinning every keyboard-opened menu to the viewport's top-left corner. `openMenu`
+    falls back to the trigger's own `getBoundingClientRect()`.
+  - **A control that only a pointer can reach is not finished.** Reordering groups was a
+    title-bar drag and nothing else; the host's `moveGroup` had accepted a one-step
+    `direction` the whole time and only the menu item was missing.
+- **`aria-label` replaces the name computed from content, so a card must not carry one.**
+  Bookmark cards used `aria-label={project.label}`, which silently threw away everything else
+  on the card - the path, the branch badge, and the `Missing` badge, which is rendered as that
+  literal word precisely so the state is not carried by colour alone. Cards point
+  `aria-labelledby` at `.project-label` and `aria-describedby` at `.project-path` instead, so
+  there is no second copy of the text to fall out of step. Icon-only buttons that repeat per
+  group (Add, Layout, Settings) name their group, or a screen reader reads six identical ones.
+- **Asynchronous acknowledgements go through the one live region.** The copied-path tick, the
+  finished Recent refresh and the filter's result count are all confirmations of something the
+  user just did, delivered visually only. `.sr-only` + `role="status"` in `App` carries all
+  three. `polite`, never `assertive`: the filter one fires on every keystroke.
 - **The bookmark label is `.project-label`, and the path line is a flex row.** The SCSS used
   to hook the label with `[data-field="project.label"]`, an attribute only the pre-Preact page
   emitted - so every label in all three layouts silently lost its weight, ellipsis and line
@@ -249,7 +328,8 @@ gets.
   the UA stylesheet's `inset: 0; margin: auto; border; padding` must all be undone before it
   can be placed by hand; it must be `pointer-events: none`, or it steals the hover that
   opened it and flickers; and one element is shared by the whole board, since only one
-  bookmark can be pointed at.
+  bookmark can be pointed at. Nothing interactive belongs in it - a button inside is what
+  forced `pointer-events: auto` and the grace-period timers that came with it.
 - **Never set `display` on a `[popover]` outside its open state.** The UA stylesheet hides a
   closed popover with `[popover]:not(:popover-open) { display: none }`, and *any* author
   `display` beats it - author rules win over UA rules regardless of specificity. A bare
@@ -259,8 +339,15 @@ gets.
   can be positioned by hand.
 - **The hover card only opens when something is actually cut off.** `isClipped()` checks the
   label, path and branch; when all three fit, the card would pop up to repeat text already on
-  screen. Copy therefore cannot live only in the card - it is also on the bookmark menu and
-  Ctrl/Cmd+C, which work whether or not the card is showing.
+  screen. That is why **copy lives on the bookmark, not in the card**: `.rowcopy` sits beside
+  the `...` button and appears on hover or focus, so the action is reachable whether or not
+  anything is truncated. It stays on the bookmark menu and Ctrl/Cmd+C as well. The card is
+  display only, which is what lets it stay `pointer-events: none` with no grace period between
+  leaving a bookmark and closing it.
+- **Out-of-flow row buttons have to be paid for in padding.** `.rowcopy` and `.rowmenu` are
+  absolutely positioned at the card's top-right, so nothing reflows when they appear - but
+  they will happily sit on top of the text. List and compact reserve `46px` of right padding
+  and grid pads the label by `44px`; a third button means all three numbers change together.
 - **Copied paths are shell-quoted, but only when they need it.** `shellQuote()` in
   `communication.ts` wraps a path in single quotes (double on Windows) when it contains
   whitespace or a shell metacharacter, escaping embedded single quotes as `'\''`. Quoting
@@ -289,6 +376,163 @@ gets.
   originally called `defaultGroup()` before creating the folder, and `defaultGroup()` can
   append a group to the model - so a failed `fs.createDirectory` left a stray empty group
   behind, to be saved by the next unrelated write.
+- **Motion comes from tokens, and there are only seven of them.** Three curves (`--ease-out`
+  for anything arriving or responding to the pointer, `--ease-move` for something travelling
+  between two positions, `--ease-hover` for colour under the pointer) and four durations
+  (`--dur-press` .1s, `--dur-hover` .15s, `--dur-enter` .18s, `--dur-move` .22s), all declared
+  at the top of `landingpage2.scss`. Nothing on this page is slow enough to need a fifth
+  duration; a hand-typed `.16s` at a call site is how the page previously ended up with six
+  near-identical values. The two JS animations read `--dur-move` and `--ease-move` out of the
+  computed style via `motion()` in `main.tsx` rather than restating them, so the FLIP flight
+  and a CSS transition of the same gesture cannot drift apart.
+  Two invariants hold the scale together, both of which were broken before they were written
+  down. **`--dur-enter` appears only on `animation`, never on `transition`** - everything it
+  times is an element arriving, and when it crept onto transitions it collected a hover effect
+  (the group hairline) and a drag response (the gap under a carried bookmark), each then running
+  at a different speed from the identical gesture beside it. **Anything that follows the pointer
+  takes `--dur-hover`**, whether it is a colour, a growth or a movement: the spine, the hairline,
+  the drag gap and the drop indicators. That last pair are entrances deliberately timed on
+  `--dur-hover` rather than `--dur-enter`, because they retarget continuously mid-drag and a
+  pointer waiting on its own feedback reads as lag whatever the curve is doing.
+  Two halves of one gesture share a duration: the fold chevron is on `--dur-move` because the
+  group height it describes is animated at `--dur-move` from `GroupShelf`, and at different
+  speeds the chevron finished early and sat there while the group was still closing. They now
+  settle within a frame of each other, measured at 196ms and 213ms.
+  **The group's height is not always the same gesture, so `motion()` takes the token as an
+  argument.** A fold, a layout switch and a filter are considered changes and take
+  `--dur-move`. The space that opens under a dragged bookmark is pointer feedback: the cards
+  slide into it on a `--dur-hover` transition, and the box that has to contain them was
+  growing at `--dur-move` - so everything below the group carried on being pushed down for
+  62ms after the movement had visibly stopped, and the board appeared to settle twice.
+  Measured in the harness at 150ms against 212ms, now both at 127ms. This is the same defect
+  as the fold chevron above, arriving from the opposite direction, and it is the reason the
+  height effect compares the *reserved padding* between renders rather than the height: the
+  drag gap is the only height change `GroupShelf` makes that the pointer drives, and the
+  height alone cannot say which gesture caused it.
+- **Anything that opens grows out of what opened it.** The action menu, both palettes, the
+  New/clone popover and the bookmark hover card all scale up from the corner nearest their
+  trigger, never from their own middle - a surface that expands away from the click reads as
+  unrelated to it. Two of those corners are constants and are written straight into the CSS
+  (`.popover` always hangs below-right of its button; the hover card is told `data-side` by its
+  positioning effect). The menu and palettes are placed at raw pointer coordinates, so
+  `useAnchored()` in `main.tsx` measures them, flips them to the other side of the pointer when
+  they would not fit, and writes the resulting corner into `--origin-x`/`--origin-y` for the
+  animation to scale from. Before that hook existed these were never measured at all: a
+  right-click near the bottom-right corner opened a menu 164px past the right edge and 250px
+  below the bottom, with most of its items unreachable. Note the palettes are `position:
+  absolute` inside `.modal`, which is fixed at `left: var(--rail-width)` - the clamp arithmetic
+  is viewport-relative and stays correct only while `--rail-width` is 0.
+  **Placing once is not enough.** These surfaces change size while open: the action menu swaps
+  its Remove row for a confirmation *plus* a Cancel row, and the rename row is taller than the
+  button it replaces. `x` and `y` do not change when that happens, so the effect does not re-run
+  and nothing else notices - a menu clamped just inside the bottom margin grew 14px back out of
+  it, and Cancel was the item that fell off, which is precisely the one that must never be
+  unreachable. A `ResizeObserver` on the surface re-places it, plus a `window` resize listener,
+  since the webview is a panel the user can drag-resize under an open menu. Neither can loop:
+  the placement only ever writes `left`/`top`, never anything affecting size.
+- **A destructive confirmation is held non-interactive while it fades in, and that is a
+  safeguard rather than an animation.** `Remove?` replaces `Remove` in the menu at exactly the
+  same coordinates and the same size, so a double-click on Remove used to land its second click
+  on the confirmation and destroy the bookmark with the confirmation never having been seen.
+  The `confirm-arm` keyframe animates `pointer-events` discretely - `none` until 99%, so the
+  release happens at the end rather than at the halfway point discrete interpolation would
+  otherwise pick - over `--dur-arm` (.3s, chosen against how fast a real double-click is, not
+  against how the fade looks). Cancel is deliberately *not* armed; the safe way out must never
+  be the slower one. It is restated inside the `prefers-reduced-motion` block so a future
+  blanket `animation: none` cannot silently disarm it. Verified both ways: a second click at
+  90ms posts nothing, a deliberate click at 450ms posts `remove`.
+- **The `[data-act="..."]` rules in the `.ctxmenu` block are the pre-Preact page's markup and
+  match nothing here.** The Preact menu renders plain `<button>` elements with no attributes at
+  all, so a rule written against those selectors is silently a no-op - the arming safeguard
+  above was written that way first and tested green while doing nothing whatsoever. The block is
+  kept because `landingpage2.js` still uses it. Hook Preact menu items with a real class or a
+  `data-` attribute added to the JSX, and confirm the selector matches something before
+  believing a result.
+- **The FLIP effect moves groups as well as cards, and a card inside a moving group animates
+  only its movement *relative* to that group.** Reordering a group used to move its header,
+  accent bar, rule and count badge in a single frame while its own bookmarks slid to the same
+  place over 220ms - a 133px jump against a 250ms glide, with the cards visibly coming away from
+  their own header and catching up. Groups are measured first so their deltas are known before
+  any card is considered, and the group's delta is subtracted from each card's. For a plain
+  reorder that cancels to zero and the cards are left alone; a reorder that also re-lays-out the
+  group animates only the difference. Without the subtraction the two transforms compose and the
+  card travels twice the distance. The check that this is right is that the gap between a group's
+  header and its first card stays constant on every frame of the move.
+- **Everything is measured before anything is animated.** A group's transform displaces the cards
+  inside it, so starting one group's flight partway through the loop corrupts the measurement of
+  every card belonging to it. Same class of bug as the two below, different source.
+- **The FLIP effect cancels its own previous flight before measuring, and adds the offset it was
+  mid-way through.** `getBoundingClientRect()` includes an in-progress transform, so a card
+  measured mid-flight reports where it currently *appears* rather than the layout box it is
+  heading for - the same pollution the mid-drag guard exists to avoid, arriving from the
+  effect's own animations. Left alone it inverts the sign: the card sits at `layout + offset`,
+  so `was - now` yields `(previousLayout - layout) - offset` where the correct origin is
+  `... + offset`, and an interrupted card flew off in the wrong direction with the error always
+  exactly twice the offset (measured at -17px where it should have been +17px). Each card is
+  therefore measured twice - once as it appears, then again after cancelling its previous flight
+  - and only flights this effect started are cancelled, never everything `getAnimations()`
+  returns, which would take the CSS transitions and the `card-in` entrance with them. This is
+  not an edge case: every keystroke in the filter re-renders and moves cards, far faster than
+  the 220ms a flight takes.
+- **The focus ring does not animate.** Arrow-key navigation is the most repeated action on the
+  page, and the ring is the only thing telling you what Enter will open, so `.project:focus`
+  restates the transition with `outline-color` and `background-color` at `0s` while leaving
+  `scale` and `translate` at their normal durations - zeroing `transition-duration` wholesale
+  would also snap the drag gap, which a focused card can be part of. It was visibly wrong
+  before: `outline-width` is not transitioned but `outline-color` was, so each move drew a
+  full-thickness ring in the old colour and eased it over 150ms while the card being left
+  behind faded out on the same curve.
+- **When a hover effect changes mechanism, check `:focus` too.** Converting the spine from
+  `width` to `transform: scaleX()` left `.project:focus .spine { width: 5px }` in place, where
+  it silently became a no-op - the box is always 5px now and the drawn width comes from
+  `--spine-scale`. Hover was verified and focus was not, so keyboard users lost the spine
+  feedback entirely while every measurement of the hover path passed.
+- **The palette scrim fades by animating `background-color`, never `opacity`.** This is the same
+  rule that put the alpha in the colour in the first place, extended to the animation: animating
+  `opacity` would create the stacking context for the length of the fade, so the palette sitting
+  inside would be dimmed by its own scrim on the way in, and a child `opacity: 1` cannot escape
+  it. The keyframe declares only `from` - a keyframe naming one end takes the element's computed
+  value for the other, so there is no second copy of the `color-mix` to keep in step.
+- **`.placeholder` is two different states and only one of them earns a stagger.** The same
+  markup renders the first-run empty board and "No bookmarks match your filter". The first is
+  rare and never mid-task, so it staggers its children 60ms apart; the second appears *while the
+  user is typing* and can come and go on successive keystrokes, so it carries `data-transient`
+  and only fades. A frequency argument that justifies motion has to be checked against every
+  state the selector actually matches, not just the one it was written for.
+- **Menus get an entrance; the board does not.** A context menu is opened a handful of times in
+  a session, which is the frequency band where an entrance earns its cost. Card clicks, filter
+  typing and keyboard navigation happen constantly and deliberately have nothing - motion on
+  something hit a hundred times a day stops being feedback and becomes a tax.
+- **Animate `transform` and `opacity`, nothing else.** Both the bookmark spine and the group
+  header's hairline used to transition a property that repaints (`width` and `background-size`
+  respectively), on hovers that fire constantly. Both are now a `scaleX` from a
+  `transform-origin` at the leading edge, over a box sized to the *hovered* state, with the
+  resting size expressed as the scale factor. `transform` is out of layout, so this is safe
+  even on the flex items where a width change would have shoved neighbours around.
+- **Use `scale` and `translate` as their own properties when one element's movements want
+  different speeds.** A bookmark card does two unrelated things with its transform: the press
+  scale, which should be immediate, and the slide that opens a gap under a dragged bookmark,
+  which should be smooth. As a single `transform` transition they had to share one duration and
+  the press was pinned to the slower value. They are now separate transitionable properties -
+  `scale` at `--dur-press`, `translate` at `--dur-enter` - which compose into the same matrix at
+  no cost. The drag gap therefore sets `translate: 0 Npx` inline, not `transform`. Both apply
+  before `transform`, which is what the FLIP effect animates; they do not collide because a card
+  is never mid-flight and mid-drag at once.
+- **Reduced motion reduces; it does not switch everything off.** The block at the foot of
+  `landingpage2.scss` rewrites `transition-property` to the non-moving half - colour and
+  opacity keep working at full duration - and disables only the keyframes that translate or
+  scale. A blanket `transition-duration: 0.01ms`, which is what this used to be, also kills
+  every hover colour on the page and reads as broken rather than as calm. Note that
+  `transition-duration` has to be replaced along with the property list: durations are matched
+  to properties positionally and repeat cyclically, so a rewritten list otherwise hands the
+  press duration to whichever colour lands in that slot. `stillness()` in `main.tsx` is the JS
+  half and skips both WAAPI animations outright, since both exist only to move things.
+- **A custom property that varies by state must be declared on one element only.** The spine's
+  scale is set twice on `.project` - once at rest, once on `:hover` - rather than once there
+  and once on `.project[data-shade]`, because the painted selector outranks `:hover` and
+  painted bookmarks would then be the only ones on the board that ignored the pointer. Where a
+  variant needs its own resting value it sets a *separate* variable (`--spine-rest`) that the
+  resting declaration falls back to.
 - Prefer `outline` over `border` for hover/selection indicators - a border occupies layout
   space and reflows the row when it appears.
 - Never set `overflow` on one axis alone for a container that anything escapes (tooltips,
