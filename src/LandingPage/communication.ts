@@ -8,7 +8,7 @@ import { parseURI } from './utils';
  */
 interface MessageFromWebview
 {
-	command:'documentReady'|'rename'|'createBookmark'|'createGroup'|'remove'|'hideRecent'|'restoreHiddenRecents'|'refreshRecents'|'moveGroup'|'open'|'move'|'patch'|'openSettings'|'setViewState'|'cloneRepository'|'openFolder'|'moveToGroup'|'createDirectory'|'copyPath';
+	command:'documentReady'|'rename'|'createBookmark'|'createGroup'|'remove'|'hideRecent'|'restoreHiddenRecents'|'refreshRecents'|'moveGroup'|'open'|'move'|'patch'|'openSettings'|'setViewState'|'cloneRepository'|'openFolder'|'moveToGroup'|'createDirectory'|'copyPath'|'moveBookmark';
 
   /** For command 'cloneRepository': the repository URL typed into the clone field. */
   url?:string;
@@ -30,6 +30,11 @@ interface MessageFromWebview
   direction?:'up'|'down';
   /** For command 'moveGroup': insertion index the group was dropped at, among user-created groups. */
   toIndex?:number;
+
+  /** For command 'moveBookmark': GUID of the group the bookmark was dropped on. */
+  toGroup?:string;
+  /** For command 'moveBookmark': GUID of the bookmark it lands in front of. Absent means the end of the group. */
+  beforeGuid?:string;
 
   /** For command 'patch' the name of the field to update. */
   field?:'shade'|'layout'|'glyph'|'collapsed'|'pinned';
@@ -493,6 +498,51 @@ function moveGroup(guid:string|undefined, direction:'up'|'down'|undefined, toInd
   sharedModel.groups = [...userGroups, ...generatedGroups];
   saveModel(sharedModel);
   return true;
+}
+
+/**
+ * Lands a dragged bookmark: into another group, or at a new position within its own.
+ *
+ * Three rules the caller does not have to know about:
+ *
+ * - **Recent is a source, never a destination.** `@vsc-mru` is regenerated from VS Code's
+ *   history on almost every message, so anything moved into it would vanish on the next sync
+ *   and anything moved *out* of it would come straight back. A bookmark dragged out of Recent
+ *   is therefore copied, exactly as {@link moveToGroup} already does from its menu.
+ * - **`beforeGuid` names the landing point, not an index.** The webview renders pinned
+ *   bookmarks first, so a rendered position does not correspond to a stored one. The index is
+ *   resolved here, against the destination array *after* the bookmark has been lifted out, so
+ *   moving one downwards inside its own group does not lose a place as the gap closes.
+ * - **A drop that changes nothing is not a write.** Returning false leaves the model and the
+ *   stored copy untouched rather than resyncing the board for no reason.
+ *
+ * @returns Whether the model changed and needs saving.
+ */
+function moveBookmark(guid:string|undefined, toGroup:string|undefined, beforeGuid:string|undefined, sharedModel:LandingPageModel):boolean
+{
+  const found = findFirst(guid, sharedModel);
+  if (!found || !found.ownerGroup) {return false;} //not a bookmark
+  const destination = sharedModel.groups.find(group => group.guid===toGroup);
+  if (!destination || destination.guid==='@vsc-mru') {return false;}
+
+  const project = found.target as LandingPageProject;
+  const source = found.ownerGroup;
+
+  if (source.guid==='@vsc-mru')
+  {
+    const clone:LandingPageProject = JSON.parse(JSON.stringify(project));
+    clone.guid = crypto.randomUUID();
+    const at = beforeGuid ? destination.projects.findIndex(p => p.guid===beforeGuid) : -1;
+    destination.projects.splice(at<0 ? destination.projects.length : at, 0, clone);
+    return true;
+  }
+
+  const from = source.projects.indexOf(project);
+  source.projects.splice(from,1);
+  const at = beforeGuid ? destination.projects.findIndex(p => p.guid===beforeGuid) : -1;
+  const insertAt = at<0 ? destination.projects.length : at;
+  destination.projects.splice(insertAt,0,project);
+  return !(source===destination && insertAt===from); //dropped back where it started
 }
 
 /**
@@ -1026,6 +1076,15 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       if (moveGroup(message.guid, message.direction, message.toIndex, sharedModel))
       {
         sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
+      }
+      break;
+    case 'moveBookmark': // {guid: bookmark dragged, toGroup: destination, beforeGuid: bookmark it lands in front of}
+      if (moveBookmark(message.guid, message.toGroup, message.beforeGuid, sharedModel))
+      {
+        // forceRebuild: the DOM sync is keyed by GUID, and an insertion moves every card after
+        // it without changing any key.
+        sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
+        saveModel(sharedModel);
       }
       break;
     case 'setViewState':
