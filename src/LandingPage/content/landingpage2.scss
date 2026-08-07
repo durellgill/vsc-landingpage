@@ -121,20 +121,49 @@
   .hidden { display: none !important; }
 
   //--- bookmark accent palette ----------------------------------------------
-  *[data-shade="red"]     { --shade-color: #D50000; --shade-foreground:white; }
-  *[data-shade="orange"]  { --shade-color: #FF5722; --shade-foreground:white; }
-  *[data-shade="yellow"]  { --shade-color: #FFC107; --shade-foreground:black; }
-  *[data-shade="green"]   { --shade-color: #7CB342; --shade-foreground:white; }
-  *[data-shade="teal"]    { --shade-color: #009688; --shade-foreground:white; }
-  *[data-shade="pink"]    { --shade-color: #C51162; --shade-foreground:white; }
-  *[data-shade="purple"]  { --shade-color: #9C27B0; --shade-foreground:white; }
-  *[data-shade="blue"]    { --shade-color: #3F51B5; --shade-foreground:white; }
-  *[data-shade="cyan"]    { --shade-color: #2196F3; --shade-foreground:white; }
-  *[data-shade="gray"]    { --shade-color: #9E9E9E; --shade-foreground:white; }
-  *[data-shade="silver"]  { --shade-color: #607D8B; --shade-foreground:white; }
-  *[data-shade="brown"]   { --shade-color: #795548; --shade-foreground:white; }
-  *[data-shade="white"]   { --shade-color: #FAFAFA; --shade-foreground:black; }
-  *[data-shade="black"]   { --shade-color: #212121; --shade-foreground:white; }
+  // Fourteen accents, designed in OKLCH and then converted, replacing a set of Material picks
+  // taken from four different tiers (`#D50000` and `#C51162` are A700, `#7CB342` is Light Green
+  // 600, `#9E9E9E` is Grey 500). Two things were wrong with that set, both measurable:
+  //
+  // **The lightness range was too wide.** OKLCH L ran .248 to .985. At the size these are
+  // actually drawn - a 5px spine, a 12px pin, a 1px divider - a swatch reads as *how bright*
+  // long before it reads as *which hue*, so a blue spine and a yellow one did not look like two
+  // members of one set; they looked like painted versus unpainted. Note the fix is a narrower
+  // range, not a flat one: lightness is the strongest discriminating channel at small sizes and
+  // the one that survives colour blindness, so it is varied deliberately rather than equalised.
+  //
+  // **The warm end was crowded and the cool end was empty.** pink 3 / red 29 / orange 37 /
+  // brown 41 put four entries in a 38-degree arc while nothing at all sat between 131 and 183.
+  // Brown is now separated by chroma and lightness rather than by hue, which is what it always
+  // needed - it is a dark low-chroma orange, not a hue of its own.
+  //
+  // Measured against the card background, worst case across dark, light and high contrast:
+  // as a fill, 1.01:1 -> 1.40:1; through `--shade-readable` as text, 4.38:1 -> 5.18:1. The
+  // first number is why `black` on a dark theme and `white` on a light one used to be literally
+  // invisible; neither can reach 3:1 without ceasing to be black or white, but a quiet marker
+  // is what the user asked for by picking them, and nothing at all is not.
+  //
+  // The four neutrals are over-represented - with the `''` clear slot the palette offers five
+  // ways to say "no colour" - but the keys are persisted in user data and the swatch's
+  // accessible name is generated from the key, so a slot labelled "Silver" that rendered violet
+  // would be a worse lie than a crowded palette. They are fixed by spacing their lightness into
+  // a legible four-step ramp (L .38 / .63 / .72 / .87) instead of being repurposed.
+  //
+  // **Add keys, never rename them**, for the same persistence reason.
+  *[data-shade="red"]     { --shade-color: #E24942; --shade-foreground:white; } // L .62 C .19 H 27
+  *[data-shade="orange"]  { --shade-color: #F19024; --shade-foreground:black; } // L .74 C .16 H 62
+  *[data-shade="yellow"]  { --shade-color: #EDD13D; --shade-foreground:black; } // L .86 C .16 H 98
+  *[data-shade="green"]   { --shade-color: #39B457; --shade-foreground:black; } // L .68 C .17 H 148
+  *[data-shade="teal"]    { --shade-color: #05908B; --shade-foreground:white; } // L .59 C .125 H 190
+  *[data-shade="pink"]    { --shade-color: #C1297E; --shade-foreground:white; } // L .55 C .20 H 352
+  *[data-shade="purple"]  { --shade-color: #A459CC; --shade-foreground:white; } // L .60 C .18 H 312
+  *[data-shade="blue"]    { --shade-color: #3A5FC9; --shade-foreground:white; } // L .52 C .17 H 266
+  *[data-shade="cyan"]    { --shade-color: #37B2E8; --shade-foreground:black; } // L .72 C .13 H 232
+  *[data-shade="gray"]    { --shade-color: #A4A4A4; --shade-foreground:black; } // L .72 C 0
+  *[data-shade="silver"]  { --shade-color: #7D89A5; --shade-foreground:white; } // L .63 C .045 H 268
+  *[data-shade="brown"]   { --shade-color: #895433; --shade-foreground:white; } // L .50 C .085 H 52
+  *[data-shade="white"]   { --shade-color: #D4D4D4; --shade-foreground:black; } // L .87 C 0
+  *[data-shade="black"]   { --shade-color: #424242; --shade-foreground:white; } // L .38 C 0
 
   // The same accent, made safe to write *text* in.
   //
@@ -146,9 +175,11 @@
   //
   // Mixing toward the theme's own foreground keeps the hue recognisable, which is the entire
   // point of an accent, while pinning the lightness to something the theme already guarantees is
-  // readable against its own background. 30% is the measured floor: it clears 4.5:1 for all
-  // fourteen shades in all three themes, worst case 4.65:1 (white on light). 40% does not -
-  // white lands at 3.57:1 there.
+  // readable against its own background. 30% is the measured floor, and it is measured against
+  // the *card* background rather than the page: the badge sits on a card, and the two differ by
+  // enough to matter. With the palette below the worst case is 5.18:1 (white on light); with the
+  // old Material palette the same 30% mix came to 4.38:1 there, which is under the floor - the
+  // palette and this mix have to be read together. 40% fails outright.
   //
   // Fills keep the literal. The spine, the group's header tab and the icon container all sit
   // *against* the background rather than on it, and they are where AGENTS.md puts the paint
@@ -247,16 +278,25 @@
 
   // This selector must stay scoped to palette swatches. Groups and bookmarks also use
   // data-shade as state, and styling every matching div turned whole groups into circles.
-  .colorslot, .palette div[data-shade]
+  // `.colorslot` is the pre-Preact page's class and is kept for `landingpage2.js`. The Preact
+  // palette renders `button`s: this rule said `div` and silently stopped matching the moment the
+  // swatches became real controls, which left the whole palette as a row of blank rounded
+  // rectangles - no fill, no circle, no hatch on the clear slot. Nothing failed; the selector
+  // just quietly addressed nothing, which is this file's most repeated failure mode.
+  .colorslot, .palette button[data-shade]
   {
     border-radius: 50%;
-    border: 1px solid rgba(0, 0, 0, 0.3);
+    // Was `rgba(0, 0, 0, 0.3)`. A black edge separates nothing from a dark editor background,
+    // so the `black` swatch had no discernible boundary on exactly the themes where it needs
+    // one most, and the clear slot's hatch disappeared with it. Both now come from the theme.
+    border: 1px solid var(--vscode-contrastBorder, color-mix(in srgb, var(--vscode-foreground) 35%, transparent));
     cursor: pointer;
     background-color:var(--shade-color);
 
     &[data-shade=""] // "clear" slot
     {
-      background-image: linear-gradient(45deg, rgba(0, 0, 0, 0.3) 5.56%, transparent 5.56%, transparent 50%, rgba(0, 0, 0, 0.3) 50%, rgba(0, 0, 0, 0.3) 55.56%, transparent 55.56%, transparent 100%);
+      $hatch: color-mix(in srgb, var(--vscode-foreground) 30%, transparent);
+      background-image: linear-gradient(45deg, #{$hatch} 5.56%, transparent 5.56%, transparent 50%, #{$hatch} 50%, #{$hatch} 55.56%, transparent 55.56%, transparent 100%);
       background-size: 4px 4px;
     }
   }
@@ -1328,7 +1368,13 @@
 
         &:hover
         {
-          outline-color: var(--accent-color);
+          // Deliberately *not* `--accent-color`, which is `--vscode-focusBorder`. Hover and
+          // focus were drawing the identical colour and were told apart only by 1px of outline
+          // width, which is not enough under a pointer sweep - and `--vscode-focusBorder` is
+          // already doing four other jobs on this page. Mixing it halfway to the hairline keeps
+          // hover recognisably related to focus while leaving the full-strength colour to mean
+          // one thing: this is what Enter will open.
+          outline-color: color-mix(in srgb, var(--accent-color) 45%, var(--hairline));
           background: var(--vscode-list-hoverBackground, var(--vscode-editorWidget-background));
           --spine-scale: 1;
         }
