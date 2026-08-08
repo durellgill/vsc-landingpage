@@ -33,12 +33,27 @@
  * and asserts on measured geometry and on posted messages - never on screenshots, which prove
  * appearance rather than behaviour.
  */
+// @ts-check
 import { execFileSync } from 'node:child_process';
+
+/**
+ * What one `evaluate()` can hand back. Every check parses JSON out of the page, so the shapes are
+ * only ever these - and naming that is the difference between a check reading a field that does
+ * not exist and failing honestly, versus comparing `undefined` against a number and passing.
+ * @typedef {null|boolean|number|string|Measured|Array<Measured>} Evaluated
+ * @typedef {Record<string, any>} Measured
+ */
 
 const URL_BASE = process.env.HARNESS_URL ?? 'http://localhost:5599/';
 let failures = 0;
 let checks = 0;
+let skipped = 0;
 
+/**
+ * Run one agent-browser subcommand and return its trimmed stdout.
+ * @param {...string} args
+ * @returns {string}
+ */
 function browser(...args) {
   return execFileSync('agent-browser', args, {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
 }
@@ -49,6 +64,10 @@ function browser(...args) {
  * Everything is wrapped in an IIFE on purpose: each eval shares one document, so a bare `const`
  * from an earlier call collides with the next one and the whole check fails with a SyntaxError
  * that looks nothing like the thing being tested.
+ *
+ * @param {string} expression Body of a function evaluated in the page; must `return` a JSON string.
+ * @returns {any} The parsed value. Typed loosely on purpose - the shape is whatever the caller's
+ *   own `JSON.stringify` produced - but each caller annotates what it expects.
  */
 function evaluate(expression) {
   const raw = browser('eval', `(()=>{${expression}})()`);
@@ -58,19 +77,83 @@ function evaluate(expression) {
 
 function open(query = '') {
   browser('open', URL_BASE + query);
-  sleep(1200);
+  // The board is what every check measures, so wait for a card rather than for a duration - and
+  // for its entrance to be over, since a rect or a computed value read mid-animation is not the
+  // settled one. Waiting only for the element to exist is what made spine-hover read a spine
+  // 4.9px wide and scrim-stacking read a palette at 0.82 opacity.
+  waitUntil(`document.querySelector('.project') && document.getAnimations().length===0`,
+    {label: 'the board to render and settle'});
 }
 
-// Deliberately synchronous: these waits are for the page to settle, and interleaving them with
-// async control flow makes an ordering bug in the *check* look like a failure in the page.
+/**
+ * Block until an expression is truthy in the page, or the timeout expires.
+ *
+ * This is the reason almost nothing here sleeps a fixed duration any more. The waits are
+ * synchronous on purpose - see {@link sleep} - but synchronous does not have to mean
+ * clock-based, and a fixed sleep encodes an assumption about how fast the machine is that is
+ * wrong the moment the machine is busy. Polling a condition is just as synchronous and states
+ * what is actually being waited for.
+ *
+ * @param {string} expression JS evaluated in the page; truthy ends the wait.
+ * @param {{timeout?:number, label?:string}} [options] `label` is what appears if it times out.
+ * @returns {boolean} True if the condition was met, false on timeout.
+ */
+function waitUntil(expression, {timeout = 5000, label = expression} = {}) {
+  const deadline = Date.now() + timeout;
+  for (;;) {
+    if (evaluate(`return JSON.stringify(!!(${expression}));`) === true) { return true; }
+    if (Date.now() >= deadline) {
+      console.log(`      (timed out after ${timeout}ms waiting for ${label})`);
+      return false;
+    }
+    sleep(50);
+  }
+}
+
+/**
+ * Block the process for `ms`.
+ *
+ * Deliberately synchronous: these waits are for the page to settle, and interleaving them with
+ * async control flow makes an ordering bug in the *check* look like a failure in the page.
+ *
+ * Prefer {@link waitUntil}. A bare sleep is correct only when waiting for something to *not*
+ * happen - the absence of an event cannot be polled for, so proving no flight was started needs
+ * a real elapsed wait. Those few call sites say so.
+ *
+ * @param {number} ms
+ */
 function sleep(ms) { execFileSync(process.execPath, ['-e', `setTimeout(()=>{}, ${ms})`]); }
 
+/**
+ * Record one assertion.
+ * @param {string} name
+ * @param {boolean} ok
+ * @param {string} [detail]
+ */
 function check(name, ok, detail) {
   checks++;
   if (!ok) { failures++; }
   console.log(`${ok ? 'pass' : 'FAIL'}  ${name}${detail ? `  ${detail}` : ''}`);
 }
 
+/**
+ * Record an assertion that could not be made, because the environment cannot support it.
+ *
+ * Distinct from a pass and from a failure on purpose: a check that silently passed when it could
+ * not run would be the worst of the three, and this repo has already shipped a CSS rule that
+ * tested green while matching no element at all.
+ *
+ * @param {string} name
+ * @param {string} [reason]
+ */
+function skip(name, reason) {
+  skipped++;
+  console.log(`SKIP  ${name}${reason ? `  ${reason}` : ''}`);
+}
+
+/**
+ * @param {...string} args
+ */
 function setMedia(...args) { browser('set', 'media', ...args); }
 
 // 1 + 2. One layout switch interrupted by another, which is what typing in the filter does to
@@ -100,14 +183,10 @@ function flipChecks() {
     },1400);
     return JSON.stringify('started');
   `);
-  sleep(2600);
+  waitUntil('window.__final', {label: 'both layout switches to settle'});
   const rows = evaluate(`
     const first=window.__log[0]?window.__log[0].at:0;
     const second=window.__log.filter(e=>e.at>first+50);
-    // Only cards in the group whose layout actually changed. A card in another group is being
-    // moved by that group's height animation, so its layout position at measure time is
-    // legitimately not its settled one and the naive expectation below does not hold for it.
-    const switched=new Set([...document.querySelectorAll('.group')][0] ? [] : []);
     return JSON.stringify(second.map(e=>{
       const m=/translate\\((-?[\\d.]+)px, *(-?[\\d.]+)px\\)/.exec(e.from)||[];
       const used=parseFloat(m[2]);
@@ -116,6 +195,9 @@ function flipChecks() {
       return {guid:e.guid, used:+used.toFixed(1), want, err: want===null?null:+(used-want).toFixed(1)};
     }));
   `);
+  // Only cards that actually travelled. A card that barely moved is being carried by its group's
+  // height animation rather than flying itself, so its measured layout position is legitimately
+  // not its settled one and the direction expectation does not hold for it.
   const sameGroup = Array.isArray(rows) ? rows.filter(r => r.err !== null && Math.abs(r.want) > 1) : [];
   const wrongWay = sameGroup.filter(r => Math.sign(r.used) !== Math.sign(r.want));
   check('flip-direction  interrupted flights keep their direction',
@@ -134,27 +216,27 @@ function groupCohesion() {
     g0.querySelector('.titlebar').dispatchEvent(new DragEvent('dragstart',{bubbles:true,dataTransfer:dt}));
     return JSON.stringify('drag');
   `);
-  sleep(600);
+  waitUntil(`document.querySelector('.group.dragging')`, {label: 'the group to enter its carried state'});
   evaluate(`
     const g1=document.querySelectorAll('.group')[1]; const r=g1.getBoundingClientRect(); const dt=new DataTransfer();
     g1.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:dt,clientX:r.left+20,clientY:r.bottom-4}));
     return JSON.stringify('over');
   `);
-  sleep(600);
+  waitUntil(`document.querySelector('.group[data-drop]')`, {label: 'the drop indicator to appear'});
   evaluate(`
     window.__tr=[]; const t0=performance.now();
     const tick=()=>{
       const g=document.querySelector('.group[data-guid="'+window.__ids.group+'"]');
       const c=document.querySelector('.project[data-guid="'+window.__ids.card+'"]');
       if(g&&c){window.__tr.push(+(c.getBoundingClientRect().top-g.querySelector('.titlebar').getBoundingClientRect().top).toFixed(1));}
-      if(performance.now()-t0<700) requestAnimationFrame(tick);
+      if(performance.now()-t0<700) requestAnimationFrame(tick); else window.__trDone=true;
     };
     const g1=document.querySelectorAll('.group')[1]; const dt=new DataTransfer();
     g1.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));
     requestAnimationFrame(tick);
     return JSON.stringify('dropped');
   `);
-  sleep(2200);
+  waitUntil('window.__trDone', {label: 'the reorder recorder to finish'});
   const gaps = evaluate('return JSON.stringify(window.__tr||[]);');
   const spread = Array.isArray(gaps) && gaps.length ? Math.max(...gaps) - Math.min(...gaps) : -1;
   check('group-cohesion  header and card move as one body',
@@ -170,7 +252,7 @@ function confirmArming({reduced = false} = {}) {
     c.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:r.left+40,clientY:r.top+10}));
     return JSON.stringify('menu');
   `);
-  sleep(600);
+  waitUntil(`document.querySelector('.ctxmenu')`, {label: 'the action menu to open'});
   const result = evaluate(`
     window.__r={};
     const rm=[...document.querySelectorAll('.ctxmenu button')].find(x=>/^Remove$/.test(x.textContent.trim()));
@@ -190,7 +272,7 @@ function confirmArming({reduced = false} = {}) {
     return JSON.stringify('armed');
   `);
   void result;
-  sleep(2000);
+  waitUntil('window.__r && window.__r.afterSlow!==undefined', {label: 'both confirmation clicks to land'});
   const r = evaluate('return JSON.stringify(window.__r||{});');
   const label = reduced ? 'confirm-arming (reduced motion)' : 'confirm-arming';
   check(`${label}  a 90ms second click is refused`,
@@ -209,7 +291,7 @@ function menuClamping() {
     c.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:innerWidth-30,clientY:innerHeight-20}));
     return JSON.stringify('corner');
   `);
-  sleep(700);
+  waitUntil(`document.querySelector('.ctxmenu')`, {label: 'the action menu to open'});
   const onOpen = evaluate(`
     const b=document.querySelector('.ctxmenu').getBoundingClientRect();
     return JSON.stringify({fits: b.right<=innerWidth && b.bottom<=innerHeight && b.left>=0 && b.top>=0});
@@ -221,7 +303,8 @@ function menuClamping() {
     if(rm) rm.click();
     return JSON.stringify('grow');
   `);
-  sleep(700);
+  waitUntil(`[...document.querySelectorAll('.ctxmenu button')].some(b=>/Cancel/.test(b.textContent))`,
+    {label: 'the confirmation row to grow the menu'});
   const onGrow = evaluate(`
     const m=document.querySelector('.ctxmenu'); const b=m.getBoundingClientRect();
     const cancel=[...m.querySelectorAll('button')].find(x=>/Cancel/.test(x.textContent));
@@ -244,11 +327,26 @@ function focusChecks() {
     const props=cs.transitionProperty.split(',').map(s=>s.trim());
     const outline=props.indexOf('outline-color');
     return JSON.stringify({
+      // Both assertions below read a value that only exists while \`:focus\` matches, and it does
+      // not match at all in a window the OS considers unfocused - so the environment has to be
+      // reported alongside the measurement or a green run proves nothing and a red one is a lie.
+      // This exact trap already cost this repo a CSS rewrite: \`:focus-visible\` was declared
+      // unreliable and replaced on the strength of a measurement taken while hasFocus was false.
+      hasFocus: document.hasFocus(),
+      matchesFocus: c.matches(':focus'),
       spine: cs.getPropertyValue('--spine-scale').trim(),
       outlineDuration: outline>=0 ? durations[outline] : 'absent',
       spineWidth: +c.querySelector('.spine').getBoundingClientRect().width.toFixed(1)
     });
   `);
+  // Not a check: a skip. Failing here would report a broken focus ring, which is not what an
+  // unfocused window is evidence of.
+  if (!r.hasFocus || !r.matchesFocus) {
+    skip('focus-instant  focus ring does not ease its colour',
+      `window unfocused (hasFocus=${r.hasFocus}, :focus matched=${r.matchesFocus})`);
+    skip('focus-instant  focused spine reaches full width', 'same');
+    return;
+  }
   check('focus-instant  focus ring does not ease its colour', r.outlineDuration === '0s', `got ${r.outlineDuration}`);
   check('focus-instant  focused spine reaches full width', r.spine === '1' && r.spineWidth === 5,
     `scale=${r.spine} width=${r.spineWidth}`);
@@ -269,7 +367,9 @@ function spineHover() {
     return JSON.stringify({guid:c?c.dataset.guid:null, rest:c?getComputedStyle(c).getPropertyValue('--spine-scale').trim():null});
   `);
   browser('hover', `.project[data-guid="${painted.guid}"]`);
-  sleep(700);
+  waitUntil(`document.querySelector('.project[data-guid="${painted.guid}"]:hover')
+    && document.getAnimations().length===0`,
+    {label: 'the spine to finish growing under the pointer'});
   const hovered = evaluate(`
     const c=document.querySelector('.project[data-guid="${painted.guid}"]');
     return JSON.stringify({scale:getComputedStyle(c).getPropertyValue('--spine-scale').trim(),
@@ -293,13 +393,14 @@ function scrimStacking() {
     c.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:r.left+40,clientY:r.top+10}));
     return JSON.stringify('menu');
   `);
-  sleep(600);
+  waitUntil(`document.querySelector('.ctxmenu')`, {label: 'the action menu to open'});
   evaluate(`
     const b=[...document.querySelectorAll('.ctxmenu button')].find(x=>/Accent colour/.test(x.textContent));
     if(b) b.click();
     return JSON.stringify('palette');
   `);
-  sleep(700);
+  waitUntil(`document.querySelector('.palette') && document.getAnimations().length===0`,
+    {label: 'the accent palette to open and settle'});
   const r = evaluate(`
     const m=document.querySelector('.modal'), p=document.querySelector('.palette');
     if(!m||!p) return JSON.stringify({missing:true});
@@ -348,19 +449,25 @@ function scrollIsNotMovement() {
     };
     return JSON.stringify('armed');
   `);
-  sleep(400);
+  // The board's own entrance animations must be finished before the hook can attribute anything
+  // to the scroll, so wait for the page to be still rather than for a duration.
+  waitUntil('document.getAnimations().length===0', {label: 'the board entrance to finish'});
   const result = evaluate(`
     const el=document.scrollingElement;
     el.scrollTop=150;
     return JSON.stringify({scrollable: el.scrollHeight>el.clientHeight, top: el.scrollTop});
   `);
-  sleep(300);
+  waitUntil('document.getAnimations().length===0', {label: 'the scroll to settle'});
   const scrolled = evaluate(`
     window.__f=[];
     document.querySelector('.project').dispatchEvent(
       new MouseEvent('contextmenu',{bubbles:true,clientX:300,clientY:200}));
     return JSON.stringify('rendered');
   `);
+  // One of the two sleeps that has to stay. The assertion is that *no* flight starts, and the
+  // absence of an event cannot be polled for - a poll would return immediately and prove
+  // nothing. Its partner below waits exactly as long for the opposite reason: the two halves
+  // are only a fair comparison if they give the page the same amount of time to animate.
   sleep(200);
   const afterScroll = evaluate(`return JSON.stringify(window.__f.length);`);
   check('scroll-not-movement  a render while scrolled starts no flights',
@@ -373,6 +480,9 @@ function scrollIsNotMovement() {
     btn.click();
     return JSON.stringify('switched');
   `);
+  // Deliberately the same fixed wait as its partner above, not a poll for `__f.length>0`.
+  // Polling here would give the layout switch as long as it needed while the scroll got 200ms,
+  // and "a scroll is not a movement" would then be comparing two different questions.
   sleep(200);
   const moves = evaluate(`return JSON.stringify(window.__f.length);`);
   check('scroll-not-movement  a real layout change still flies',
@@ -392,13 +502,13 @@ function foldSync() {
       window.__f.push([+(performance.now()-t0).toFixed(0),
         +(Math.atan2(m.b,m.a)*180/Math.PI).toFixed(1),
         +box.getBoundingClientRect().height.toFixed(1)]);
-      if(performance.now()-t0<700) requestAnimationFrame(tick);
+      if(performance.now()-t0<700) requestAnimationFrame(tick); else window.__fDone=true;
     };
     g.querySelector('.titlebar [aria-expanded]').click();
     requestAnimationFrame(tick);
     return JSON.stringify('folding');
   `);
-  sleep(2200);
+  waitUntil('window.__fDone', {label: 'the fold recorder to finish'});
   const settled = evaluate(`
     const f=window.__f||[];
     const at=(idx)=>{for(let i=f.length-1;i>0;i--){if(Math.abs(f[i][idx]-f[i-1][idx])>0.5) return f[i][0];} return 0;};
@@ -413,10 +523,25 @@ function foldSync() {
 // 6. Reduced motion downgrades entrances to opacity rather than switching them off, and no
 // animation anywhere may carry a transform.
 function reducedMotion() {
+  // `finally`, because the media override lives in the browser session and that session outlives
+  // this process. Without it, anything throwing between here and the restore leaves reduced
+  // motion forced on for every subsequent run - and a poisoned run does not look poisoned, it
+  // looks like four genuine motion regressions (flip-direction, focus-instant,
+  // scroll-not-movement and fold-sync all fail, because under reduced motion there is nothing
+  // moving for them to measure). Confirmed by forcing it: 12/16 with four plausible-looking
+  // failures, green again the moment the media state was restored.
+  try {
+    reducedMotionChecks();
+  } finally {
+    setMedia('dark');
+  }
+}
+
+function reducedMotionChecks() {
   setMedia('dark', 'reduced-motion');
   open();
   evaluate(`
-    window.__seen=[];
+    window.__seen=[]; window.__swept=0;
     window.__sweep=()=>{
       for (const a of document.getAnimations()) {
         let frames=[]; try{frames=a.effect.getKeyframes();}catch(e){}
@@ -425,20 +550,21 @@ function reducedMotion() {
           transform:frames.some(f=>f.transform!==undefined||f.scale!==undefined||f.translate!==undefined)
         });
       }
+      window.__swept++;
     };
     const c=document.querySelector('.project'), r=c.getBoundingClientRect();
     c.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:r.left+40,clientY:r.top+10}));
     setTimeout(window.__sweep,30);
     return JSON.stringify('menu');
   `);
-  sleep(900);
+  waitUntil('window.__swept>=1', {label: 'the menu animation sweep'});
   evaluate(`
     const p=[...document.querySelectorAll('.ctxmenu button')].find(x=>/Accent colour/.test(x.textContent));
     if(p) p.click();
     setTimeout(window.__sweep,30);
     return JSON.stringify('palette');
   `);
-  sleep(900);
+  waitUntil('window.__swept>=2', {label: 'the palette animation sweep'});
   const seen = evaluate('return JSON.stringify(window.__seen||[]);');
   const moving = Array.isArray(seen) ? seen.filter(s => s.transform) : [{name: 'unreadable'}];
   check('reduced-motion  no animation carries a transform',
@@ -447,7 +573,6 @@ function reducedMotion() {
 
   // The safeguard is not an animation and must not be downgraded with the rest.
   confirmArming({reduced: true});
-  setMedia('dark');
 }
 
 try {
@@ -457,16 +582,39 @@ try {
   process.exit(2);
 }
 
-flipChecks();
-groupCohesion();
-confirmArming();
-menuClamping();
-focusChecks();
-spineHover();
-scrimStacking();
-scrollIsNotMovement();
-foldSync();
-reducedMotion();
+// Every piece of browser state this script changes is restored here as well as at the call site,
+// because the browser session outlives the process and a leaked override silently corrupts the
+// *next* run rather than this one. `media` is the one that has actually bitten; `viewport` is
+// changed by menuClamping and restored the same way.
+function restoreBrowserState() {
+  try { setMedia('dark'); } catch { /* browser already gone: nothing to restore */ }
+  try { browser('set', 'viewport', '1280', '800'); } catch { /* ditto */ }
+}
 
-console.log(`\n${checks - failures}/${checks} checks passed`);
+let crashed = null;
+try {
+  flipChecks();
+  groupCohesion();
+  confirmArming();
+  menuClamping();
+  focusChecks();
+  spineHover();
+  scrimStacking();
+  scrollIsNotMovement();
+  foldSync();
+  reducedMotion();
+} catch (err) {
+  crashed = err;
+} finally {
+  restoreBrowserState();
+}
+
+if (crashed) {
+  console.error(`\ncheck run aborted: ${crashed && crashed.message ? crashed.message : crashed}`);
+  process.exit(3);
+}
+
+console.log(`\n${checks - failures}/${checks} checks passed${skipped ? `, ${skipped} skipped` : ''}`);
+// A skip is not a pass. It does not fail the run - an unfocused window is an environment fact,
+// not a regression - but it must never be counted as evidence that the check succeeded.
 process.exit(failures ? 1 : 0);

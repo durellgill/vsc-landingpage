@@ -165,7 +165,7 @@ export async function populateVscMru(sharedModel:LandingPageModel):Promise<void>
  * @param limit How many to keep. `0` means no limit, which does stat the whole history.
  * @returns The surviving entries, in order.
  */
-async function takeExisting(projects:LandingPageProject[], limit:number):Promise<LandingPageProject[]>
+export async function takeExisting(projects:LandingPageProject[], limit:number):Promise<LandingPageProject[]>
 {
   const kept:LandingPageProject[] = [];
   // Enough per round to fill the quota in one pass when nothing is missing, and never so

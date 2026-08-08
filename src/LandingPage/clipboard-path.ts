@@ -64,7 +64,7 @@ export async function copyPath(guid:string|undefined, sharedModel:LandingPageMod
  * @param text Path to quote.
  * @returns The path, quoted only if a shell would otherwise mangle it.
  */
-function shellQuote(text:string):string
+export function shellQuote(text:string):string
 {
   // Whitespace, glob characters, redirections, expansions, quotes and comment markers.
   if (!/[\s'"\\$`&|;<>()*?\[\]{}!#~]/.test(text)) {return text;}

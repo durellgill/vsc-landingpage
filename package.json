@@ -124,12 +124,14 @@
     "install-local": "node scripts/install-local.mjs",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
-    "typecheck": "tsc -p . --noEmit",
+    "typecheck": "npm run typecheck:src && npm run typecheck:scripts",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test",
     "harness": "npm run compile && npm run build:harness && node scripts/harness.mjs",
-    "motion-check": "node scripts/motion-check.mjs"
+    "motion-check": "node scripts/motion-check.mjs",
+    "typecheck:src": "tsc -p . --noEmit",
+    "typecheck:scripts": "tsc --noEmit --allowJs --checkJs --target es2022 --module nodenext --moduleResolution nodenext --skipLibCheck scripts/motion-check.mjs"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.6",
@@ -139,7 +141,7 @@
     "@typescript-eslint/eslint-plugin": "^8.17.0",
     "@typescript-eslint/parser": "^8.17.0",
     "@vscode/test-cli": "^0.0.15",
-    "@vscode/test-electron": "^2.4.1",
+    "@vscode/test-electron": "^3.1.0",
     "eslint": "^10.8.0",
     "sass": "^1.83.1",
     "typescript": "^5.7.2",

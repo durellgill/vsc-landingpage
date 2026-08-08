@@ -80,7 +80,7 @@ export async function reportBookmarkHealth(webviewPanel:vscode.WebviewPanel, sha
  * @returns Branch name, short commit id when detached, or undefined when this is not a
  *          repository - which is the common case and not an error.
  */
-async function readGitBranch(folder:vscode.Uri):Promise<string|undefined>
+export async function readGitBranch(folder:vscode.Uri):Promise<string|undefined>
 {
   try
   {
