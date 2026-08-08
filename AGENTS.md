@@ -169,14 +169,19 @@ gets.
     wrapping ones, matching how `insertionPoint()` measures.
 - **The delete zone is armed by dwell, and that is a safeguard rather than an animation.** It
   is rendered only while a bookmark is being carried - a permanently visible delete target is a
-  permanent invitation - and pinned to the right edge, which is the one part of the window the
-  board never uses because `.page` is capped at `--page-max` and left-aligned. A drag is far
-  easier to make by accident than a menu item is to click, so a drop does nothing until the
-  pointer has rested in the zone for `--dur-arm`: the same duration and the same reasoning as
-  the menu's `Remove?` confirmation, which is held non-interactive while it fades in. The
-  middle state matters as much as the other two - hovered-but-not-armed stays dashed and muted
-  and advertises `dropEffect: 'none'`, so neither the panel nor the cursor claims a release
-  will do something it will not. **Recent is hidden, never removed**, exactly as the action
+  permanent invitation - and spans the foot of the window, 96px deep and full width, which is
+  where a drag-to-discard target belongs and which can be hit by throwing the pointer at it. It
+  used to be a 112px box floating to the right of the board: out of the way, but a small target
+  parked where the user had no reason to look, at a distance that varied with the editor width.
+  A drag is far easier to make by accident than a menu item is to click, so a drop does nothing
+  until the pointer has rested in the zone for `--dur-arm`: the same duration and the same
+  reasoning as the menu's `Remove?` confirmation, which is held non-interactive while it fades
+  in. The middle state matters as much as the other two, but **colour is not what gates it**:
+  the zone goes red the moment it is hovered, because red is what the target *is* and
+  withholding it until a timer elapsed made the panel look inert exactly when it was being
+  asked what it would do. The dwell is carried by everything else - hovered stays dashed over a
+  faint wash and reads "Hold to remove" while armed fills solid and reads "Release to remove",
+  and `dropEffect: 'none'` until armed keeps the cursor agreeing. **Recent is hidden, never removed**, exactly as the action
   menu already splits those two cases, and the label says which one will happen. The zone is
   `aria-hidden`: it is a drop target that cannot be operated from a keyboard at all, and both
   actions it offers are already on the bookmark's menu.
@@ -474,6 +479,19 @@ gets.
 - **Everything is measured before anything is animated.** A group's transform displaces the cards
   inside it, so starting one group's flight partway through the loop corrupts the measurement of
   every card belonging to it. Same class of bug as the two below, different source.
+- **A baseline measured while a group's height is animating is provisional, and gets corrected
+  once it lands.** `GroupShelf` animates its own height, and a child's layout effect runs before
+  the parent's - so on the render that grows a group, the FLIP effect measures every element
+  below it at its *pre-growth* position and stores that as the baseline. The height animation
+  then carries them to the real position and nothing re-measures, so the next render for any
+  reason at all - the `bookmarkHealth` reply that follows every sync, a hover, a keystroke -
+  compares against a stale baseline and flies the untouched part of the board up and back down.
+  Adding one bookmark made both groups below it jump 20.6px and settle, measured in the harness,
+  which is what "the other groups do a weird refresh" was. The effect therefore waits on every
+  `.foldable` height animation *and* its own flights, and re-measures the baseline once nothing
+  is left carrying a transform. A token discards the correction if a newer render has already
+  run its own pass. Nothing is animated from that path: it only fixes what the next render will
+  compare against.
 - **The FLIP effect cancels its own previous flight before measuring, and adds the offset it was
   mid-way through.** `getBoundingClientRect()` includes an in-progress transform, so a card
   measured mid-flight reports where it currently *appears* rather than the layout box it is

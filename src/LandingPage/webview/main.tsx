@@ -575,7 +575,11 @@ function App() {
    */
   const boxes = useRef(new Map<string,{left:number; top:number}>());
   const flights = useRef(new Map<string,Animation>());
+  const settle = useRef(0);
   useLayoutEffect(()=>{
+    // Bumped before the mid-drag bail-out, so a settle scheduled by an earlier pass can never
+    // write a baseline over a layout this pass has already moved on from.
+    const token = ++settle.current;
     if (carry) {return;}
     const next = new Map<string,{left:number; top:number}>();
     const quiet = stillness();
@@ -595,6 +599,28 @@ function App() {
     // inside it, so starting one group's flight partway through the loop would corrupt the
     // measurement of every card belonging to it - the same pollution as the interrupted-flight
     // case, arriving from a different element.
+    /*
+     * A group whose height is in the air is already carrying everything *below* it, and nothing
+     * below it measures as a layout box while that runs - see the note by the settle at the foot
+     * of this effect. Those parts are therefore measured and stored as usual but not flown: a
+     * flight started from a provisional baseline is exactly the double motion this effect exists
+     * to prevent. Same guard as `carry` above, for the same reason.
+     *
+     * It has to be per element rather than a blanket bail-out, which is what it was first written
+     * as. The animating group's *own* cards are laid out normally - the box grows around them,
+     * it does not move them - and a layout switch is precisely a height change plus a card
+     * rearrangement, so suppressing the whole board there stopped the switched group's cards
+     * gliding at all. Everything at or above the animating group is honest; everything after it
+     * is not.
+     */
+    const shelves = Array.from(document.querySelectorAll<HTMLElement>('.content .group'));
+    const settling = shelves.findIndex(group => group.querySelector('.foldable')?.getAnimations().length);
+    const carriedByFold = (element:HTMLElement) => {
+      if (settling<0) {return false;}
+      const owner = element.classList.contains('group') ? element : element.closest<HTMLElement>('.group');
+      return !!owner && shelves.indexOf(owner) > settling;
+    };
+
     const parts = movingParts();
     const measured = parts.map(part => {
       const seen = part.element.getBoundingClientRect();
@@ -625,7 +651,7 @@ function App() {
       }
       for (const part of measured) {
         const delta = moved.get(part.key);
-        if (!delta) {continue;}
+        if (!delta || carriedByFold(part.element)) {continue;}
         let {dx,dy} = delta;
         // A card inside a group that is itself flying only animates what it does *relative* to
         // that group, because the group's transform is already carrying it. Reordering moves a
@@ -649,6 +675,41 @@ function App() {
     // Anything that has left the board takes its flight with it.
     for (const key of [...flights.current.keys()]) {if (!next.has(key)) {flights.current.delete(key);}}
     boxes.current = next;
+
+    /*
+     * The baseline just stored is provisional whenever a group's height is in the air, and
+     * correcting it is what stops the board twitching a beat after something is added to a
+     * group.
+     *
+     * `GroupShelf` animates its own height, and a child's layout effect runs before the
+     * parent's - so on the render that grows a group, the height animation has already started
+     * from the *old* height, and every rect this effect then measures below that group is the
+     * pre-growth one. That is the position stored. The animation then carries those groups to
+     * where they really belong, nothing re-measures, and the next render for any reason at all
+     * - the `bookmarkHealth` reply that follows every sync, a hover, a keystroke - compares
+     * against the stale baseline and flies the whole board back up and down again. Adding one
+     * bookmark to a group made both groups below it jump 20.6px and settle, measured in the
+     * harness, which is exactly the "weird refresh" of groups that were not touched.
+     *
+     * So the positions are measured once more after everything has landed. Both sets have to be
+     * waited on: the heights, and this effect's own flights, since a rect read while either is
+     * running is not a layout box. Nothing is animated from here - this only corrects what the
+     * *next* render will compare against.
+     */
+    const inAir = [
+      ...Array.from(document.querySelectorAll<HTMLElement>('.content .foldable')).flatMap(box=>box.getAnimations()),
+      ...flights.current.values(),
+    ];
+    if (!inAir.length) {return;}
+    // `finished` rejects on cancel, which is an ordinary outcome here, hence `allSettled`.
+    Promise.allSettled(inAir.map(animation=>animation.finished)).then(()=>{
+      if (token!==settle.current) {return;}
+      const dx = window.scrollX, dy = window.scrollY;
+      for (const part of movingParts()) {
+        const rect = part.element.getBoundingClientRect();
+        boxes.current.set(part.key, {left:rect.left+dx, top:rect.top+dy});
+      }
+    });
   });
   const hovered = useMemo(() => {
     if (!hover) {return null;}
@@ -1060,6 +1121,12 @@ function Palette({type,x,y,choose,close}:any) {
  * fades in so a double-click cannot carry through onto it. A flick across the zone on the way
  * somewhere else releases nothing.
  *
+ * There are three states and the labels name all three, because the dwell is otherwise invisible:
+ * "Drag here to remove" at rest, "Hold to remove" once the pointer is inside but the timer has
+ * not run, and "Release to remove" once it has. The middle one is the one that had to be added -
+ * the zone turns red as soon as it is hovered, since that is what the target is, so something
+ * other than colour has to carry the fact that a release at that instant would do nothing.
+ *
  * The label says which of the two things will happen, because they are genuinely different
  * actions. Recent is generated from VS Code's history and cannot be edited, so an entry dragged
  * here is *hidden* from this page through `hideRecent` - reversible from the Recent group's own
@@ -1093,7 +1160,7 @@ function DeleteZone({from,onRelease}:{from:string;onRelease:(armed:boolean)=>voi
     onDragLeave={()=>{setOver(false); setArmed(false); window.clearTimeout(timer.current);}}
     onDrop={event=>{event.preventDefault(); event.stopPropagation(); window.clearTimeout(timer.current); onRelease(armed);}}>
     <Svg name="trash2"/>
-    <span class="dropbin-label">{armed ? `Release to ${verb}` : `Drop here to ${verb}`}</span>
+    <span class="dropbin-label">{!over ? `Drag here to ${verb}` : armed ? `Release to ${verb}` : `Hold to ${verb}`}</span>
   </div>;
 }
 
