@@ -19,7 +19,7 @@ export default defineConfig({
     ssr: true,
     minify: false,
     lib: {
-      entry: {'harness-render': resolve(import.meta.dirname, 'src/LandingPage/LandingPageTemplate2.ts')},
+      entry: {'harness-render': resolve(import.meta.dirname, 'src/LandingPage/LandingPageTemplate.ts')},
       formats: ['es']
     },
     rollupOptions: {

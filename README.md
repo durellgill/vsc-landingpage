@@ -1,8 +1,6 @@
-# Landingpage
+# Landing Page
 
-> **My fork.** Upstream is [renebuehling/vsc-landingpage](https://github.com/renebuehling/vsc-landingpage).
-> See [PROGRESS.md](PROGRESS.md) for what I changed and [AGENTS.md](AGENTS.md) for how the
-> code is put together.
+Landing Page is a customizable VS Code start page for bookmark groups and recently opened files, folders, and workspaces. See [AGENTS.md](AGENTS.md) for the architecture and project conventions, and [DEVELOP.md](DEVELOP.md) for the contributor workflow.
 
 ## Running it locally
 
@@ -20,7 +18,7 @@ palette (`Cmd+Shift+P`) in that window.
 The default *Run Extension* launch config gives that window its own extensions directory and
 its own profile:
 
-- **Own extensions dir** - none of your ~33 installed extensions load. That is the difference
+- **Own extensions dir** - none of your installed extensions load. That is the difference
   between a slow F5 and a fast one. Built-in extensions still load, so Clone still works.
 - **Own profile** - the dev host always starts as an empty window. Without this it inherits
   your window restore state, reopens the last folder you had, and then the landing page does
@@ -61,7 +59,7 @@ Append `?empty` for the empty state, `?theme=light` for the light theme, or `?he
 suppress the missing-target markers. It supplies the `--vscode-*` theme variables itself, so
 colours are real rather than missing.
 
-## Installing my build for daily use
+## Installing this build for daily use
 
 ```bash
 npx @vscode/vsce package
@@ -70,20 +68,11 @@ code --install-extension vsc-landingpage-0.1.0.vsix
 
 Bump `version` in `package.json` first, or VS Code may not register the update.
 
-This build's extension ID is `local.vsc-landingpage`, so it installs alongside the
-marketplace copy (`renebuehling.vsc-landingpage`) without an ID clash. They do still both
-register the same command IDs, so uninstall the marketplace one to avoid duplicate entries
-in the palette:
-
-```bash
-code --uninstall-extension renebuehling.vsc-landingpage
-```
-
 **Before ever publishing:** `publisher` in `package.json` is the placeholder `local`. It must
 be changed to a real VS Code Marketplace publisher account or `vsce publish` will fail.
 
-Note that the extension ID is also the key for stored bookmarks, so this build starts with
-an empty landing page rather than inheriting whatever the marketplace copy had saved.
+The extension ID is also the key for stored bookmarks. Changing the publisher creates a new
+storage namespace, so an installed development build and a published build do not share data.
 
 Build commands:
 
@@ -94,6 +83,7 @@ Build commands:
 | `npm run harness` | Serve the real page in a browser (see above) |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | `tsc --noEmit` |
+| `npm test` | Official VS Code Extension Development Host integration suite |
 
 The build is Vite, not webpack. See [AGENTS.md](AGENTS.md) for how the two bundles fit
 together and why their order matters.
@@ -107,6 +97,8 @@ together and why their order matters.
 > Delete it any time with `rm -rf .vscode-test`; the next `npm test` re-downloads it.
 >
 > **F5 downloads nothing** - it uses your installed VS Code.
+>
+> For an interactive run in the VS Code Testing view, install the recommended **Extension Test Runner** and start the `tasks: watch-tests` task. It uses your installed VS Code; the pinned CLI run remains the reproducible check for automation and releases.
 
 ---
 
@@ -249,13 +241,7 @@ A bookmark in one of *your* groups whose folder or file has been moved, renamed 
 marked with a red spine and a **Missing** badge. The check runs when the page opens and
 whenever **Recent** is refreshed, which includes the panel coming back into view.
 
-In **Recent** a missing entry is simply dropped instead, and the list reaches further back
-into VS Code's history to make up the number - `maxRecentItems` counts entries you can
-actually see, so hiding or losing a few never shrinks the list below it. Recent mirrors what you have opened
-rather than a list you curate, and the list is rebuilt from VS Code's history on every sync,
-so a dead entry there is noise you have no way to remove. It is marked, never hidden or
-disabled - you may well want to open it anyway, rename it, or remove it, and quietly dropping
-a bookmark you made is not this page's decision.
+In **Recent** a missing entry is dropped, and the list reaches further back into VS Code's history to make up the number - `maxRecentItems` counts entries you can actually see, so hiding or losing a few never shrinks the list below it. Recent mirrors what you have opened rather than a list you curate, and the list is rebuilt from VS Code's history on every sync, so a dead entry there is noise you have no way to remove. In a user-created group, a missing bookmark is marked but never hidden or disabled - you may still want to open it, rename it, or remove it, and quietly dropping a bookmark you made is not this page's decision.
 
 Only local (`file:`) targets are checked. A remote or virtual path can be perfectly valid
 while its filesystem provider is not currently registered.
@@ -310,11 +296,6 @@ The page adopts your editor theme rather than bringing its own. Every colour res
 `--vscode-*` theme variable, so light, dark and high-contrast all work. The only fixed colours
 are the accent palette you pick bookmark shades from.
 
-> **No screenshots here on purpose.** The GIFs in `doc/img/` are upstream's and predate this
-> fork's redesign - they show a toolbar with tool modes that no longer exists. Rather than
-> illustrate the extension with a UI it does not have, there are no images until they are
-> retaken.
-
 ## Settings
 
 | Setting | Default | Meaning |
@@ -332,9 +313,3 @@ are the accent palette you pick bookmark shades from.
 | Add to Landing Page Group... | Explorer and editor-tab context menus |
 | Reload Landing Page | Re-syncs the page from the stored model |
 | Reset/Delete Landing Page Contents | Removes all groups and bookmarks. Not undoable. |
-
-<!--
-
-Build notes see DEVELOP.md
-
--->

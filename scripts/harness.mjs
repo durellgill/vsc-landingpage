@@ -23,6 +23,7 @@ import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const rendererPath = join(root, 'out', 'harness-render.mjs');
+const harnessCspNonce = 'vsc-landingpage-harness';
 
 /**
  * Loads the renderer, reloading it whenever the build has produced a newer one.
@@ -229,14 +230,15 @@ const stub = `<script>
 const server = createServer(async (request, response) => {
   const url = new URL(request.url, 'http://localhost');
   const payload = url.searchParams.has('empty') ? {groups: []} : model;
-  let html = (await renderer())('/assets', "'self'");
+  let html = (await renderer())('/assets', "'self'", harnessCspNonce);
   // The stub must be installed before the bundle runs, so it goes ahead of the page script.
   // ?healthy suppresses the missing-target verdict, for checking the undecorated board.
   const missing = url.searchParams.has('healthy') ? [] : ['p-6'];
   // Branch labels the host would have read from .git/HEAD, including a long one to check
   // that the badge truncates rather than pushing the path out of the card.
   const branches = {'p-1': 'main', 'p-2': 'feature/very-long-branch-name-here', 'MRU:a': 'main'};
-  html = html.replace('<script>', stub.replace('__MODEL__', JSON.stringify(payload)).replace('__MISSING__', JSON.stringify(missing)).replace('__BRANCHES__', JSON.stringify(branches)) + '\n<script>');
+  const pageScriptTag = `<script nonce="${harnessCspNonce}">`;
+  html = html.replace(pageScriptTag, stub.replace('__MODEL__', JSON.stringify(payload)).replace('__MISSING__', JSON.stringify(missing)).replace('__BRANCHES__', JSON.stringify(branches)) + `\n${pageScriptTag}`);
   // Theme variables go last in <head> so they win over anything the page defines itself.
   html = html.replace('</head>', themeStyle(url.searchParams.get('theme')) + '</head>');
   // The harness is served over http, where the webview CSP meta tag only gets in the way.

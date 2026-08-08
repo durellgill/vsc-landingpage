@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { LandingPageModel } from './LandingPageModel';
 
 /**
- * Pointer to the extension context, required to {@link saveModel}.
+ * Pointer to the extension context, required to {@link saveLandingPageModel}.
  */
 let landingPageExtContext: vscode.ExtensionContext;
 
@@ -34,7 +34,7 @@ export function extensionGlobalState():vscode.Memento
  * Permanently store the landingpage model in extension's storage.
  * @param model Current model status.
  */
-export function saveModel(model:LandingPageModel):void
+export async function saveLandingPageModel(model:LandingPageModel):Promise<void>
 {
-  landingPageExtContext.globalState.update('landingPageModel',model);
+  await landingPageExtContext.globalState.update('landingPageModel',model);
 }

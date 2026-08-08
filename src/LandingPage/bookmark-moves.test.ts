@@ -1,27 +1,7 @@
 import * as assert from 'assert';
-import * as vscode from 'vscode';
 import { LandingPageGroup, LandingPageModel, LandingPageProject } from './LandingPageModel';
 import { RECENT_GROUP_GUID } from './recent-mru-overlay';
-import { registerExtensionContext } from './model-storage';
 import { moveBookmark, moveGroup } from './bookmark-moves';
-
-/**
- * `moveGroup` persists through {@link saveModel}, which needs an extension context. The tests
- * care about the reordering, not the write, so this is the smallest thing that makes the write
- * a no-op instead of a crash.
- */
-function stubExtensionContext():void
-{
-  const state = new Map<string,unknown>();
-  registerExtensionContext({
-    globalState: {
-      get: (key:string, fallback?:unknown) => state.has(key) ? state.get(key) : fallback,
-      update: async (key:string, value:unknown) => {state.set(key, value);},
-      keys: () => [...state.keys()],
-      setKeysForSync: () => {},
-    },
-  } as unknown as vscode.ExtensionContext);
-}
 
 function bookmark(label:string):LandingPageProject
 {
@@ -40,8 +20,6 @@ function order(g:LandingPageGroup):string[]
 }
 
 suite('moveBookmark', () => {
-  stubExtensionContext();
-
   test('moving one down inside its own group does not lose a place as the gap closes', () => {
     // The documented trap: `beforeGuid` names a landing point, and the index is resolved after
     // the bookmark has been lifted out. Moving `a` to just before `c` must put it between b and
@@ -112,8 +90,6 @@ suite('moveBookmark', () => {
 });
 
 suite('moveGroup', () => {
-  stubExtensionContext();
-
   const guids = (model:LandingPageModel) => model.groups.map(g => g.guid);
 
   test('a downward toIndex loses one place, because it was measured before the lift', () => {

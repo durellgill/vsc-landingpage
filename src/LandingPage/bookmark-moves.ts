@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { findItemByGuid, LandingPageModel, LandingPageProject } from './LandingPageModel';
 import { RECENT_GROUP_GUID } from './recent-mru-overlay';
 import { describeGroupSize } from './group-destination';
-import { saveModel } from './model-storage';
+import { saveLandingPageModel } from './model-storage';
 import { sendMessageToWebview } from './webview-messages';
 
 /**
@@ -38,7 +38,6 @@ export function moveGroup(guid:string|undefined, direction:'up'|'down'|undefined
 
   const generatedGroups = sharedModel.groups.filter(group => group.guid===RECENT_GROUP_GUID);
   sharedModel.groups = [...userGroups, ...generatedGroups];
-  saveModel(sharedModel);
   return true;
 }
 
@@ -140,6 +139,6 @@ export async function moveToGroup(guid:string|undefined, sharedModel:LandingPage
     destination.projects.push(project);
   }
 
-  saveModel(sharedModel);
+  await saveLandingPageModel(sharedModel);
   sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
 }

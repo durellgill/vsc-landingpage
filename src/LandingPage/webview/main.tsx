@@ -23,7 +23,7 @@ function post(command:string, data:Record<string, unknown>={}) {vscode.postMessa
  * The two JS animations on this page - the FLIP card flight and the group's height - both move
  * things, which is exactly what reduced motion asks us to stop doing, so both are skipped
  * outright rather than shortened. The CSS half of the same decision lives in the
- * `prefers-reduced-motion` block of landingpage2.scss, and it is deliberately *not* a blanket
+ * `prefers-reduced-motion` block of landingpage.scss, and it is deliberately *not* a blanket
  * off switch: colour and opacity still respond there, because they are feedback rather than
  * movement.
  *

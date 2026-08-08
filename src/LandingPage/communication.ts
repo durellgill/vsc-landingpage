@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
-import { findItemByGuid, LandingPageGroup, LandingPageModel, LandingPageProject, ItemLocation } from './LandingPageModel';
+import { findItemByGuid, LandingPageGroup, LandingPageModel, LandingPageProject } from './LandingPageModel';
 import { parseUriNameParts } from './uri-name-parts';
 import { MessageFromWebview, sendMessageToWebview, syncModelInWebview } from './webview-messages';
-import { saveModel } from './model-storage';
+import { saveLandingPageModel } from './model-storage';
 import { reportBookmarkHealth } from './bookmark-health';
 import {
   RECENT_GROUP_GUID, clearMruCustomisations, customiseMru, hideMru, populateVscMru, restoreHiddenMru,
@@ -56,11 +56,10 @@ export async function refreshRecents(webviewPanel:vscode.WebviewPanel, sharedMod
 export async function resetModel(sharedModel:LandingPageModel):Promise<void>
 {
   sharedModel.groups=[];
-  sharedModel.viewState={};
   await restoreHiddenMru();
   await clearMruCustomisations();
   await populateVscMru(sharedModel);
-  saveModel(sharedModel);
+  await saveLandingPageModel(sharedModel);
   vscode.window.showInformationMessage('Model reset. Please close and reopen landingpage view.');
 }
 
@@ -74,9 +73,8 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
 {
   // Refreshing the MRU list runs a VS Code command and rewrites the `Recent` group, so only
   // do it for messages that actually resolve or render model items. Previously this ran for
-  // every message, including the `setViewState` sent on each keystroke in the filter box.
-  const needsMru = message.command!=='setViewState'
-                && message.command!=='openSettings'
+  // every message, including commands that do not read or render model items.
+  const needsMru = message.command!=='openSettings'
                 && message.command!=='cloneRepository'
                 && message.command!=='openFolder';
   if (needsMru) {await populateVscMru(sharedModel);}
@@ -93,8 +91,8 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       const label = message.value?.trim();
       if (!label) {return;}
       foundGoP.target.label=label;
+      await saveLandingPageModel(sharedModel);
       sendMessageToWebview({command:'syncModel',model:sharedModel}, webviewPanel);
-      saveModel(sharedModel);
       break;
     case 'createBookmark':  //{guid: groupGUID to add bookmark into, pickFolder:bool show folder or file picker?}
       // No guid means the page-level create menu was used, which names no destination group.
@@ -102,36 +100,34 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
         ? findItemByGuid(message.guid, sharedModel)?.target as LandingPageGroup|undefined
         : await pickDestinationGroup(sharedModel, 'Add the bookmark to group');
       if (!addTo) {if (message.guid) {vscode.window.showWarningMessage(`createBookmark: no group with guid ${message.guid}`);} return;}
-      vscode.window.showOpenDialog({canSelectFiles:true, canSelectFolders:message.pickFolder,canSelectMany:true, filters:{'Workspaces':['code-workspace'],'Files':['*']}})
-      .then((selectedFiles:vscode.Uri[]|undefined)=>
+      const selectedFiles = await vscode.window.showOpenDialog({canSelectFiles:true, canSelectFolders:message.pickFolder,canSelectMany:true, filters:{'Workspaces':['code-workspace'],'Files':['*']}});
+      if (selectedFiles)
       {
-        if (selectedFiles)
+        for(let uri of selectedFiles)
         {
-          for(let uri of selectedFiles)
-          {
-            let nameParts = parseUriNameParts(uri);
+          let nameParts = parseUriNameParts(uri);
 
-            const p:LandingPageProject =     {guid:crypto.randomUUID(), label:nameParts.basename, path:uri.toString()};
-            if (!nameParts.ext)              {p.icon = 'folder';}
-            else if (nameParts.ext==='code-workspace') {p.icon = 'workspace';}
-            //else: unknown file type
+          const p:LandingPageProject =     {guid:crypto.randomUUID(), label:nameParts.basename, path:uri.toString()};
+          if (!nameParts.ext)              {p.icon = 'folder';}
+          else if (nameParts.ext==='code-workspace') {p.icon = 'workspace';}
+          //else: unknown file type
 
-            addTo.projects.push(p);
-          }
-          sendMessageToWebview({command:'syncModel',model:sharedModel}, webviewPanel);
-          saveModel(sharedModel);
+          addTo.projects.push(p);
         }
-      });
+        await saveLandingPageModel(sharedModel);
+        sendMessageToWebview({command:'syncModel',model:sharedModel}, webviewPanel);
+      }
       break;
     case 'createGroup':
       sharedModel.groups.splice(0,0,{guid:crypto.randomUUID(),label:'Group',projects:[]});
+      await saveLandingPageModel(sharedModel);
       sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
-      saveModel(sharedModel);
       break;
     case 'remove':  //{guid: item to remove}
       let foundGoP2 = findItemByGuid(message.guid, sharedModel);
 
-      const performRemoval=(foundGoP2:ItemLocation)=>{
+      if(foundGoP2!==null)
+      {
         if(foundGoP2.ownerGroup) //project in group
         {
           let index = foundGoP2.ownerGroup.projects.indexOf(foundGoP2.target);
@@ -141,11 +137,9 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
         {
           foundGoP2.model.groups.splice(foundGoP2.model.groups.indexOf(foundGoP2.target as LandingPageGroup),1);
         }
+        await saveLandingPageModel(sharedModel);
         sendMessageToWebview({command:'syncModel',model:sharedModel}, webviewPanel);
-        saveModel(sharedModel);
-      };
-
-      if(foundGoP2!==null) {performRemoval(foundGoP2);}
+      }
       else {console.warn(`remove: item with guid "${message.guid}" not found.`,sharedModel);}
       break;
     case 'open': // {guid: item with path to open}
@@ -179,68 +173,6 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
         }
       }
       else {console.warn(`open: item with guid "${message.guid}" not found.`,sharedModel);}
-      break;
-    case 'move': // {guid:move, guid2:relativeTo, pos:beforeOrAfterGuid2}
-      let foundDrag=findItemByGuid(message.guid, sharedModel); // item to move
-      let foundDrop=findItemByGuid(message.guid2, sharedModel); //item to move relative to
-      // The `Recent` group is generated and sealed: it is rebuilt from VS Code's history on
-      // every message, so moving anything into or out of it either silently reverts or
-      // deletes a user bookmark. Group ordering also keeps `@vsc-mru` pinned last, which a
-      // free-form move would break. This handler only serves the legacy page; the Preact
-      // webview reorders groups with `moveGroup` and moves bookmarks with `moveToGroup`.
-      const touchesMru = (r:ItemLocation|null) => r?.ownerGroup?.guid===RECENT_GROUP_GUID || (r?.target as LandingPageGroup)?.guid===RECENT_GROUP_GUID;
-      if (touchesMru(foundDrag) || touchesMru(foundDrop))
-      {
-        console.warn('move: refused, the generated Recent group cannot be reordered or used as a drop target.');
-        break;
-      }
-      if (foundDrag && foundDrop)
-      {
-        let dragIs=foundDrag.ownerGroup?'project':'group';
-        let dropIs=foundDrop.ownerGroup?'project':'group';
-
-        if (dragIs==='group')
-        {
-          let fromPos = foundDrag.model.groups.indexOf(foundDrag.target as LandingPageGroup);
-          foundDrag.model.groups.splice(fromPos!,1); //remove from old parent
-
-          if (dropIs==='project') // -> not possible
-          {
-            console.error('move: cannot drop a group onto a bookmark.');
-          }
-          else //if (dropIs==='group') // -> put group as sibling of other group
-          {
-            let toPos = foundDrop.model.groups.indexOf(foundDrop.target as LandingPageGroup);
-            foundDrop.model.groups.splice(toPos!+(message.pos==='after'?1:0),0,foundDrag.target as LandingPageGroup);
-          }
-        }
-        else //if (dragIs==='project')
-        {
-          let fromPos = foundDrag.ownerGroup!.projects.indexOf(foundDrag.target);
-
-          if (message.cloneGUID)
-          {
-            foundDrag.target = JSON.parse(JSON.stringify(foundDrag.target)); //clone
-            foundDrag.target.guid = message.cloneGUID;
-          }
-          else
-          {
-            foundDrag.ownerGroup!.projects.splice(fromPos!,1); //remove from old parent
-          }
-
-          if (dropIs==='project') // -> put project as sibling of other project
-          {
-            let toPos = foundDrop?.ownerGroup?.projects.indexOf(foundDrop.target);
-            foundDrop?.ownerGroup?.projects.splice(toPos!+(message.pos==='after'?1:0),0,foundDrag!.target);
-          }
-          else //if (dropIs==='group') // -> add project as child of group
-          {
-            (foundDrop.target as LandingPageGroup).projects.push(foundDrag!.target);
-          }
-        }
-        saveModel(sharedModel);
-        sendMessageToWebview({command:'syncModel',model:sharedModel}, webviewPanel);
-      }
       break;
     case 'patch': // {guid: item to patch, field: field to patch('shade' or 'layout'), value: new value}
       let found = findItemByGuid(message.guid,sharedModel);
@@ -282,16 +214,15 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
         console.warn(`patch: field not supported for key ${message.field}.`);
         break;
       }
-      // Preact renders from the model rather than mutating individual DOM nodes. Every saved
-      // patch must therefore return the updated model to the webview. The old imperative
-      // page updated its own DOM before posting, which masked this missing response.
-      saveModel(sharedModel);
+      // The page renders from the model rather than mutating individual DOM nodes. Every saved
+      // patch must therefore return the updated model to the webview.
+      await saveLandingPageModel(sharedModel);
       sendMessageToWebview({command:'syncModel',model:sharedModel}, webviewPanel);
       break;
     case 'hideRecent':
       await hideMru(message.guid);
       await populateVscMru(sharedModel);
-      saveModel(sharedModel);
+      await saveLandingPageModel(sharedModel);
       sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
       break;
     case 'refreshRecents':
@@ -302,12 +233,13 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
     case 'restoreHiddenRecents':
       await restoreHiddenMru();
       await populateVscMru(sharedModel);
-      saveModel(sharedModel);
+      await saveLandingPageModel(sharedModel);
       sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
       break;
     case 'moveGroup':
       if (moveGroup(message.guid, message.direction, message.toIndex, sharedModel))
       {
+        await saveLandingPageModel(sharedModel);
         sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
       }
       break;
@@ -316,16 +248,8 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       {
         // forceRebuild: the DOM sync is keyed by GUID, and an insertion moves every card after
         // it without changing any key.
+        await saveLandingPageModel(sharedModel);
         sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
-        saveModel(sharedModel);
-      }
-      break;
-    case 'setViewState':
-      if (!sharedModel.viewState) {sharedModel.viewState={};}
-      if(message.field)
-      {
-        sharedModel.viewState[message.field]=message.value; // just store generic key-value pair
-        saveModel(sharedModel);
       }
       break;
     case 'copyPath': // {guid: bookmark whose target path should go to the clipboard}

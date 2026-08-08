@@ -1,29 +1,32 @@
 import type * as vscode from 'vscode';
+import { randomUUID } from 'node:crypto';
 import { icons } from './iconography';
 
 // Vite inlines all three at build time. The SCSS is compiled by Vite itself via `?inline`;
 // the Preact bundle is produced by the separate webview build, which must run first.
 import landingpageHtml from './content/landingpage-preact.html?raw';
-import landingpageCss from './content/landingpage2.scss?inline';
+import landingpageCss from './content/landingpage.scss?inline';
 import landingpageJs from './content/dist/landingpage-preact.js?raw';
 
 /**
  * Builds the page HTML from plain strings, with no dependency on the `vscode` module.
  *
- * Kept separate from {@link LandingPageTemplate2} so the browser harness in
+ * Kept separate from {@link LandingPageTemplate} so the browser harness in
  * `scripts/harness.mjs` can render exactly the page the extension host renders.
  *
  * @param assetPath Webview URI of the extension's `assets/` folder, as a string.
  * @param cspSource Origin the webview serves local resources from.
+ * @param cspNonce Single-use content security policy nonce for the inline bundle and styles.
  * @returns Complete HTML document.
  */
-export function renderLandingPage(assetPath:string, cspSource:string):string
+export function renderLandingPage(assetPath:string, cspSource:string, cspNonce:string):string
 {
   let s:string = landingpageHtml;
 
-  s = s.replaceAll('/*%landingpage2.scss%*/',landingpageCss)
+  s = s.replaceAll('/*%landingpage.scss%*/',landingpageCss)
     .replaceAll('/*%landingpage-preact.js%*/',landingpageJs)
     .replaceAll('%cspSource%',cspSource)
+    .replaceAll('%cspNonce%',cspNonce)
     .replaceAll('%assetPath%',assetPath);
 
   for (const [key, value] of Object.entries(icons)) //replace all ${iconname} placeholders with actual SVG source from iconography.ts
@@ -37,7 +40,7 @@ export function renderLandingPage(assetPath:string, cspSource:string):string
 /**
  * Loads content/html and performs parsing of css/js/icon-svgs.
  */
-export class LandingPageTemplate2
+export class LandingPageTemplate
 {
   /**
    * Generates the HTML source to be injected into the webview.
@@ -49,6 +52,6 @@ export class LandingPageTemplate2
    */
   public makeHTML(assetPath:vscode.Uri, cspSource:string):string
   {
-    return renderLandingPage(assetPath.toString(), cspSource);
+    return renderLandingPage(assetPath.toString(), cspSource, randomUUID());
   }
 }

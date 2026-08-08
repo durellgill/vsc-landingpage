@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
  * Builds the Preact webview.
  *
  * The output is a single self-contained IIFE because it is inlined into a `<script>` tag by
- * `LandingPageTemplate2`, not loaded as a file - the webview's CSP allows inline script but
+ * `LandingPageTemplate`, not loaded as a file - the webview's CSP allows the nonced inline script but
  * no module loading, and there is no origin to fetch chunks from. That is also why code
  * splitting and asset emission are switched off.
  *

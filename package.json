@@ -1,10 +1,11 @@
 {
   "name": "vsc-landingpage",
-  "displayName": "Landing Page (Dev)",
-  "description": "Welcome page with customizable project bookmarks. Personal fork of renebuehling/vsc-landingpage.",
+  "displayName": "Landing Page",
+  "description": "A customizable VS Code start page for bookmark groups and recently opened files, folders, and workspaces.",
   "version": "0.1.0",
+  "license": "MIT",
   "engines": {
-    "vscode": "^1.96.0"
+    "vscode": "^1.125.0"
   },
   "categories": [
     "Other"
@@ -21,6 +22,10 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/atechaccount/vsc-landingpage"
+  },
+  "homepage": "https://github.com/atechaccount/vsc-landingpage#readme",
+  "bugs": {
+    "url": "https://github.com/atechaccount/vsc-landingpage/issues"
   },
   "pricing": "Free",
   "activationEvents": [
@@ -122,22 +127,22 @@
     "build": "npm run compile",
     "vsix": "npx -y @vscode/vsce package",
     "install-local": "node scripts/install-local.mjs",
-    "compile-tests": "tsc -p . --outDir out",
-    "watch-tests": "tsc -p . -w --outDir out",
+    "compile-tests": "node scripts/compile-tests.mjs",
+    "watch-tests": "node scripts/compile-tests.mjs --watch",
     "typecheck": "npm run typecheck:src && npm run typecheck:scripts",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "vscode-test",
+    "test": "vscode-test --fail-zero",
     "harness": "npm run compile && npm run build:harness && node scripts/harness.mjs",
     "motion-check": "node scripts/motion-check.mjs",
     "typecheck:src": "tsc -p . --noEmit",
-    "typecheck:scripts": "tsc --noEmit --allowJs --checkJs --target es2022 --module nodenext --moduleResolution nodenext --skipLibCheck scripts/motion-check.mjs"
+    "typecheck:scripts": "tsc --noEmit --allowJs --checkJs --target es2022 --module nodenext --moduleResolution nodenext --skipLibCheck scripts/compile-tests.mjs scripts/motion-check.mjs"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.6",
     "@types/mocha": "^10.0.10",
     "@types/node": "^20.19.43",
-    "@types/vscode": "^1.96.0",
+    "@types/vscode": "1.125.0",
     "@typescript-eslint/eslint-plugin": "^8.17.0",
     "@typescript-eslint/parser": "^8.17.0",
     "@vscode/test-cli": "^0.0.15",

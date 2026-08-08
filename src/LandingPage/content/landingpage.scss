@@ -1,7 +1,7 @@
 // Landingpage webview styles.
 //
-// Built to src/LandingPage/content/dist/landingpage2.css by `npm run build:css`
-// and inlined into the webview by LandingPageTemplate2.ts. Do not edit the generated CSS.
+// Compiled by Vite and inlined into the webview by LandingPageTemplate.ts during the
+// extension build. There is no generated CSS file to edit.
 //
 // Every colour here must resolve to a VS Code theme variable so the page works in dark,
 // light and high-contrast themes. The only literal colours are the `data-shade` bookmark
@@ -13,7 +13,6 @@
   --gapspace:16px;    // gaps between layout areas
   --gapspace-s:8px;   // smaller gaps between layout areas
   --ctrlspace:2px;    // small spacing for padding/margins between i.e. icon and label
-  --corner:4px;       // legacy borderradius alias, kept for the palette/colorslot
   --radius:6px;
   --radius-s:4px;
   --buttonsize:24px;  // base size of a button, including icon (svg may be smaller, but relates to 24x24 design scale)
@@ -264,26 +263,13 @@
   }
 
   //--- paint picker ----------------------------------------------------------
-  // Swatch showing the active paint colour. Anchored to the icon wrapper inside the button,
-  // not the button itself - the sidebar buttons are full width, so anchoring to the button
-  // would strand it against the far edge of the sidebar.
-  .colorslot
-  {
-    position: absolute;
-    bottom:-3px;
-    right:-4px;
-    width: 9px;
-    height: 9px;
-  }
-
   // This selector must stay scoped to palette swatches. Groups and bookmarks also use
   // data-shade as state, and styling every matching div turned whole groups into circles.
-  // `.colorslot` is the pre-Preact page's class and is kept for `landingpage2.js`. The Preact
-  // palette renders `button`s: this rule said `div` and silently stopped matching the moment the
+  // The palette renders `button`s: this rule once said `div` and silently stopped matching the moment the
   // swatches became real controls, which left the whole palette as a row of blank rounded
   // rectangles - no fill, no circle, no hatch on the clear slot. Nothing failed; the selector
   // just quietly addressed nothing, which is this file's most repeated failure mode.
-  .colorslot, .palette button[data-shade]
+  .palette button[data-shade]
   {
     border-radius: 50%;
     // Was `rgba(0, 0, 0, 0.3)`. A black edge separates nothing from a dark editor background,
@@ -377,7 +363,7 @@
     .glyph-clear { color: var(--vscode-descriptionForeground); }
   }
 
-  // Preview of the currently selected icon. Anchored to the icon wrapper, see .colorslot.
+  // Preview of the currently selected icon, anchored to the icon wrapper.
   .glyphslot
   {
     position: absolute;
@@ -471,19 +457,6 @@
       background-color: var(--vscode-menu-separatorBackground, var(--hairline));
     }
 
-    // Bookmarks cannot be added to. Layout is intentionally controlled by its visible icon
-    // in the group header, rather than duplicated in this menu.
-    &[data-kind="project"] { [data-act="addfile"], [data-act="addfolder"] { display:none; } }
-    // Groups have no path or custom icon. They do have a heading accent colour.
-    &[data-kind="group"]   { [data-act="open"], [data-act="movetogroup"], [data-act="hiderecent"], [data-act="hiderecentconfirm"] { display:none; } }
-    // The VS Code recents list is generated, so it cannot be renamed, removed or added to.
-    &[data-sealed="yes"]   { [data-act="rename"], [data-act="remove"], [data-act="removeconfirm"], [data-act="cancelremove"], [data-act="addfile"], [data-act="addfolder"] { display:none; } }
-
-    // Removal stays in the menu. The first click replaces it with an explicit confirmation
-    // and a cancel action, instead of opening a notification in a distant VS Code corner.
-    [data-act="restorerecents"], [data-act="hiderecent"], [data-act="hiderecentconfirm"], [data-act="removeconfirm"], [data-act="cancelremove"] { display:none; }
-    &[data-sealed="yes"] [data-act="hiderecent"] { display:flex; }
-    &[data-kind="group"][data-sealed="yes"] [data-act="restorerecents"] { display:flex; }
     .ctxrename
     {
       display: none;
@@ -509,7 +482,6 @@
     }
     &[data-renaming="yes"]
     {
-      [data-act="rename"] { display:none; }
       // Fades in where the Rename row was. Nothing destructive here, so it is armed immediately -
       // unlike the two confirmations below.
       .ctxrename { display:flex; animation: card-in var(--dur-enter) var(--ease-out); }
@@ -528,23 +500,8 @@
     // action wants: the deliberate half is slowed, and everything else on the page stays quick.
     // Cancel is *not* armed - the safe way out should never be the slower one.
     //
-    // Keyed off `data-confirm`, which the Preact menu puts on the two confirm buttons. Note the
-    // `[data-act=...]` rules below are the *pre-Preact* page's markup, kept for the
-    // `landingpage2.js` fallback: this page's menu buttons carry no attributes at all, so a rule
-    // written against those selectors silently does nothing here. This safeguard was written
-    // that way first and tested as a no-op.
+    // Keyed off `data-confirm`, which the menu puts on the two confirm buttons.
     button[data-confirm] { animation: confirm-arm var(--dur-arm) var(--ease-out); }
-
-    &[data-confirming-remove="yes"]
-    {
-      [data-act="remove"] { display:none; }
-      [data-act="removeconfirm"], [data-act="cancelremove"] { display:flex; }
-    }
-    &[data-confirming-hide-recent="yes"]
-    {
-      [data-act="hiderecent"] { display:none; }
-      [data-act="hiderecentconfirm"] { display:flex; }
-    }
   }
 
   // The "..." affordance on each row, and the copy button beside it on bookmarks. Present but
@@ -1319,14 +1276,6 @@
         }
       }
 
-      // all layouts. `.layout-changing` is only ever set by landingpage2.js, the pre-Preact
-      // fallback page; the Preact webview animates every card on mount instead (above). The
-      // selector is kept so the fallback keeps its rearrange animation.
-      &.layout-changing .project
-      {
-        animation: card-in var(--dur-move) var(--ease-out) backwards;
-      }
-
       .project
       {
         outline: 1px solid var(--hairline);
@@ -1817,7 +1766,7 @@
 
   // A destructive confirmation arriving under the pointer that just clicked. The button fades in
   // and is held non-interactive until the very end, so the click that opened it cannot also
-  // press it - see `[data-confirming-remove]` above for what that was costing.
+  // press it. The menu renders only the confirmation button during this state.
   //
   // `pointer-events` is not interpolatable, so it animates discretely: a discrete property holds
   // the `from` value until the next keyframe is reached, which is why the release sits at 99%

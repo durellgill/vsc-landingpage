@@ -9,7 +9,7 @@ import { LandingPageModel } from './LandingPageModel';
  */
 export interface MessageFromWebview
 {
-	command:'documentReady'|'rename'|'createBookmark'|'createGroup'|'remove'|'hideRecent'|'restoreHiddenRecents'|'refreshRecents'|'moveGroup'|'open'|'move'|'patch'|'openSettings'|'setViewState'|'cloneRepository'|'openFolder'|'moveToGroup'|'createDirectory'|'copyPath'|'moveBookmark';
+	command:'documentReady'|'rename'|'createBookmark'|'createGroup'|'remove'|'hideRecent'|'restoreHiddenRecents'|'refreshRecents'|'moveGroup'|'open'|'patch'|'openSettings'|'cloneRepository'|'openFolder'|'moveToGroup'|'createDirectory'|'copyPath'|'moveBookmark';
 
   /** For command 'cloneRepository': the repository URL typed into the clone field. */
   url?:string;
@@ -20,12 +20,6 @@ export interface MessageFromWebview
   pickFolder?:boolean;
   /** For command 'open': open the target in a new VS Code window instead of this one. */
   newWindow?:boolean;
-  /** For command 'move' the GUID of the element the dragged element (GUID) is placed relative to. */
-  guid2?:string;
-  /** If given, command 'move' will create a copy and assign this GUID to the cloned node. */
-  cloneGUID?:string;
-  /** For command 'move' the insertion relation to drop target (GUID2). */
-  pos?:'before'|'after';
   /** Direction for moving a user-created group one position. */
   direction?:'up'|'down';
   /** For command 'moveGroup': insertion index the group was dropped at, among user-created groups. */

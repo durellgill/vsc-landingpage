@@ -51,8 +51,7 @@ Thumbs.db
 *.vsix
 *.vscode-test
 
-# Lock files
-package-lock.json
+# Lock files from unsupported package managers
 yarn.lock
 
 # Optional build cache

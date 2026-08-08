@@ -3,7 +3,7 @@ import { findItemByGuid, LandingPageGroup, LandingPageModel, LandingPageProject 
 import { parseUriNameParts } from './uri-name-parts';
 import { RECENT_GROUP_GUID } from './recent-mru-overlay';
 import { defaultGroup, describeGroupSize } from './group-destination';
-import { saveModel } from './model-storage';
+import { saveLandingPageModel } from './model-storage';
 import { sendMessageToWebview } from './webview-messages';
 
 /**
@@ -91,7 +91,7 @@ export async function bookmarkUris(uris:vscode.Uri[]|undefined, sharedModel:Land
     destination.projects.push(await makeBookmark(uri));
   }
 
-  saveModel(sharedModel);
+  await saveLandingPageModel(sharedModel);
   if (webviewPanel)
   {
     sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
@@ -142,8 +142,8 @@ export async function createDirectory(groupGuid:string|undefined, sharedModel:La
   destination.projects.push({guid:crypto.randomUUID(), label:nameParts.basename, path:target.toString(), icon:'folder'});
   // forceRebuild: defaultGroup() may have just inserted a group, and the DOM sync is keyed
   // by GUID so it would not place a new one.
+  await saveLandingPageModel(sharedModel);
   sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
-  saveModel(sharedModel);
 
   const open = await vscode.window.showInformationMessage(`Created ${nameParts.basename} in "${destination.label}".`, 'Open folder');
   if (open) {vscode.commands.executeCommand('vscode.openFolder', target, {forceNewWindow:false});}

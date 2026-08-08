@@ -9,7 +9,6 @@ src/**
 .gitignore
 .yarnrc
 vite.config.*.mts
-vsc-extension-quickstart.md
 **/tsconfig.json
 **/eslint.config.mjs
 **/*.map
@@ -28,13 +27,10 @@ skills-lock.json
 board.png
 
 # Working notes for contributors and coding agents. README.md and CHANGELOG.md still ship,
-# because the marketplace renders those; these four are internal and were only being packaged
+# because the marketplace renders those; these files are internal and were only being packaged
 # by accident.
 AGENTS.md
 CLAUDE.md
-PROGRESS.md
-HANDOFF.md
-TODO.md
 
 # Upstream's demo GIFs, which were the whole size of the extension. Nothing embeds them - the
 # readme only mentions the folder in passing - so shipping them cost 1.4 MB for no benefit.

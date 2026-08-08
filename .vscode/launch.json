@@ -9,7 +9,7 @@
 			// Default. Fast and isolated:
 			//
 			// --extensions-dir  gives the dev host an empty extensions directory, so none of
-			//                   the ~33 extensions in ~/.vscode/extensions (1.4 GB) load.
+			//                   the developer's installed extensions load.
 			//                   Built-in extensions still load - they ship inside the VS Code
 			//                   app bundle, not the extensions dir - so the built-in Git
 			//                   extension that Clone depends on is unaffected.

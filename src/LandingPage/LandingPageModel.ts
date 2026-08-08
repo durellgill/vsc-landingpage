@@ -6,11 +6,6 @@ export interface LandingPageModel
   /** List of group declarations. */
   groups:LandingPageGroup[];
 
-  /** 
-   * Dictionary for storing view state information, e.g. current filter keyword.
-   */
-  viewState?: {[key: string]: any};
-
   // 🔺 Reminder: also review communication.ts:resetModel() if LandingPageModel is changed.
 }
 
@@ -127,31 +122,3 @@ export function findItemByGuid(guid:string|undefined, inModel:LandingPageModel):
   }
   return null;
 }
-
-
-/**
- * Test for dev/debugging.
- * //TODO: remove test model
- */
-export const demoModel:LandingPageModel=
-{
-  groups: [
-    {
-      guid:'{test-group-a}',
-      label:'Test-Group A',
-      projects:[
-        {guid:'{test-prj-a1}',label:'Project A.1'},
-        {guid:'{test-prj-a2}',label:'Project A.2'}
-      ]
-    },
-    {
-      label:'Test-Group B',
-      guid:'{test-group-b}',
-      projects:[
-        {guid:'{test-prj-b1}',label:'Project B.1'},
-        {guid:'{test-prj-b2}',label:'Project B.2'},
-        {guid:'{test-prj-b3}',label:'Project B.3'}
-      ]
-    }
-  ]
-};

@@ -2,8 +2,6 @@
 
 Working notes for this repo. Read by Codex natively and by Claude Code via `CLAUDE.md`.
 
-This is a fork of [renebuehling/vsc-landingpage](https://github.com/renebuehling/vsc-landingpage).
-
 ## What this extension is
 
 A VS Code extension that replaces the start page with a bookmark board: groups of
@@ -63,15 +61,15 @@ keeping it in the dispatcher would make that a cycle.
    `dist/extension.js` as CommonJS, with `vscode` and Node builtins external.
 
 Step 2 imports the output of step 1 as text, so a stale webview bundle silently ships an old
-page. There is no separate CSS step: `LandingPageTemplate2.ts` imports the SCSS with
+page. There is no separate CSS step: `LandingPageTemplate.ts` imports the SCSS with
 `?inline`, so Vite compiles Sass as part of the extension build.
 
-`LandingPageTemplate2.ts` inlines the compiled CSS, the Preact bundle and the raw HTML into
+`LandingPageTemplate.ts` inlines the compiled CSS, the Preact bundle and the raw HTML into
 one string using Vite's `?raw` and `?inline` imports, substituting these placeholders:
 
 | Placeholder | Replaced with |
 |---|---|
-| `/*%landingpage2.scss%*/` | the compiled CSS |
+| `/*%landingpage.scss%*/` | the compiled CSS |
 | `/*%landingpage-preact.js%*/` | bundled Preact webview |
 | `%cspSource%` | `webview.cspSource` (needed by the CSP meta tag) |
 | `%assetPath%` | webview URI of `assets/` (custom cursors) |
@@ -94,8 +92,6 @@ Consequences worth knowing:
   not sizing; stripping those collapses them to nothing and the icon renders blank - which is
   what happened to both layout buttons.
 - **`content/dist/` is generated** and gitignored. Never edit it.
-- `landingpage2.js` is retained as the pre-Preact reference implementation. Do not make
-  product changes there unless intentionally maintaining the fallback as well.
 
 ## Run and debug
 
@@ -138,7 +134,7 @@ ordinary DOM inspector, and every message the page posts recorded on `window.__p
   confirm appearance.
 
 The page it serves is built by `vite.config.harness.mts` from `renderLandingPage()`, the same
-pure function `LandingPageTemplate2.makeHTML()` calls - so what you see is what the webview
+pure function `LandingPageTemplate.makeHTML()` calls - so what you see is what the webview
 gets.
 
 ## Package and release
@@ -354,9 +350,9 @@ gets.
   finished Recent refresh and the filter's result count are all confirmations of something the
   user just did, delivered visually only. `.sr-only` + `role="status"` in `App` carries all
   three. `polite`, never `assertive`: the filter one fires on every keystroke.
-- **The bookmark label is `.project-label`, and the path line is a flex row.** The SCSS used
-  to hook the label with `[data-field="project.label"]`, an attribute only the pre-Preact page
-  emitted - so every label in all three layouts silently lost its weight, ellipsis and line
+- **The bookmark label is `.project-label`, and the path line is a flex row.** The SCSS once
+  hooked the label with `[data-field="project.label"]`, which the current page never emits,
+  so every label in all three layouts silently lost its weight, ellipsis and line
   clamp. Style card internals through real classes, and check a rule actually matches before
   trusting it. The path line carries inline badges as well as text, so it is `display: flex`
   with `align-items: center`; baseline alignment left the badges off by a fraction of a pixel.
@@ -425,7 +421,7 @@ gets.
   for anything arriving or responding to the pointer, `--ease-move` for something travelling
   between two positions, `--ease-hover` for colour under the pointer) and four durations
   (`--dur-press` .1s, `--dur-hover` .15s, `--dur-enter` .18s, `--dur-move` .22s), all declared
-  at the top of `landingpage2.scss`. Nothing on this page is slow enough to need a fifth
+  at the top of `landingpage.scss`. Nothing on this page is slow enough to need a fifth
   duration; a hand-typed `.16s` at a call site is how the page previously ended up with six
   near-identical values. The two JS animations read `--dur-move` and `--ease-move` out of the
   computed style via `motion()` in `main.tsx` rather than restating them, so the FLIP flight
@@ -486,13 +482,6 @@ gets.
   be the slower one. It is restated inside the `prefers-reduced-motion` block so a future
   blanket `animation: none` cannot silently disarm it. Verified both ways: a second click at
   90ms posts nothing, a deliberate click at 450ms posts `remove`.
-- **The `[data-act="..."]` rules in the `.ctxmenu` block are the pre-Preact page's markup and
-  match nothing here.** The Preact menu renders plain `<button>` elements with no attributes at
-  all, so a rule written against those selectors is silently a no-op - the arming safeguard
-  above was written that way first and tested green while doing nothing whatsoever. The block is
-  kept because `landingpage2.js` still uses it. Hook Preact menu items with a real class or a
-  `data-` attribute added to the JSX, and confirm the selector matches something before
-  believing a result.
 - **The FLIP effect moves groups as well as cards, and a card inside a moving group animates
   only its movement *relative* to that group.** Reordering a group used to move its header,
   accent bar, rule and count badge in a single frame while its own bookmarks slid to the same
@@ -577,7 +566,7 @@ gets.
   before `transform`, which is what the FLIP effect animates; they do not collide because a card
   is never mid-flight and mid-drag at once.
 - **Reduced motion reduces; it does not switch everything off.** The block at the foot of
-  `landingpage2.scss` rewrites `transition-property` to the non-moving half - colour and
+  `landingpage.scss` rewrites `transition-property` to the non-moving half - colour and
   opacity keep working at full duration - and disables only the keyframes that translate or
   scale. A blanket `transition-duration: 0.01ms`, which is what this used to be, also kills
   every hover colour on the page and reads as broken rather than as calm. Note that

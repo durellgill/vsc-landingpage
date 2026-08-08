@@ -19,5 +19,5 @@ export default defineConfig({
 	// that will not start is a tooling problem to fix in `package.json` - the 2.x line of
 	// `@vscode/test-electron` could not launch 1.110+ at all, because it looked for
 	// `Contents/MacOS/Electron`, which those builds renamed to the product name.
-	version: '1.132.0',
+	version: '1.125.0',
 });
