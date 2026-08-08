@@ -1643,9 +1643,10 @@
   // once - the colour is what the target *is*, and hiding that until a timer elapses left the
   // panel looking inert at the moment the user was asking it what it would do. What the dwell
   // gates is the *action*, and that is carried by the rest of the state: hovered is a dashed
-  // outline over a faint wash and says "Hold to remove", and the drag is advertised as `none`,
-  // so the cursor still agrees that a release now does nothing. Armed fills solid and says
-  // "Release to remove". See `DeleteZone` in main.tsx for why the dwell exists at all.
+  // outline over a faint wash and says "Hold to remove". Armed fills solid and says "Release
+  // to remove". The drop target itself must stay enabled throughout the dwell so Chromium
+  // dispatches the final drop even when the pointer has not moved since arming; `DeleteZone`
+  // gates the action in its drop handler instead.
   .dropbin
   {
     position: fixed;

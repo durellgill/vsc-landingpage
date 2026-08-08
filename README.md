@@ -1,6 +1,6 @@
 # Landing Page
 
-Landing Page is a customizable VS Code start page for bookmark groups and recently opened files, folders, and workspaces. See [AGENTS.md](AGENTS.md) for the architecture and project conventions, and [DEVELOP.md](DEVELOP.md) for the contributor workflow.
+Landing Page is a customizable VS Code start page for bookmark groups and recently opened files, folders, and workspaces. See [AGENTS.md](AGENTS.md) for the agent runbook, [DECISIONS.md](DECISIONS.md) for durable product and architecture decisions, and [DEVELOP.md](DEVELOP.md) for the contributor workflow.
 
 ## Running it locally
 

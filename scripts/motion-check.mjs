@@ -2,7 +2,7 @@
 /**
  * Motion regression check.
  *
- * Seven things on this page were broken in ways a build, a typecheck and a lint all pass through
+ * Eight things on this page were broken in ways a build, a typecheck and a lint all pass through
  * happily, because every one of them is a *behaviour* rather than a value. Each check below is a
  * bug that actually shipped here, reduced to the smallest assertion that would have caught it:
  *
@@ -24,6 +24,8 @@
  *                          renders - so the board jumped by the scroll distance on any render.
  *   7. reduced-motion      entrances must downgrade to opacity-only, and `confirm-arm` must
  *                          survive, because it is a safeguard rather than an animation.
+ *   8. delete-dwell        a stationary pointer armed the delete zone visually, but its last
+ *                          recorded drop effect still refused the release.
  *
  * Usage:
  *   npm run harness        # in another shell, or leave one running on 5599
@@ -419,6 +421,55 @@ function scrimStacking() {
     `scrim=${r.scrimOpacity} palette=${r.paletteOpacity} opacityKeyframes=${r.keyframesTouchOpacity}`);
 }
 
+/** Starts a real pointer drag from the first bookmark into the delete zone. */
+function dragFirstBookmarkToDeleteZone() {
+  const point = evaluate(`
+    const card=document.querySelector('.project');
+    const rect=card.getBoundingClientRect();
+    return JSON.stringify({x:Math.round(rect.left+rect.width/2), y:Math.round(rect.top+rect.height/2)});
+  `);
+  browser('mouse', 'move', String(point.x), String(point.y));
+  browser('mouse', 'down');
+  browser('mouse', 'move', String(point.x+12), String(point.y+12));
+  waitUntil(`document.querySelector('.dropbin')`, {label: 'the delete zone to appear'});
+  const target = evaluate(`
+    const zone=document.querySelector('.dropbin');
+    const rect=zone.getBoundingClientRect();
+    return JSON.stringify({x:Math.round(rect.left+rect.width/2), y:Math.round(rect.top+rect.height/2)});
+  `);
+  browser('mouse', 'move', String(target.x), String(target.y));
+  waitUntil(`document.querySelector('.dropbin[data-over]')`, {label: 'the delete zone to receive the drag'});
+}
+
+// 8. The dwell is a real safeguard, and an armed zone must also remain a valid browser drop
+// target when the pointer stays still. The bug was a split verdict: the timer changed the label
+// to "Release to remove", while the last dragover had already recorded `dropEffect: none`.
+// Chromium then cancelled the release without dispatching `drop` at all.
+function deleteDwell() {
+  open();
+  dragFirstBookmarkToDeleteZone();
+  sleep(90);
+  browser('mouse', 'up');
+  sleep(100);
+  const early = evaluate(`return JSON.stringify((window.__posted||[]).filter(m=>m.command==='remove').length);`);
+  check('delete-dwell  an early release is refused', early === 0, `posted ${early}`);
+
+  open();
+  dragFirstBookmarkToDeleteZone();
+  waitUntil(`document.querySelector('.dropbin[data-armed]')`, {label: 'the delete zone to arm'});
+  // agent-browser's low-level mouse release omits dragend when no movement preceded it. Dispatch
+  // the browser event at the measured release point to exercise the application's fallback.
+  evaluate(`
+    const zone=document.querySelector('.dropbin').getBoundingClientRect();
+    document.querySelector('.project.dragging').dispatchEvent(new DragEvent('dragend',{bubbles:true,clientX:zone.left+zone.width/2,clientY:zone.top+zone.height/2}));
+    return JSON.stringify('released');
+  `);
+  browser('mouse', 'up');
+  waitUntil(`(window.__posted||[]).some(m=>m.command==='remove')`, {label: 'the armed release to post remove'});
+  const armed = evaluate(`return JSON.stringify((window.__posted||[]).filter(m=>m.command==='remove').length);`);
+  check('delete-dwell  an armed stationary release removes', armed === 1, `posted ${armed}`);
+}
+
 // 9. The two halves of a fold finish together.
 //
 // The chevron rotation and the group's height are one gesture expressed twice, and they are
@@ -600,6 +651,7 @@ try {
   focusChecks();
   spineHover();
   scrimStacking();
+  deleteDwell();
   scrollIsNotMovement();
   foldSync();
   reducedMotion();

@@ -15,6 +15,7 @@ vite.config.*.mts
 **/*.ts
 **/.vscode-test.*
 DEVELOP.md
+DECISIONS.md
 
 # Agent tooling. `.claude/skills/*` are symlinks *to directories*; vsce enumerates them as
 # files and its secret scanner then read()s them, which fails with EISDIR and aborts the

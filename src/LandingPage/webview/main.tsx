@@ -1142,23 +1142,58 @@ function DeleteZone({from,onRelease}:{from:string;onRelease:(armed:boolean)=>voi
   const [over,setOver] = useState(false);
   const [armed,setArmed] = useState(false);
   const timer = useRef<number>(0);
-  useEffect(()=>()=>window.clearTimeout(timer.current),[]);
+  const zone = useRef<HTMLDivElement>(null);
+  const overNow = useRef(false);
+  const armedNow = useRef(false);
+  const finished = useRef(false);
+  function releaseIfOver(event:DragEvent) {
+    const rect = zone.current?.getBoundingClientRect();
+    const inside = !!rect && event.clientX>=rect.left && event.clientX<=rect.right && event.clientY>=rect.top && event.clientY<=rect.bottom;
+    if (finished.current || !inside) {return;}
+    finished.current = true;
+    window.clearTimeout(timer.current);
+    onRelease(armedNow.current);
+  }
+  useEffect(()=>{
+    // The timer can arm without another pointer movement. Chromium does not dispatch `drop`
+    // until it sees another dragover, even though the target remains under the pointer. Capture
+    // dragend as the reliable release signal; refs hold the dwell verdict without waiting for a
+    // render, and `finished` prevents a normal drop from posting twice.
+    window.addEventListener('dragend',releaseIfOver,true);
+    return ()=>{window.clearTimeout(timer.current); window.removeEventListener('dragend',releaseIfOver,true);};
+  },[]);
   const sealed = from==='@vsc-mru';
   const verb = sealed ? 'hide' : 'remove';
-  return <div class="dropbin" data-over={over?'yes':undefined} data-armed={armed?'yes':undefined} aria-hidden="true"
+  return <div ref={zone} class="dropbin" data-over={over?'yes':undefined} data-armed={armed?'yes':undefined} aria-hidden="true"
     onDragOver={event=>{
-      // The zone has to accept the drag to receive a drop at all, but it advertises `none`
-      // until it is armed, so the cursor itself says the release will not do anything yet.
+      // Keep the browser drop target valid for the whole dwell. If `dropEffect` is `none`
+      // before the timer arms and the pointer then stays still, Chromium records that old
+      // verdict and never dispatches `drop` on release. The handler below still gates the
+      // destructive action on `armed`, so an early release remains a no-op.
       event.preventDefault();
-      if (event.dataTransfer) {event.dataTransfer.dropEffect = armed ? 'move' : 'none';}
+      if (event.dataTransfer) {event.dataTransfer.dropEffect = 'move';}
     }}
     onDragEnter={()=>{
+      if (overNow.current) {return;}
+      overNow.current = true;
       setOver(true);
       window.clearTimeout(timer.current);
-      timer.current = window.setTimeout(()=>setArmed(true), motion('--dur-arm').duration);
+      timer.current = window.setTimeout(()=>{
+        if (!overNow.current) {return;}
+        armedNow.current = true;
+        setArmed(true);
+      }, motion('--dur-arm').duration);
     }}
-    onDragLeave={()=>{setOver(false); setArmed(false); window.clearTimeout(timer.current);}}
-    onDrop={event=>{event.preventDefault(); event.stopPropagation(); window.clearTimeout(timer.current); onRelease(armed);}}>
+    onDragLeave={event=>{
+      const to=event.relatedTarget as Node|null;
+      if (to && (event.currentTarget as HTMLElement).contains(to)) {return;}
+      overNow.current = false;
+      armedNow.current = false;
+      setOver(false);
+      setArmed(false);
+      window.clearTimeout(timer.current);
+    }}
+    onDrop={event=>{event.preventDefault(); event.stopPropagation(); releaseIfOver(event);}}>
     <Svg name="trash2"/>
     <span class="dropbin-label">{!over ? `Drag here to ${verb}` : armed ? `Release to ${verb}` : `Hold to ${verb}`}</span>
   </div>;
