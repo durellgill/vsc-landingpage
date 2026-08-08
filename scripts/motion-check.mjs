@@ -22,8 +22,10 @@
  *   6. scroll-not-movement a scroll between two renders looked like every element having moved,
  *                          because the FLIP effect compared viewport-relative rects across
  *                          renders - so the board jumped by the scroll distance on any render.
- *   7. reduced-motion      entrances must downgrade to opacity-only, and `confirm-arm` must
- *                          survive, because it is a safeguard rather than an animation.
+ *   7. reduced-motion      entrances must downgrade to opacity-only, and the two documented
+ *                          exemptions must survive: `confirm-arm`, which is a safeguard rather
+ *                          than an animation, and `landingpage-spin`, which is the only report
+ *                          that work is still in flight.
  *   8. delete-dwell        a stationary pointer armed the delete zone visually, but its last
  *                          recorded drop effect still refused the release.
  *
@@ -572,7 +574,18 @@ function foldSync() {
 }
 
 // 6. Reduced motion downgrades entrances to opacity rather than switching them off, and no
-// animation anywhere may carry a transform.
+// *entrance* may carry a transform.
+//
+// "No animation anywhere may carry a transform" is the rule this used to state, and it was
+// wrong in a way that stayed hidden: `landingpage-spin` is exempt by design - the stylesheet
+// says so where the exemption is written - because a busy spinner is the only thing telling
+// the user a round trip is still in flight, and it has no static equivalent. It is a rotation,
+// so it does carry a transform. The old blanket assertion passed only because a resting page
+// has no spinner running, which meant the check agreed with the stylesheet by luck. The first
+// person to sweep a busy page would have been told the spinner was a regression.
+//
+// So the rule is now stated with its exemption, and the exemption is *tested* rather than
+// merely tolerated: the spinner is armed on purpose below and asserted to still be moving.
 function reducedMotion() {
   // `finally`, because the media override lives in the browser session and that session outlives
   // this process. Without it, anything throwing between here and the restore leaves reduced
@@ -616,11 +629,34 @@ function reducedMotionChecks() {
     return JSON.stringify('palette');
   `);
   waitUntil('window.__swept>=2', {label: 'the palette animation sweep'});
+
+  // The busy spinner, armed deliberately. It is the one animation the stylesheet keeps running
+  // under reduced motion, so it has to be on the page for the exemption below to mean anything
+  // - and `data-busy` is what the refresh control sets while it waits for the host.
+  evaluate(`
+    const b=document.querySelector('[data-role="refresh"]');
+    if(b) b.setAttribute('data-busy','yes');
+    setTimeout(window.__sweep,30);
+    return JSON.stringify('spinner');
+  `);
+  waitUntil('window.__swept>=3', {label: 'the spinner animation sweep'});
+
   const seen = evaluate('return JSON.stringify(window.__seen||[]);');
-  const moving = Array.isArray(seen) ? seen.filter(s => s.transform) : [{name: 'unreadable'}];
-  check('reduced-motion  no animation carries a transform',
-    Array.isArray(seen) && seen.length > 0 && moving.length === 0,
-    `${Array.isArray(seen) ? seen.length : 0} animations, ${moving.length} moving`);
+  const all = Array.isArray(seen) ? seen : [];
+  // Exempt by name, not by "anything still moving is probably fine". A new transform-carrying
+  // animation must fail this check; only the one the stylesheet documents may pass it.
+  const EXEMPT = ['landingpage-spin'];
+  const moving = Array.isArray(seen) ? seen.filter(s => s.transform && !EXEMPT.includes(s.name)) : [{name: 'unreadable'}];
+  check('reduced-motion  no entrance carries a transform',
+    Array.isArray(seen) && all.length > 0 && moving.length === 0,
+    `${all.length} animations, ${moving.length} moving${moving.length ? `: ${moving.map(m => m.name).join(', ')}` : ''}`);
+
+  // The other half of the same rule, and the half that has no other guard: reduced motion must
+  // not switch the spinner off. Nothing else on the page reports that work is still running.
+  const spinner = all.filter(s => s.name === 'landingpage-spin');
+  check('reduced-motion  the busy spinner keeps turning',
+    spinner.length > 0 && spinner.every(s => s.transform),
+    spinner.length ? `${spinner.length} running, rotating` : 'no landingpage-spin animation found');
 
   // The safeguard is not an animation and must not be downgraded with the rest.
   confirmArming({reduced: true});
