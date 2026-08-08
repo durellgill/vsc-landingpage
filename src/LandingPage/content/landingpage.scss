@@ -194,6 +194,23 @@
   }
 
   //--- icons -----------------------------------------------------------------
+  // Every icon is an `<svg>` inside a `<span class="icon">` - see `Svg()` in main.tsx, which has
+  // to wrap because it sets the markup with `dangerouslySetInnerHTML`.
+  //
+  // The span must not establish a line box. As a block container it did, and an inline `<svg>`
+  // sits on the text baseline inside one, so a 16px icon rendered into a 19px span with the 3px
+  // of descender space underneath it. The span is what flexbox centres, so every icon beside a
+  // label came out 1.5px high - visible on the "New" button, where a plus and a chevron both
+  // floated above the word between them. `display: flex` removes the line box, and the span then
+  // shrinks to the icon it holds.
+  //
+  // This was previously patched one selector at a time (the fold chevron, the hovercard, the
+  // pictoral rows). Those local overrides are gone; fix it here or it stays fixed nowhere.
+  .icon
+  {
+    display: flex;
+  }
+
   .lucide
   {
     width: 16px;
@@ -963,7 +980,7 @@
           // height animation are two halves of the same fold, and the height is animated from
           // GroupShelf at `--dur-move`. At different speeds the chevron finished early and sat
           // there while the group was still closing.
-          .icon { display: flex; transition: transform var(--dur-move) var(--ease-move); }
+          .icon { transition: transform var(--dur-move) var(--ease-move); }
           &[aria-expanded="false"] .icon { transform: rotate(-90deg); }
         }
 
@@ -1159,7 +1176,6 @@
             grid-row: 1;
             align-self: start;
             margin-top: -3px; // optical centring against the 1.35 line-height of the label
-            .icon { display: flex; }
             .lucide { width: 19px; height: 19px; }
           }
 
@@ -1209,8 +1225,6 @@
           padding: 10px 46px 10px 14px;
           position: relative;
 
-          .pictoral .icon { display: flex; }
-
           .textblock
           {
             flex: 1 1 auto;
@@ -1248,8 +1262,6 @@
           // would otherwise sit on top of the truncated path.
           padding: 6px 46px 6px 10px;
           position: relative;
-
-          .pictoral .icon { display: flex; }
 
           .textblock
           {
