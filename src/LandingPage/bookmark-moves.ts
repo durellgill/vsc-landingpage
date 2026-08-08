@@ -3,7 +3,7 @@ import { findItemByGuid, LandingPageModel, LandingPageProject } from './LandingP
 import { RECENT_GROUP_GUID } from './recent-mru-overlay';
 import { describeGroupSize } from './group-destination';
 import { saveLandingPageModel } from './model-storage';
-import { sendMessageToWebview } from './webview-messages';
+import { syncModelInWebview } from './webview-messages';
 
 /**
  * Moves one user-created group while keeping generated Recent at the end of the board.
@@ -140,5 +140,5 @@ export async function moveToGroup(guid:string|undefined, sharedModel:LandingPage
   }
 
   await saveLandingPageModel(sharedModel);
-  sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
+  syncModelInWebview(webviewPanel, sharedModel);
 }

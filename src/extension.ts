@@ -1,7 +1,8 @@
 import { join } from 'path';
 import * as vscode from 'vscode';
 import { window } from 'vscode';
-import { bookmarkUris, cloneRepository, handleMessageFromWebview, refreshRecents, registerExtensionContext, resetModel, syncModelInWebview } from './LandingPage/communication';
+import { bookmarkUris, cloneRepository, handleMessageFromWebview, refreshRecents, registerExtensionContext, resetModel } from './LandingPage/communication';
+import { syncModelInWebview } from './LandingPage/webview-messages';
 import { LandingPageModel } from './LandingPage/LandingPageModel';
 import { LandingPageTemplate } from './LandingPage/LandingPageTemplate';
 

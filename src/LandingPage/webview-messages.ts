@@ -37,40 +37,29 @@ export interface MessageFromWebview
 }
 
 /**
- * A model sync sent from the extension host down to the webview page.
+ * Pushes the model down to the webview page, which re-renders the board from it.
  *
- * Note this is not the only message the host sends: `bookmarkHealth` and `pathCopied` are
- * posted directly, since neither carries a model.
- */
-export interface MessageToWebview
-{
-  /** Signal ID to send to webview. */
-  command:string;
-  /** Data model to render. */
-  model:LandingPageModel;
-  /** If true, the webview does not sync existing dom elements, but recreates the whole render tree. */
-  forceRebuild?:boolean;
-}
-
-/**
- * Posts one message down to the webview page.
+ * This is the only message the host sends that carries a model, and the only one sent from
+ * more than one place, which is why it is the only one with a function. `bookmarkHealth`,
+ * `pathCopied` and `setFocusToFilterInput` each have a single caller and post directly - a
+ * wrapper per message would be a layer with one caller each.
  *
  * `postMessage` serialises, so the page always receives a fresh object even though the host
  * mutates and reposts the same model instance every time. Anything standing in for the host
  * outside VS Code has to `structuredClone` to match that, or the page's `useState` bails out
  * on `Object.is` and stops re-rendering.
- */
-export function sendMessageToWebview(message:MessageToWebview, webviewPanel:vscode.WebviewPanel):void
-{
-  webviewPanel.webview.postMessage(message);
-}
-
-/**
- * Performs a resync/reload of the webview to reflect the given model.
+ *
+ * There is deliberately no `forceRebuild` flag. One was posted with eight of these messages
+ * for a long time, described as recreating the whole render tree because the DOM sync is
+ * keyed by GUID and a reorder changes positions without changing keys. The page never read
+ * it - `git log -S forceRebuild -- main.tsx` returns nothing, so the receiver at
+ * `main.tsx`'s `syncModel` branch has never looked at the field. Preact reconciles from the
+ * new model on its own. Do not reintroduce it without a consumer.
+ *
  * @param webviewPanel Webview instance to update.
  * @param sharedModel Model to render.
  */
 export function syncModelInWebview(webviewPanel:vscode.WebviewPanel, sharedModel:LandingPageModel):void
 {
-  sendMessageToWebview({command:'syncModel',model:sharedModel}, webviewPanel); // when webview is ready, send model to it
+  webviewPanel.webview.postMessage({command:'syncModel', model:sharedModel});
 }

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { findItemByGuid, LandingPageGroup, LandingPageModel, LandingPageProject } from './LandingPageModel';
 import { parseUriNameParts } from './uri-name-parts';
-import { MessageFromWebview, sendMessageToWebview, syncModelInWebview } from './webview-messages';
+import { MessageFromWebview, syncModelInWebview } from './webview-messages';
 import { saveLandingPageModel } from './model-storage';
 import { reportBookmarkHealth } from './bookmark-health';
 import {
@@ -18,7 +18,6 @@ import { cloneRepository } from './clone-repository';
 // this file deliberately owns the dispatch and little else, so each case reads as one hop to
 // the real implementation.
 export { registerExtensionContext } from './model-storage';
-export { syncModelInWebview } from './webview-messages';
 export { bookmarkUris } from './bookmark-creation';
 export { cloneRepository } from './clone-repository';
 
@@ -31,16 +30,13 @@ export { cloneRepository } from './clone-repository';
  * three ways in: the refresh control on the Recent group, the panel regaining visibility, and
  * the *Landing Page: Refresh Recent* palette command.
  *
- * `forceRebuild` is required because the DOM sync is keyed by GUID, and MRU GUIDs are derived
- * from the target path - a reordered history changes positions without changing keys.
- *
  * @param webviewPanel Panel to update.
  * @param sharedModel Model whose `@vsc-mru` group is rebuilt in place.
  */
 export async function refreshRecents(webviewPanel:vscode.WebviewPanel, sharedModel:LandingPageModel):Promise<void>
 {
   await populateVscMru(sharedModel);
-  sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
+  syncModelInWebview(webviewPanel, sharedModel);
   // Not awaited: the board should paint from the fresh model immediately, and the health
   // verdict decorates it a moment later.
   void reportBookmarkHealth(webviewPanel, sharedModel);
@@ -92,7 +88,7 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       if (!label) {return;}
       foundGoP.target.label=label;
       await saveLandingPageModel(sharedModel);
-      sendMessageToWebview({command:'syncModel',model:sharedModel}, webviewPanel);
+      syncModelInWebview(webviewPanel, sharedModel);
       break;
     case 'createBookmark':  //{guid: groupGUID to add bookmark into, pickFolder:bool show folder or file picker?}
       // No guid means the page-level create menu was used, which names no destination group.
@@ -115,13 +111,13 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
           addTo.projects.push(p);
         }
         await saveLandingPageModel(sharedModel);
-        sendMessageToWebview({command:'syncModel',model:sharedModel}, webviewPanel);
+        syncModelInWebview(webviewPanel, sharedModel);
       }
       break;
     case 'createGroup':
       sharedModel.groups.splice(0,0,{guid:crypto.randomUUID(),label:'Group',projects:[]});
       await saveLandingPageModel(sharedModel);
-      sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
+      syncModelInWebview(webviewPanel, sharedModel);
       break;
     case 'remove':  //{guid: item to remove}
       let foundGoP2 = findItemByGuid(message.guid, sharedModel);
@@ -138,7 +134,7 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
           foundGoP2.model.groups.splice(foundGoP2.model.groups.indexOf(foundGoP2.target as LandingPageGroup),1);
         }
         await saveLandingPageModel(sharedModel);
-        sendMessageToWebview({command:'syncModel',model:sharedModel}, webviewPanel);
+        syncModelInWebview(webviewPanel, sharedModel);
       }
       else {console.warn(`remove: item with guid "${message.guid}" not found.`,sharedModel);}
       break;
@@ -217,39 +213,37 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       // The page renders from the model rather than mutating individual DOM nodes. Every saved
       // patch must therefore return the updated model to the webview.
       await saveLandingPageModel(sharedModel);
-      sendMessageToWebview({command:'syncModel',model:sharedModel}, webviewPanel);
+      syncModelInWebview(webviewPanel, sharedModel);
       break;
     case 'hideRecent':
       await hideMru(message.guid);
       await populateVscMru(sharedModel);
       await saveLandingPageModel(sharedModel);
-      sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
+      syncModelInWebview(webviewPanel, sharedModel);
       break;
     case 'refreshRecents':
       // populateVscMru() already ran above for this command, so the model is current; all
       // that is left is to hand it back with the rebuild flag set.
-      sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
+      syncModelInWebview(webviewPanel, sharedModel);
       break;
     case 'restoreHiddenRecents':
       await restoreHiddenMru();
       await populateVscMru(sharedModel);
       await saveLandingPageModel(sharedModel);
-      sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
+      syncModelInWebview(webviewPanel, sharedModel);
       break;
     case 'moveGroup':
       if (moveGroup(message.guid, message.direction, message.toIndex, sharedModel))
       {
         await saveLandingPageModel(sharedModel);
-        sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
+        syncModelInWebview(webviewPanel, sharedModel);
       }
       break;
     case 'moveBookmark': // {guid: bookmark dragged, toGroup: destination, beforeGuid: bookmark it lands in front of}
       if (moveBookmark(message.guid, message.toGroup, message.beforeGuid, sharedModel))
       {
-        // forceRebuild: the DOM sync is keyed by GUID, and an insertion moves every card after
-        // it without changing any key.
         await saveLandingPageModel(sharedModel);
-        sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
+        syncModelInWebview(webviewPanel, sharedModel);
       }
       break;
     case 'copyPath': // {guid: bookmark whose target path should go to the clipboard}

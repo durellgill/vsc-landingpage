@@ -4,7 +4,7 @@ import { parseUriNameParts } from './uri-name-parts';
 import { RECENT_GROUP_GUID } from './recent-mru-overlay';
 import { defaultGroup, describeGroupSize } from './group-destination';
 import { saveLandingPageModel } from './model-storage';
-import { sendMessageToWebview } from './webview-messages';
+import { syncModelInWebview } from './webview-messages';
 
 /**
  * Builds a bookmark for one file, folder or workspace URI.
@@ -15,7 +15,7 @@ import { sendMessageToWebview } from './webview-messages';
  * @param uri Target to bookmark.
  * @returns Bookmark ready to be pushed into a group.
  */
-export async function makeBookmark(uri:vscode.Uri):Promise<LandingPageProject>
+async function makeBookmark(uri:vscode.Uri):Promise<LandingPageProject>
 {
   const nameParts = parseUriNameParts(uri);
   const project:LandingPageProject = {guid:crypto.randomUUID(), label:nameParts.basename, path:uri.toString()};
@@ -94,7 +94,7 @@ export async function bookmarkUris(uris:vscode.Uri[]|undefined, sharedModel:Land
   await saveLandingPageModel(sharedModel);
   if (webviewPanel)
   {
-    sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
+    syncModelInWebview(webviewPanel, sharedModel);
   }
   else
   {
@@ -140,10 +140,8 @@ export async function createDirectory(groupGuid:string|undefined, sharedModel:La
 
   const nameParts = parseUriNameParts(target);
   destination.projects.push({guid:crypto.randomUUID(), label:nameParts.basename, path:target.toString(), icon:'folder'});
-  // forceRebuild: defaultGroup() may have just inserted a group, and the DOM sync is keyed
-  // by GUID so it would not place a new one.
   await saveLandingPageModel(sharedModel);
-  sendMessageToWebview({command:'syncModel',model:sharedModel, forceRebuild:true}, webviewPanel);
+  syncModelInWebview(webviewPanel, sharedModel);
 
   const open = await vscode.window.showInformationMessage(`Created ${nameParts.basename} in "${destination.label}".`, 'Open folder');
   if (open) {vscode.commands.executeCommand('vscode.openFolder', target, {forceNewWindow:false});}
