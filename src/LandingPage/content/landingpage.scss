@@ -87,7 +87,12 @@
   font-size: var(--vscode-font-size);
   color: var(--vscode-foreground);
   background-color: var(--vscode-editor-background);
+  // Chrome is not selectable - a drag on the board is a bookmark move, and a stray text
+  // selection across rows fights it. Paths are the exception: the whole subject of this page
+  // is filesystem paths, and copying a fragment of one is a thing people actually do. The
+  // per-row copy button takes the whole path; this takes any part of it.
   user-select: none;
+  .project-path, .project-label { user-select: text; }
 
   h1, h2, p { margin: 0; padding: 0; font-weight: 400; }
 
@@ -1021,8 +1026,13 @@
           flex: 1 1 auto;
           height: 1px;
           min-width: var(--gapspace-s);
-          background: linear-gradient(to right, var(--group-accent), transparent);
+          // At rest this is a plain hairline that spans its whole track: a divider that stops
+          // at 35% of the way across reads as a rendering fault, not as restraint. The group's
+          // accent is the *hover* reveal, fading out along the same line, so the gesture is a
+          // colour arriving rather than a line finishing something it should have finished.
+          background: linear-gradient(to right, var(--hairline), var(--hairline));
           background-repeat: no-repeat;
+          transition: background-image var(--dur-hover) var(--ease-hover);
 
           // The hairline runs further along the row as the pointer enters the group. Expressed
           // as a scale rather than the `background-size: 35% -> 100%` this used to be: squeezing
@@ -1033,7 +1043,6 @@
           // Safe on a flex item because `transform` does not participate in layout, so the rule
           // still measures its full `flex: 1 1 auto` width and nothing beside it moves - which
           // is the constraint the group header cares about most, per the hover note below.
-          transform: scaleX(.35);
           transform-origin: left center;
           // `--dur-hover`, matching the spine. Both are the same gesture - something growing
           // under the pointer - and they are often on screen together, so a hairline running at
@@ -1070,7 +1079,7 @@
         &:hover
         {
           .group-label { color: var(--group-accent-text); }
-          .rule { transform: scaleX(1); }
+          .rule { background-image: linear-gradient(to right, var(--group-accent), transparent); }
           &::before { opacity: 1; }
         }
         &:not(:hover) .hover-only button {visibility: hidden;}
@@ -1207,12 +1216,23 @@
       }
 
       // Default layout: one bookmark per full-width row, meant to be read top to bottom
-      // and scrolled. The label sits above the path so long paths never squeeze the name.
+      // and scrolled.
+      //
+      // Name left, path right, on one line - the same two-column split `compact` already uses,
+      // because the row is 900px wide and stacking the path under the name left the right two
+      // thirds of every row empty while the content huddled at the left edge. Two anchors give
+      // the eye a column to scan in either direction.
       &.list
       {
         display: flex;
         flex-direction: column;
-        gap: var(--gapspace-s);
+
+        // One divider per junction. It has to be the *only* line there: with the card's own
+        // outline still drawn this was three hairlines inside two pixels, with the 6px radius
+        // pinching each one away from both ends and leaving a tick at every row corner. That
+        // repeating artifact was the single ugliest thing on the board.
+        .project + .project { border-top: 1px solid var(--hairline); }
+        .project { border-radius: 0; background: transparent; }
 
         .project
         {
@@ -1222,7 +1242,7 @@
           flex-wrap: nowrap;
           gap: 10px;
           // As in compact: the right end is reserved for the two out-of-flow buttons.
-          padding: 10px 46px 10px 14px;
+          padding: 9px 46px 9px 14px;
           position: relative;
 
           .textblock
@@ -1230,18 +1250,39 @@
             flex: 1 1 auto;
             min-width: 0;
             display: flex;
-            flex-direction: column;
-            gap: 1px;
+            flex-direction: row;
+            align-items: baseline;
+            gap: var(--gapspace);
 
+            // The label keeps its width and the path absorbs the slack, so a long path
+            // truncates before the bookmark name does.
             .project-label
             {
+              flex: 0 1 auto;
+              min-width: 0;
               font-weight: 500;
               white-space: nowrap;
               overflow: hidden;
               text-overflow: ellipsis;
             }
+            // Immediately after the name, not flushed right. Splitting them to opposite edges
+            // of a 920px row put 621px of nothing between the two fields that are read together
+            // - and the branch badge still truncated while that space sat empty. Adjacent means
+            // one saccade, and the slack collects harmlessly at the trailing edge.
+            .project-path { flex: 1 1 0; min-width: 0; }
           }
         }
+      }
+
+      // Grid and compact are tiles, not rows: they sit side by side, so they need an edge to
+      // be told apart. A hairline states it; the `editorWidget-background` fill never could,
+      // being one RGB unit from the page behind it - which is what left a bare vertical seam
+      // once the radius came off the shared rule.
+      &.grid .project, &.compact .project
+      {
+        border: 1px solid var(--hairline);
+        border-radius: var(--radius);
+        background: transparent;
       }
 
       // Compact layout: dense multi-column rows, for groups with a lot of bookmarks.
@@ -1290,11 +1331,17 @@
 
       .project
       {
-        outline: 1px solid var(--hairline);
-        box-shadow: var(--elevation);
-        border-radius: var(--radius);
+        // No resting outline, and no shadow. The card body is `editorWidget-background`, which
+        // resolves one RGB unit away from the editor background behind it - so the container
+        // was drawn entirely by borrowed chrome sitting around a surface that was never there.
+        // A shadow at `0 1px 3px rgb(0 0 0/.18)` over `rgb(31,31,31)` renders nothing at all.
+        //
+        // Hover and focus supply the only figure/ground the row needs, which is how every list
+        // in VS Code works - the explorer, the palette and the problems panel all draw flat
+        // full-bleed rows and let the pointer do the lifting.
+        outline: none;
         border:none;
-        overflow: hidden; // clip the spine to the rounded corners
+        overflow: hidden; // clip the spine to the row box
 
         // The paint colour lives in the spine (below), not the card body. Flooding the whole
         // card with a saturated colour fought every editor theme and made the pale shades
@@ -1442,7 +1489,7 @@
           flex: none;
           gap: 3px;
           margin-right: 6px;
-          max-width: 18ch;
+          max-width: 28ch;
           overflow: hidden;
           white-space: nowrap;
           // Real text, at .8em, so this is the one place on the card that needs the full 4.5:1
@@ -1536,9 +1583,20 @@
           align-items: center;
           justify-content: center;
           flex: none;
-          color: var(--type-color, var(--vscode-descriptionForeground));
-          background-color: color-mix(in srgb, var(--type-color, var(--vscode-descriptionForeground)) 16%, transparent);
-          border-radius: var(--radius-s);
+          // Neutral, and the spine is the row's only accent.
+          //
+          // This used to be a coloured glyph on a 16% plate of its own colour, which measured
+          // 2.50:1 - under the 3:1 WCAG 1.4.11 floor for a graphical object - because the plate
+          // dragged the background toward the very hue drawn on top of it. Dropping the plate
+          // alone was not enough: the darker shades still only reach 2.87:1 as a bare glyph on
+          // the editor background, because `#3A5FC9` is simply dark against `#1f1f1f`.
+          //
+          // Colour here was redundant anyway. The glyph's *shape* already says folder, file or
+          // workspace, and the spine already says which shade the user picked - so the icon was
+          // a third statement of two facts, and it was the loudest mark on a row while four of
+          // eight bookmarks drew the identical folder. `--vscode-icon-foreground` is what the
+          // explorer uses for exactly these glyphs.
+          color: var(--vscode-icon-foreground, var(--vscode-foreground));
           .lucide { width: 17px; height: 17px; stroke-width: 1.8px; }
         }
 
@@ -1553,7 +1611,10 @@
           align-items: center;
           min-width: 0;
           font-family: var(--mono);
-          font-size: .8em;
+          // .8em resolved to 10.4px. This is the field that distinguishes two checkouts both
+          // called `api`, so it was the smallest text on the page carrying the highest-stakes
+          // distinction. .85em clears the 11px floor for functional text.
+          font-size: .85em;
           color: var(--vscode-descriptionForeground);
           white-space: nowrap;
           overflow: hidden;
@@ -1571,7 +1632,6 @@
         // The type icon picks up the paint colour, tying the row to its spine.
         &[data-shade]:not([data-shade=""])
         {
-          .pictoral { color: var(--shade-color); background-color: color-mix(in srgb, var(--shade-color) 16%, transparent); }
         }
 
 

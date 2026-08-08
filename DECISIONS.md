@@ -120,7 +120,19 @@ Decision: Page colors use `--vscode-*` variables. Bookmark shades are accent fil
 
 Reason: The page sits inside VS Code and must remain legible in dark, light, and high-contrast themes. Raw accent colors often fail text contrast.
 
-Consequences: Test all three themes. Paint bookmark color on the spine and icon container rather than washing the card background. Scope swatch rules to `.palette button[data-shade]` so model containers are not styled as swatches.
+Consequences: Test all three themes. Paint the bookmark color on the spine, and nowhere else on a bookmark. Scope swatch rules to `.palette button[data-shade]` so model containers are not styled as swatches.
+
+## D012a: The spine is a bookmark's only accent
+
+Status: active. Supersedes the icon half of D012.
+
+Decision: A bookmark's shade is drawn on its spine. The type icon is `--vscode-icon-foreground`, never the shade or a per-kind color.
+
+Reason: D012 originally put the color on "the spine and icon container", and the icon container was a 16% wash of the glyph's own color with the glyph at full strength on top. That measures 2.50:1, under the 3:1 WCAG 1.4.11 floor for a graphical object, and it fails for the reason it was built: a tint plate made from the glyph's color pulls the background toward the thing drawn on it. Removing the plate is not sufficient. The darker shades still only reach 2.87:1 as a bare glyph on the editor background, because a color like `#3A5FC9` is genuinely dark against `#1f1f1f`.
+
+The color was also redundant. The glyph's shape already says folder, file, or workspace, and the spine already says which shade the user chose, so the icon was a third statement of two facts. It was the loudest mark on a row while carrying the least: four of eight bookmarks on a default board draw the same folder glyph.
+
+Consequences: One accent per bookmark. Do not reintroduce a colored icon, a tinted icon plate, or a card background wash. `--shade-readable` remains the rule for shade-derived *text*, which is a separate contrast problem with a separate answer.
 
 ## D013: Motion uses shared tokens
 
