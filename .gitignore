@@ -62,6 +62,7 @@ yarn.lock
 # are symlinks to directories outside the repo - committing them would publish broken links.
 .agents/
 .claude/
+.codex/
 skills-lock.json
 
 # Scratch screenshots taken while working on the page. Referenced by nothing.
