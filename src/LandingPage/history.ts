@@ -1,6 +1,6 @@
 import { commands, Uri, workspace } from "vscode";
 import { LandingPageProject } from "./LandingPageModel";
-import { parseURI } from "./utils";
+import { parseUriNameParts } from "./uri-name-parts";
 
 /**
  * Workspace bookmark in MRU list provided in {@link RecentlyOpenedItems.workspaces}.
@@ -74,7 +74,7 @@ export async function importVscRecentList():Promise<LandingPageProject[]>
   {
     if (recentWorkspace.folderUri)
     {
-      let nameParts = parseURI(recentWorkspace.folderUri);
+      let nameParts = parseUriNameParts(recentWorkspace.folderUri);
       result.push({
         guid:mruGuid(recentWorkspace.folderUri),
         path:recentWorkspace.folderUri.toString(),
@@ -84,7 +84,7 @@ export async function importVscRecentList():Promise<LandingPageProject[]>
     }
     else if (recentWorkspace.workspace?.configPath)
     {
-      let nameParts = parseURI(recentWorkspace.workspace.configPath);
+      let nameParts = parseUriNameParts(recentWorkspace.workspace.configPath);
       result.push({
         guid:mruGuid(recentWorkspace.workspace.configPath),
         path:recentWorkspace.workspace.configPath.toString(),
@@ -95,7 +95,7 @@ export async function importVscRecentList():Promise<LandingPageProject[]>
   }
   for(let recentFile of recentWorkspaces.files)
   {
-    let nameParts = parseURI(recentFile.fileUri);
+    let nameParts = parseUriNameParts(recentFile.fileUri);
     result.push({
       guid:mruGuid(recentFile.fileUri),
       path:recentFile.fileUri.toString(),

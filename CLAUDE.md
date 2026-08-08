@@ -1,10 +1,18 @@
 @AGENTS.md
+@.agents/skills/write-discoverable-code/SKILL.md
 
 # Notes for coding agents
 
 `AGENTS.md` (imported above) covers what this extension is, how it builds, and the
 conventions. This file is about *working on it* without repeating mistakes that have already
 been made here.
+
+`write-discoverable-code` is also imported above. It is the naming and searchability standard
+for anything added here: exported names carry a domain word, filenames never state a bare role
+(`utils.ts`, `types.ts`, `config.ts`), error strings exist verbatim in the source rather than
+being assembled from a prefix, and a renamed thing gets renamed at every site in the same
+commit. Note that `.agents/` is gitignored, so that import resolves only where the skill is
+installed - the rules are restated here so a fresh clone still gets them.
 
 ## Read this first
 

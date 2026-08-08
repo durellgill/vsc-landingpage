@@ -86,7 +86,7 @@ export interface LandingPageProject extends LandingPageItem
 }
 
 
-export interface ScanResult
+export interface ItemLocation
 {
   /** The element which was searched for, i.e. the group or project with a specific GUID. */
   target:LandingPageGroup|LandingPageProject;
@@ -105,7 +105,7 @@ export interface ScanResult
  * @param inModel Model to scan.
  * @returns Scan result for found item or null if no item was found.
  */
-export function findFirst(guid:string|undefined, inModel:LandingPageModel):ScanResult|null
+export function findItemByGuid(guid:string|undefined, inModel:LandingPageModel):ItemLocation|null
 {
   if (!guid){ return null;}
   if (guid.length>0)

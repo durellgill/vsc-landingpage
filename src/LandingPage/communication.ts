@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
-import { findFirst, LandingPageGroup, LandingPageModel, LandingPageProject, ScanResult } from './LandingPageModel';
+import { findItemByGuid, LandingPageGroup, LandingPageModel, LandingPageProject, ItemLocation } from './LandingPageModel';
 import { importVscRecentList, recentLimit } from './history';
-import { parseURI } from './utils';
+import { parseUriNameParts } from './uri-name-parts';
 
 /** 
  * Model for data sent from landingpage2.html to communictations.ts 
@@ -70,7 +70,7 @@ let landingPageExtContext: vscode.ExtensionContext;
  * Called from extension's activate function in `extension.ts`.
  * @param ctx Context for this extension.
  */
-export function registerContext(ctx: vscode.ExtensionContext):void
+export function registerExtensionContext(ctx: vscode.ExtensionContext):void
 {
   landingPageExtContext = ctx;
 }
@@ -140,7 +140,7 @@ async function customiseMru(guid:string|undefined, field:keyof MruCustomisation,
   else {all[guid] = entry;}
   await landingPageExtContext.globalState.update(MRU_CUSTOM_KEY, all);
 
-  const found = findFirst(guid, sharedModel);
+  const found = findItemByGuid(guid, sharedModel);
   if (found) {applyMruCustomisation(found.target as LandingPageProject, entry);}
   return true;
 }
@@ -198,7 +198,7 @@ async function clearMruCustomisations():Promise<void>
  */
 async function populateVscMru(sharedModel:LandingPageModel):Promise<void>
 {
-  let mruFound = findFirst('@vsc-mru',sharedModel);
+  let mruFound = findItemByGuid('@vsc-mru',sharedModel);
   let mruGroup:LandingPageGroup;
   if(mruFound) //MRU list already yet in model -> use that
   {
@@ -330,7 +330,7 @@ async function pickDestinationGroup(sharedModel:LandingPageModel, title:string):
 
 async function moveToGroup(guid:string|undefined, sharedModel:LandingPageModel, webviewPanel:vscode.WebviewPanel):Promise<void>
 {
-  const found = findFirst(guid, sharedModel);
+  const found = findItemByGuid(guid, sharedModel);
   if (!found || !found.ownerGroup)
   {
     vscode.window.showWarningMessage('Select a bookmark to move.');
@@ -377,14 +377,14 @@ async function moveToGroup(guid:string|undefined, sharedModel:LandingPageModel, 
  * Builds a bookmark for one file, folder or workspace URI.
  *
  * The item type is resolved by stat-ing the URI rather than by looking at the extension,
- * because {@link parseURI} cannot tell a folder named `my.app` from a file.
+ * because {@link parseUriNameParts} cannot tell a folder named `my.app` from a file.
  *
  * @param uri Target to bookmark.
  * @returns Bookmark ready to be pushed into a group.
  */
 async function makeBookmark(uri:vscode.Uri):Promise<LandingPageProject>
 {
-  const nameParts = parseURI(uri);
+  const nameParts = parseUriNameParts(uri);
   const project:LandingPageProject = {guid:crypto.randomUUID(), label:nameParts.basename, path:uri.toString()};
 
   let isDirectory = false;
@@ -432,7 +432,7 @@ export async function bookmarkUris(uris:vscode.Uri[]|undefined, sharedModel:Land
     {label:'$(add) New group...', description:'Create a group for these bookmarks', guid:NEW_GROUP}
   ];
 
-  const what = uris.length===1 ? `"${parseURI(uris[0]).basename}"` : `${uris.length} items`;
+  const what = uris.length===1 ? `"${parseUriNameParts(uris[0]).basename}"` : `${uris.length} items`;
   const picked = await vscode.window.showQuickPick(items, {title:`Add ${what} to group`, placeHolder:'Choose a group'});
   if (!picked) {return;} //cancelled
 
@@ -520,7 +520,7 @@ function moveGroup(guid:string|undefined, direction:'up'|'down'|undefined, toInd
  */
 function moveBookmark(guid:string|undefined, toGroup:string|undefined, beforeGuid:string|undefined, sharedModel:LandingPageModel):boolean
 {
-  const found = findFirst(guid, sharedModel);
+  const found = findItemByGuid(guid, sharedModel);
   if (!found || !found.ownerGroup) {return false;} //not a bookmark
   const destination = sharedModel.groups.find(group => group.guid===toGroup);
   if (!destination || destination.guid==='@vsc-mru') {return false;}
@@ -609,10 +609,10 @@ async function createDirectory(groupGuid:string|undefined, sharedModel:LandingPa
 
   // Resolved only once the folder exists. `defaultGroup()` can append a group to the model,
   // and doing that before the create could leave a stray empty group behind on failure.
-  const destination = (groupGuid ? findFirst(groupGuid, sharedModel)?.target as LandingPageGroup|undefined : undefined)
+  const destination = (groupGuid ? findItemByGuid(groupGuid, sharedModel)?.target as LandingPageGroup|undefined : undefined)
     ?? defaultGroup(sharedModel);
 
-  const nameParts = parseURI(target);
+  const nameParts = parseUriNameParts(target);
   destination.projects.push({guid:crypto.randomUUID(), label:nameParts.basename, path:target.toString(), icon:'folder'});
   // forceRebuild: defaultGroup() may have just inserted a group, and the DOM sync is keyed
   // by GUID so it would not place a new one.
@@ -638,7 +638,7 @@ async function createDirectory(groupGuid:string|undefined, sharedModel:LandingPa
  */
 async function copyPath(guid:string|undefined, sharedModel:LandingPageModel, webviewPanel:vscode.WebviewPanel):Promise<void>
 {
-  const found = findFirst(guid, sharedModel);
+  const found = findItemByGuid(guid, sharedModel);
   const path = (found?.target as LandingPageProject|undefined)?.path;
   if (!path) {return;}
 
@@ -849,8 +849,8 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       // vscode.window.showWarningMessage(`postmessage syncmodel!: ${JSON.stringify(sharedModel)}`);
       break;
     case 'rename': // guid: ID of model element to rename
-      let foundGoP = findFirst(message.guid,sharedModel);
-      if (!foundGoP) {vscode.window.showWarningMessage(`GroupOrProject not found: ${message.guid}`);return;}
+      let foundGoP = findItemByGuid(message.guid,sharedModel);
+      if (!foundGoP) {vscode.window.showWarningMessage(`rename: no group or bookmark with guid ${message.guid}`);return;}
       const label = message.value?.trim();
       if (!label) {return;}
       foundGoP.target.label=label;
@@ -860,7 +860,7 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
     case 'createBookmark':  //{guid: groupGUID to add bookmark into, pickFolder:bool show folder or file picker?}
       // No guid means the page-level create menu was used, which names no destination group.
       const addTo = message.guid
-        ? findFirst(message.guid, sharedModel)?.target as LandingPageGroup|undefined
+        ? findItemByGuid(message.guid, sharedModel)?.target as LandingPageGroup|undefined
         : await pickDestinationGroup(sharedModel, 'Add the bookmark to group');
       if (!addTo) {if (message.guid) {vscode.window.showWarningMessage(`Group not found: ${message.guid}`);} return;}
       vscode.window.showOpenDialog({canSelectFiles:true, canSelectFolders:message.pickFolder,canSelectMany:true, filters:{'Workspaces':['code-workspace'],'Files':['*']}})
@@ -870,7 +870,7 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
         {
           for(let uri of selectedFiles)
           {            
-            let nameParts = parseURI(uri);              
+            let nameParts = parseUriNameParts(uri);              
             
             const p:LandingPageProject =     {guid:crypto.randomUUID(), label:nameParts.basename, path:uri.toString()};
             if (!nameParts.ext)              {p.icon = 'folder';}
@@ -893,9 +893,9 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       saveModel(sharedModel);
       break;
     case 'remove':  //{guid: item to remove}        
-      let foundGoP2 = findFirst(message.guid, sharedModel);
+      let foundGoP2 = findItemByGuid(message.guid, sharedModel);
 
-      const performRemoval=(foundGoP2:ScanResult)=>{
+      const performRemoval=(foundGoP2:ItemLocation)=>{
         if(foundGoP2.ownerGroup) //project in group
         {
           let index = foundGoP2.ownerGroup.projects.indexOf(foundGoP2.target);
@@ -914,7 +914,7 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       else {console.warn(`remove: item with guid "${message.guid}" not found.`,sharedModel);}        
       break;
     case 'open': // {guid: item with path to open}        
-      let projectFound = findFirst(message.guid, sharedModel);
+      let projectFound = findItemByGuid(message.guid, sharedModel);
       if(projectFound!==null)
       {
         const project = projectFound.target as LandingPageProject;
@@ -944,17 +944,17 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
           console.warn(`open: guid "${message.guid}" points to element without path!`,sharedModel);
         }          
       }
-      else {console.warn(`remove: item with guid "${message.guid}" not found.`,sharedModel);}
+      else {console.warn(`open: item with guid "${message.guid}" not found.`,sharedModel);}
       break;
     case 'move': // {guid:move, guid2:relativeTo, pos:beforeOrAfterGuid2}
-      let foundDrag=findFirst(message.guid, sharedModel); // item to move
-      let foundDrop=findFirst(message.guid2, sharedModel); //item to move relative to
+      let foundDrag=findItemByGuid(message.guid, sharedModel); // item to move
+      let foundDrop=findItemByGuid(message.guid2, sharedModel); //item to move relative to
       // The `Recent` group is generated and sealed: it is rebuilt from VS Code's history on
       // every message, so moving anything into or out of it either silently reverts or
       // deletes a user bookmark. Group ordering also keeps `@vsc-mru` pinned last, which a
       // free-form move would break. This handler only serves the legacy page; the Preact
       // webview reorders groups with `moveGroup` and moves bookmarks with `moveToGroup`.
-      const touchesMru = (r:ScanResult|null) => r?.ownerGroup?.guid==='@vsc-mru' || (r?.target as LandingPageGroup)?.guid==='@vsc-mru';
+      const touchesMru = (r:ItemLocation|null) => r?.ownerGroup?.guid==='@vsc-mru' || (r?.target as LandingPageGroup)?.guid==='@vsc-mru';
       if (touchesMru(foundDrag) || touchesMru(foundDrop))
       {
         console.warn('move: refused, the generated Recent group cannot be reordered or used as a drop target.');
@@ -1010,8 +1010,8 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       }
       break;
     case 'patch': // {guid: item to patch, field: field to patch('shade' or 'layout'), value: new value}
-      let found = findFirst(message.guid,sharedModel);
-      if (!found) {vscode.window.showWarningMessage(`GroupOrProject not found: ${message.guid}`);return;}
+      let found = findItemByGuid(message.guid,sharedModel);
+      if (!found) {vscode.window.showWarningMessage(`patch: no group or bookmark with guid ${message.guid}`);return;}
       if (message.field==='shade')
       {
         // Both bookmarks and user-created groups support an accent colour. Groups use it

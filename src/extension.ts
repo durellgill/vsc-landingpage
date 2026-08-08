@@ -2,7 +2,7 @@
 import { join } from 'path';
 import * as vscode from 'vscode';
 import { window } from 'vscode';
-import { bookmarkUris, cloneRepository, handleMessageFromWebview, refreshRecents, registerContext, resetModel, syncModelInWebview } from './LandingPage/communication';
+import { bookmarkUris, cloneRepository, handleMessageFromWebview, refreshRecents, registerExtensionContext, resetModel, syncModelInWebview } from './LandingPage/communication';
 import { LandingPageModel } from './LandingPage/LandingPageModel';
 import { LandingPageTemplate2 } from './LandingPage/LandingPageTemplate2';
 
@@ -10,7 +10,7 @@ import { LandingPageTemplate2 } from './LandingPage/LandingPageTemplate2';
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) 
 {
-	registerContext(context);
+	registerExtensionContext(context);
 
 	let landingpageWebviewPanel:vscode.WebviewPanel|null = null;
 	// Loaded here rather than when the panel opens, because the Explorer context menu can add

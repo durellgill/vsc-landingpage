@@ -1,9 +1,9 @@
 import { Uri } from "vscode";
 
 /**
- * Data envelope for {@link parseURI} result. 
+ * The base name and file extension of a URI, split apart. Result of {@link parseUriNameParts}.
  */
-interface UriScan
+export interface UriNameParts
 {
   /**
    * File or folder basename, which is usually
@@ -18,14 +18,17 @@ interface UriScan
 }
 
 /**
- * Analyses an URI for basename and extension
- * parts that can be used for label auto-generation.
+ * Splits a URI into its base name and file extension, so a bookmark label can be generated
+ * from the file name or folder name without the extension.
+ *
+ * It splits on the last dot, so it cannot tell a folder named `my.app` from a file: callers
+ * that know which one they have should decide whether to use `ext` at all.
  * @param uri URI to process.
  * @returns Name parts.
  */
-export function parseURI(uri:Uri):UriScan
+export function parseUriNameParts(uri:Uri):UriNameParts
 {
-  const result:UriScan={basename:''};
+  const result:UriNameParts={basename:''};
 
   let name = uri.fsPath.split(/[\\\/]/).pop()||'error';
   let pos = name.lastIndexOf('.');
