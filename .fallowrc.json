@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/fallow/schema.json",
+  "entry": [
+    "src/extension.ts",
+    "src/LandingPage/webview/main.tsx",
+    "src/**/*.test.ts",
+    "scripts/*.mjs",
+    ".vscode-test.mjs"
+  ],
+  "ignorePatterns": [
+    "dist/**",
+    "out/**",
+    "src/LandingPage/content/dist/**",
+    ".vscode-test/**",
+    ".agents/**",
+    ".claude/skills/**"
+  ]
+}

@@ -58,7 +58,7 @@
       },
       {
         "command": "vsc-landingpage.addToGroup",
-        "title": "\u2795 Add to Landing Page Group..."
+        "title": "➕ Add to Landing Page Group..."
       }
     ],
     "keybindings": [
@@ -135,6 +135,8 @@
     "test": "vscode-test --fail-zero",
     "harness": "npm run compile && npm run build:harness && node scripts/harness.mjs",
     "motion-check": "node scripts/motion-check.mjs",
+    "fallow": "fallow",
+    "fallow:audit": "fallow audit --base origin/main",
     "typecheck:src": "tsc -p . --noEmit",
     "typecheck:scripts": "tsc --noEmit --allowJs --checkJs --target es2022 --module nodenext --moduleResolution nodenext --skipLibCheck scripts/compile-tests.mjs scripts/motion-check.mjs"
   },
@@ -148,6 +150,7 @@
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.1.0",
     "eslint": "^10.8.0",
+    "fallow": "^3.14.0",
     "sass": "^1.83.1",
     "typescript": "^5.7.2",
     "vite": "^8.2.0"
