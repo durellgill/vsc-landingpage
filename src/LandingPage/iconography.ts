@@ -18,7 +18,6 @@ import svgGripHorizontal from 'lucide-static/icons/grip-horizontal.svg?raw';
 import svgGripVertical from 'lucide-static/icons/grip-vertical.svg?raw';
 import svgFolder from 'lucide-static/icons/folder.svg?raw';
 import svgFolderPlus from 'lucide-static/icons/folder-plus.svg?raw';
-import svgBriefcaseBusiness from 'lucide-static/icons/briefcase-business.svg?raw';
 import svgAppWindow from 'lucide-static/icons/app-window.svg?raw';
 import svgFileSliders from 'lucide-static/icons/file-sliders.svg?raw';
 import svgFileQuestion from 'lucide-static/icons/file-question.svg?raw';
@@ -123,7 +122,6 @@ export const icons=
   gripVertical : icon(svgGripVertical),
   folder : icon(svgFolder),
   folderPlus : icon(svgFolderPlus),
-  // briefcaseBusiness : icon(svgBriefcaseBusiness),
   appWindow : icon(svgAppWindow),
   fileSliders : icon(svgFileSliders),
   fileQuestion : icon(svgFileQuestion),

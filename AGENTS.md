@@ -26,6 +26,33 @@ If you have not written a VS Code extension before, the whole thing is three mov
 Anything that needs a dialog, the filesystem, or a VS Code command belongs in the extension
 host, not the page.
 
+### Where host code lives
+
+`communication.ts` is the dispatch and little else: `handleMessageFromWebview` reads as one hop
+per case into a module named after the question it answers. It was 1122 lines holding all of
+this inline, which meant a search for any one concept landed on the same wall of code.
+
+| Module | The question it answers |
+|---|---|
+| `communication.ts` | which handler runs for a message from the page |
+| `webview-messages.ts` | what the two message shapes are, and how one is posted |
+| `model-storage.ts` | where the model and the extension context are persisted |
+| `recent-mru-overlay.ts` | how the generated `Recent` group is rebuilt, and where per-entry customisations survive that rebuild |
+| `bookmark-health.ts` | whether a target still exists, and what branch a folder is on |
+| `bookmark-creation.ts` | how a bookmark or a new folder comes into being |
+| `bookmark-moves.ts` | where a dragged or reassigned group/bookmark lands |
+| `group-destination.ts` | which group receives something when the user was not asked |
+| `clipboard-path.ts` | what goes on the clipboard, and how it is shell-quoted |
+| `clone-repository.ts` | how a repository is cloned |
+| `uri-name-parts.ts` | how a URI is split into a label and an extension |
+
+Two things this arrangement depends on. `RECENT_GROUP_GUID` in `recent-mru-overlay.ts` replaced
+the `'@vsc-mru'` literal that was written out thirteen times, so the rule "Recent is a source,
+never a destination" is now greppable rather than being spelled the same way by coincidence.
+And `sendMessageToWebview` lives in `webview-messages.ts` rather than in `communication.ts`,
+because the action modules post to the page and `communication.ts` imports the action modules -
+keeping it in the dispatcher would make that a cycle.
+
 ## Build
 
 `npm run compile`. Two Vite builds run **in that order, and the order matters**:
