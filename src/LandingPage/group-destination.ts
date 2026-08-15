@@ -3,29 +3,6 @@ import { LandingPageGroup, LandingPageModel } from './LandingPageModel';
 import { RECENT_GROUP_GUID } from './recent-mru-overlay';
 
 /**
- * The group a page-level create lands in when the user was not asked to choose.
- *
- * The first user-created group, or a new one if the board has none. Never the generated
- * `Recent` group, which is rebuilt from VS Code's history and would discard the bookmark.
- *
- * Callers must resolve this only *after* whatever irreversible step they are doing has
- * succeeded: this can append a group to the model, so calling it first leaves a stray empty
- * group behind when the create fails.
- *
- * @param sharedModel Model to resolve against; a group is appended to it when there is none.
- * @returns A group that can receive a bookmark.
- */
-export function defaultGroup(sharedModel:LandingPageModel):LandingPageGroup
-{
-  const existing = sharedModel.groups.find(group => group.guid!==RECENT_GROUP_GUID);
-  if (existing) {return existing;}
-
-  const created:LandingPageGroup = {guid:crypto.randomUUID(), label:'Group', projects:[]};
-  sharedModel.groups.splice(0,0,created);
-  return created;
-}
-
-/**
  * Asks the user which group an item should land in, with a native quick pick.
  *
  * Used by the page-level create actions, which - unlike the group composer - have no

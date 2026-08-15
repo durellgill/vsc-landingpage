@@ -56,11 +56,11 @@ Consequences: Add new durable Recent customization fields to the overlay. Remove
 
 Status: active
 
-Decision: Group-local creation uses that group. Page-level creation asks for a destination when needed. Creating a folder on disk completes the filesystem step before a default group is created.
+Decision: Group-local creation uses that group. Page-level bookmark creation asks for a destination when needed. Page-level folder creation creates the folder and opens it in the current VS Code window without adding a bookmark or group; VS Code adds it to Open Recent naturally.
 
 Reason: A failed irreversible operation must not leave model changes behind, and a control inside a group already communicates its destination.
 
-Consequences: Do not prompt for a group before the folder exists. Keep webview-initiated text input in the page. Explorer and editor context commands may use native quick picks and input boxes because they start outside the page.
+Consequences: Only the New folder action inside a group creates a bookmark for the new directory. Keep webview-initiated text input in the page. Explorer and editor context commands may use native quick picks and input boxes because they start outside the page.
 
 ## D007: Dragging uses identifiers and geometry
 

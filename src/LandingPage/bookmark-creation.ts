@@ -1,10 +1,16 @@
 import * as vscode from 'vscode';
-import { findItemByGuid, LandingPageGroup, LandingPageModel, LandingPageProject } from './LandingPageModel';
+import { LandingPageGroup, LandingPageModel, LandingPageProject } from './LandingPageModel';
 import { parseUriNameParts } from './uri-name-parts';
 import { RECENT_GROUP_GUID } from './recent-mru-overlay';
-import { defaultGroup, describeGroupSize } from './group-destination';
+import { describeGroupSize } from './group-destination';
 import { saveLandingPageModel } from './model-storage';
 import { syncModelInWebview } from './webview-messages';
+
+/** Resolves an explicit group for a newly created directory bookmark. */
+export function createdDirectoryBookmarkGroup(groupGuid:string|undefined, sharedModel:LandingPageModel):LandingPageGroup|undefined
+{
+  return groupGuid ? sharedModel.groups.find(group => group.guid===groupGuid) : undefined;
+}
 
 /**
  * Builds a bookmark for one file, folder or workspace URI.
@@ -103,23 +109,18 @@ export async function bookmarkUris(uris:vscode.Uri[]|undefined, sharedModel:Land
 }
 
 /**
- * Creates a new directory on disk and bookmarks it into the given group.
+ * Creates a new directory on disk, then opens it or bookmarks it into an explicit group.
  *
  * Uses the native save dialog rather than an open dialog plus an input box: the save sheet
  * is the only native picker that lets the user both browse to a parent folder and type the
  * new folder's name in one step, which keeps text entry out of `showInputBox` as the page
  * conventions require.
- * @param groupGuid Group that should receive the bookmark.
+ * @param groupGuid Explicit group that should receive the bookmark. Without one, the folder opens.
  * @param sharedModel Model to update.
  * @param webviewPanel Panel to resync.
  */
 export async function createDirectory(groupGuid:string|undefined, sharedModel:LandingPageModel, webviewPanel:vscode.WebviewPanel):Promise<void>
 {
-  // The dialog comes first, deliberately. This action is about making a folder on disk;
-  // being asked which group to file it under before anything has been created is a question
-  // about bookmarking, asked before the user has said what they are bookmarking. So the
-  // native picker opens straight away and the destination is resolved afterwards, without a
-  // prompt - the group header's own Add button is how you choose a destination explicitly.
   const target = await vscode.window.showSaveDialog({title:'Create a new folder', saveLabel:'Create folder'});
   if (!target) {return;}
 
@@ -133,10 +134,20 @@ export async function createDirectory(groupGuid:string|undefined, sharedModel:La
     return;
   }
 
-  // Resolved only once the folder exists. `defaultGroup()` can append a group to the model,
-  // and doing that before the create could leave a stray empty group behind on failure.
-  const destination = (groupGuid ? findItemByGuid(groupGuid, sharedModel)?.target as LandingPageGroup|undefined : undefined)
-    ?? defaultGroup(sharedModel);
+  // The page-level New menu names no bookmark destination. It creates a project folder and
+  // opens it in this window, which also lets VS Code add it to Open Recent naturally.
+  if (!groupGuid)
+  {
+    await vscode.commands.executeCommand('vscode.openFolder', target, {forceNewWindow:false});
+    return;
+  }
+
+  const destination = createdDirectoryBookmarkGroup(groupGuid, sharedModel);
+  if (!destination)
+  {
+    vscode.window.showWarningMessage('Created the folder, but its destination group no longer exists.');
+    return;
+  }
 
   const nameParts = parseUriNameParts(target);
   destination.projects.push({guid:crypto.randomUUID(), label:nameParts.basename, path:target.toString(), icon:'folder'});
