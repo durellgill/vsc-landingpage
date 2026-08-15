@@ -1721,31 +1721,45 @@
   // gates the action in its drop handler instead.
   .dropbin
   {
+    // A box on the right, inset from the edge rather than pinned to it. It sat across the bottom
+    // before, and the bottom edge of the editor area is usually the last thing between the
+    // pointer and the desktop - the panel is often collapsed and the window rarely reaches the
+    // foot of the screen - so a downward gesture that overshot the zone left the window
+    // entirely, and Chromium does not report a drag that ended outside it.
+    //
+    // The inset is the point, not decoration: overshooting to the right now crosses a margin of
+    // dead page before it reaches the window edge, so the gesture has somewhere to be wrong
+    // without escaping. It makes the escape rarer, not impossible.
     position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    right: var(--gapspace);
+    // Centred with a negative margin of half its own height rather than a `translateY(-50%)`,
+    // because `bin-in` animates `transform` and would drop the centring for the length of the
+    // animation and again at its end. The margin leaves `transform` entirely to the animation.
+    top: 50%;
+    margin-top: -75px;
     z-index: 60;
 
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: var(--gapspace);
+    gap: calc(var(--gapspace) / 2);
     // The page has no global `box-sizing` reset, so the padding and border would otherwise be
-    // added to the 96px and the bar would quietly be 129px deep.
+    // added to these and the box would quietly be 33px larger in each direction.
     box-sizing: border-box;
-    height: 96px;
+    width: 150px;
+    height: 150px;
     padding: var(--gapspace);
 
     border: 1px dashed var(--vscode-panel-border, var(--hairline));
-    border-width: 1px 0 0;
+    border-radius: var(--radius);
     background-color: var(--vscode-editorWidget-background);
     color: var(--vscode-descriptionForeground);
     text-align: center;
     line-height: 1.3;
 
     // Grows out of the edge it is attached to, like everything else that opens on this page.
-    transform-origin: center bottom;
+    transform-origin: right center;
     animation: bin-in var(--dur-enter) var(--ease-out);
     transition: border-color var(--dur-hover) var(--ease-hover),
                 background-color var(--dur-hover) var(--ease-hover),
@@ -1782,10 +1796,12 @@
   }
 
   //--- motion ----------------------------------------------------------------
-  // Everything here travels *inward*: from a small positive translateY, or from a scale
-  // below 1, to the element's own resting box. Nothing moves outward or sideways, so no
-  // animation can escape a clipping ancestor - the card sets `overflow: hidden` to clip its
-  // spine - or widen the page and flash a horizontal scrollbar mid-flight.
+  // Everything here travels *inward*: from a small positive translate, or from a scale below 1,
+  // to the element's own resting box, so no animation can escape a clipping ancestor - the card
+  // sets `overflow: hidden` to clip its spine - or widen the page and flash a horizontal
+  // scrollbar mid-flight. `bin-in` is the one that travels sideways, and it is the exception
+  // that proves the rule: it is `position: fixed`, so it is outside the document's scroll size
+  // and the 12px it starts to the right of its resting box cannot widen anything.
   // Deliberately opacity only. This used to travel 4px upward as well, which read as the whole
   // board shoving itself down every time anything changed. Repositioning is not this
   // animation's job any more: cards that *move* are animated from where they were by the FLIP
@@ -1800,7 +1816,7 @@
   // the movement is small and entirely inside the empty margin beside the board.
   @keyframes bin-in
   {
-    from { opacity: 0; transform: translateY(12px); }
+    from { opacity: 0; transform: translateX(12px); }
     to   { opacity: 1; transform: none; }
   }
 

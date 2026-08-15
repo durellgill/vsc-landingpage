@@ -28,6 +28,13 @@
  *                          that work is still in flight.
  *   8. delete-dwell        a stationary pointer armed the delete zone visually, but its last
  *                          recorded drop effect still refused the release.
+ *   9. delete-return       the drag left the webview and came back, and the delete zone stayed
+ *                          dead for the rest of it - never highlighted, never armed.
+ *  10. resize-baseline     a panel resize re-flowed the board without rendering, so the FLIP
+ *                          baseline went stale and the next layout switch flew untouched groups.
+ *  11. mru-twin           a bookmark that is also in `Recent` appears twice under one GUID, and
+ *                          the two cards shared one FLIP baseline - so switching `Recent` between
+ *                          layouts flew the group's copy across its neighbour and back.
  *
  * Usage:
  *   npm run harness        # in another shell, or leave one running on 5599
@@ -472,6 +479,42 @@ function deleteDwell() {
   check('delete-dwell  an armed stationary release removes', armed === 1, `posted ${armed}`);
 }
 
+// 13. The delete zone wakes up again after the drag has been outside the webview.
+//
+// Carrying a bookmark off the page - over the terminal panel, or off the window - fires
+// `dragleave` on the zone and resets it, but Chromium keeps the zone as its current drop
+// target. Coming back over it resumes `dragover` with no `dragenter`, so a zone that woke only
+// on `dragenter` stayed dead for the rest of the drag: it never highlighted and never armed,
+// and the only way out was to drop and start again.
+//
+// The leave and the return are dispatched rather than mimed with the mouse, because that
+// asymmetry is the whole bug: a synthetic pointer move back into the zone would carry the
+// `dragenter` the real re-entry omits, and the check would pass against the broken code.
+function deleteZoneAfterLeavingWindow() {
+  open();
+  dragFirstBookmarkToDeleteZone();
+  evaluate(`
+    const zone=document.querySelector('.dropbin');
+    zone.dispatchEvent(new DragEvent('dragleave',{bubbles:true,relatedTarget:null}));
+    return JSON.stringify('left');
+  `);
+  waitUntil(`!document.querySelector('.dropbin[data-over]')`, {label: 'the zone to reset on leaving'});
+  evaluate(`
+    const zone=document.querySelector('.dropbin');
+    const rect=zone.getBoundingClientRect();
+    window.__back=setInterval(()=>zone.dispatchEvent(new DragEvent('dragover',
+      {bubbles:true,cancelable:true,clientX:rect.left+rect.width/2,clientY:rect.top+rect.height/2})),30);
+    return JSON.stringify('returned');
+  `);
+  const lit = waitUntil(`document.querySelector('.dropbin[data-over]')`, {label: 'the zone to highlight again'});
+  check('delete-return    the zone highlights again after the drag left the webview', lit,
+    lit ? 'lit by dragover alone' : 'never highlighted');
+  const arms = waitUntil(`document.querySelector('.dropbin[data-armed]')`, {label: 'the zone to arm again'});
+  check('delete-return    and still arms by dwell', arms, arms ? 'armed' : 'never armed');
+  evaluate(`clearInterval(window.__back); return JSON.stringify('stopped');`);
+  browser('mouse', 'up');
+}
+
 // 9. The two halves of a fold finish together.
 //
 // The chevron rotation and the group's height are one gesture expressed twice, and they are
@@ -541,6 +584,84 @@ function scrollIsNotMovement() {
   check('scroll-not-movement  a real layout change still flies',
     moves > 0, `${moves} flights`);
   void scrolled; void afterMove;
+}
+
+// 11. A resize is not a movement either, and it is the same class of bug as check 6.
+//
+// The FLIP baseline is only written during a render. Dragging the editor panel narrower re-wraps
+// every grid and re-flows every group without rendering anything, so the baseline goes on
+// describing the wide layout. The next render for any reason at all - switching one group
+// between list, grid and compact, say - then read that stale baseline as movement and flew
+// groups nobody had touched: narrowing the panel and switching `Recent` slid an untouched
+// group's card 34px sideways, a beat after the resize that actually moved it.
+//
+// Both halves again, for the same reason as check 6: the switched group's own cards must still
+// fly, or "never animate anything" would pass.
+function resizeIsNotMovement() {
+  open();
+  browser('set', 'viewport', '760', '800');
+  waitUntil('document.getAnimations().length===0', {label: 'the resize to settle'});
+  evaluate(`
+    window.__f=[];
+    const real=Element.prototype.animate;
+    Element.prototype.animate=function(frames,opts){
+      const owner=this.closest&&this.closest('.group');
+      if(owner&&(this.classList.contains('project')||this.classList.contains('group'))){
+        window.__f.push(owner.dataset.guid);
+      }
+      return real.apply(this,arguments);
+    };
+    const mru=document.querySelector('.group[data-guid="@vsc-mru"]');
+    mru.querySelector('button[data-role="layout"]').click();
+    return JSON.stringify('switched');
+  `);
+  // A fixed wait, like check 6's: half the assertion is that something did *not* animate, and
+  // the absence of a flight cannot be polled for.
+  sleep(300);
+  /** @type {string[]} */
+  const flew = evaluate(`return JSON.stringify(window.__f);`);
+  const strangers = flew.filter(guid => guid !== '@vsc-mru');
+  check('resize-baseline  a layout switch after a resize leaves other groups alone',
+    strangers.length === 0, `${strangers.length} stray flights: ${strangers.join(',') || 'none'}`);
+  check('resize-baseline  the switched group still flies',
+    flew.some(guid => guid === '@vsc-mru'), `${flew.length} flights`);
+  browser('set', 'viewport', '1280', '800');
+}
+
+// 12. Switching one group's layout moves that group's cards and nothing else.
+//
+// The board can hold the same bookmark twice: once in a group and once in `Recent`, under one
+// GUID. The FLIP baseline was keyed on that GUID alone, so both cards wrote to the same entry -
+// whichever was measured last won - and the next render read the other card's position as
+// movement. Clicking `Recent`'s layout button flew a card in an untouched group sideways across
+// its neighbour and slid it back, which is what the bug report showed.
+//
+// Both halves again, as in checks 6 and 11: the switched group's own cards must still fly, or
+// "nothing animates" would pass.
+function mruTwinBaseline() {
+  open();
+  evaluate(`
+    window.__f=[];
+    const real=Element.prototype.animate;
+    Element.prototype.animate=function(frames,opts){
+      const owner=this.closest&&this.closest('.group');
+      if(owner&&(this.classList.contains('project')||this.classList.contains('group'))){
+        window.__f.push(owner.dataset.guid);
+      }
+      return real.apply(this,arguments);
+    };
+    document.querySelector('.group[data-guid="@vsc-mru"] button[data-role="layout"]').click();
+    return JSON.stringify('switched');
+  `);
+  // Fixed, like checks 6 and 11: half the assertion is that something did *not* animate.
+  sleep(300);
+  /** @type {string[]} */
+  const flew = evaluate(`return JSON.stringify(window.__f);`);
+  const strangers = flew.filter(guid => guid !== '@vsc-mru');
+  check('mru-twin         a layout switch leaves the twin in another group alone',
+    strangers.length === 0, `${strangers.length} stray flights: ${strangers.join(',') || 'none'}`);
+  check('mru-twin         the switched group still flies',
+    flew.some(guid => guid === '@vsc-mru'), `${flew.length} flights`);
 }
 
 function foldSync() {
@@ -688,7 +809,10 @@ try {
   spineHover();
   scrimStacking();
   deleteDwell();
+  deleteZoneAfterLeavingWindow();
   scrollIsNotMovement();
+  resizeIsNotMovement();
+  mruTwinBaseline();
   foldSync();
   reducedMotion();
 } catch (err) {

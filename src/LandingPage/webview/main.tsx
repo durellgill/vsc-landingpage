@@ -243,14 +243,29 @@ function cards():HTMLElement[] {return Array.from(document.querySelectorAll<HTML
  *
  * Keys are namespaced because a group and a bookmark are separate GUID spaces and nothing stops
  * them colliding.
+ *
+ * A GUID does not identify a card on its own either. The same bookmark can sit in a group *and*
+ * in `Recent` - opening one from the group puts it in VS Code's recently-opened list, and the
+ * overlay then rebuilds a `Recent` entry for it - so two cards on the board carry the same GUID.
+ * Keyed on the GUID alone the two share one baseline, each render overwrites it with whichever
+ * card was measured last, and the next render reads the *other* card's position as movement:
+ * switching `Recent` between layouts flew a card in an untouched group across its neighbour and
+ * back, which is the whole bug. Repeats are therefore numbered in DOM order, which is stable
+ * across renders for as long as both cards are on the board.
  */
 function movingParts():{key:string; element:HTMLElement; card:boolean}[] {
   const parts:{key:string; element:HTMLElement; card:boolean}[] = [];
+  const seen = new Map<string,number>();
+  const unique = (key:string) => {
+    const count = seen.get(key) ?? 0;
+    seen.set(key, count+1);
+    return count ? `${key}#${count}` : key;
+  };
   for (const group of Array.from(document.querySelectorAll<HTMLElement>('.content .group'))) {
-    if (group.dataset.guid) {parts.push({key:`group:${group.dataset.guid}`, element:group, card:false});}
+    if (group.dataset.guid) {parts.push({key:unique(`group:${group.dataset.guid}`), element:group, card:false});}
   }
   for (const card of cards()) {
-    if (card.dataset.guid) {parts.push({key:`card:${card.dataset.guid}`, element:card, card:true});}
+    if (card.dataset.guid) {parts.push({key:unique(`card:${card.dataset.guid}`), element:card, card:true});}
   }
   return parts;
 }
@@ -576,6 +591,20 @@ function App() {
   const boxes = useRef(new Map<string,{left:number; top:number}>());
   const flights = useRef(new Map<string,Animation>());
   const settle = useRef(0);
+  /**
+   * Record where everything currently sits, without animating anything.
+   *
+   * Document-relative for the same reason the effect stores document-relative positions: the
+   * baseline is compared across renders, and a scroll in between must not read as movement.
+   * Only ever called when nothing is in flight, so every rect here is a real layout box.
+   */
+  const rebaseline = ()=>{
+    const dx = window.scrollX, dy = window.scrollY;
+    for (const part of movingParts()) {
+      const rect = part.element.getBoundingClientRect();
+      boxes.current.set(part.key, {left:rect.left+dx, top:rect.top+dy});
+    }
+  };
   useLayoutEffect(()=>{
     // Bumped before the mid-drag bail-out, so a settle scheduled by an earlier pass can never
     // write a baseline over a layout this pass has already moved on from.
@@ -704,13 +733,36 @@ function App() {
     // `finished` rejects on cancel, which is an ordinary outcome here, hence `allSettled`.
     Promise.allSettled(inAir.map(animation=>animation.finished)).then(()=>{
       if (token!==settle.current) {return;}
-      const dx = window.scrollX, dy = window.scrollY;
-      for (const part of movingParts()) {
-        const rect = part.element.getBoundingClientRect();
-        boxes.current.set(part.key, {left:rect.left+dx, top:rect.top+dy});
-      }
+      rebaseline();
     });
   });
+
+  /*
+   * The baseline is only ever written during a render, so a reflow that happens *without* one
+   * leaves it describing a layout that no longer exists. Dragging the editor panel narrower
+   * re-wraps every grid and re-flows every group, nothing re-renders, and then the next render
+   * for any reason at all reads that stale baseline as movement and flies groups nobody touched.
+   *
+   * Measured in the harness: narrow the panel, then switch `Recent` to another layout, and an
+   * untouched group above it slid its card 34px sideways - the width it lost to the resize,
+   * animated a beat late by the click that came after it.
+   *
+   * Re-measured rather than cleared, so the change that *did* happen still animates; clearing
+   * the map would take the switched group's own flight with it and the layout switch would snap.
+   *
+   * Nothing is done while anything is in the air: a rect read then is not a layout box, and the
+   * settle above is already waiting to write the correct baseline once it lands.
+   */
+  useEffect(()=>{
+    const onResize = ()=>{
+      if (flights.current.size) {return;}
+      const folding = Array.from(document.querySelectorAll<HTMLElement>('.content .foldable'));
+      if (folding.some(box=>box.getAnimations().length)) {return;}
+      rebaseline();
+    };
+    window.addEventListener('resize', onResize);
+    return ()=>window.removeEventListener('resize', onResize);
+  },[]);
   const hovered = useMemo(() => {
     if (!hover) {return null;}
     for (const group of model.groups) {
@@ -790,6 +842,38 @@ function App() {
     // itself - so it is `pointer-events: none` and there is no gap for the pointer to cross.
     setHover(null);
   }
+
+  /**
+   * Ends a drag that was released outside the window.
+   *
+   * Chromium never dispatches `dragend` when the pointer comes up outside the host window, so
+   * everything hung off it - the ghosted source card, the delete zone, the gap held open at the
+   * landing point - stayed stuck until some unrelated event happened to arrive.
+   *
+   * Every event below is suppressed by Chromium for the whole of a live native drag, so none of
+   * them can end a drag that is still running, and any one of them arriving is proof that the
+   * drag is already over. It is a list rather than a single event because which one shows up
+   * first depends on how the pointer comes back: sliding in over the board fires `mouseover` and
+   * `pointerover` before any `mousemove`, and clicking straight back in may fire only
+   * `mousedown`. `buttons` is the second guard - a stray move with the button still down is the
+   * gesture in progress, not the end of it.
+   *
+   * `keydown` is deliberately absent. It is delivered *during* a drag, because Escape cancels
+   * one, so it would tear down a live drag on any keypress.
+   *
+   * Cancel only. A release anywhere but inside the delete zone destroys nothing, so this
+   * deliberately does not go through `onRelease`.
+   */
+  useEffect(()=>{
+    if (!carry && !drag) {return;}
+    function abandoned(event:Event) {
+      if ('buttons' in event && (event as MouseEvent).buttons!==0) {return;}
+      setCarry(null); setDrag(null); setHover(null);
+    }
+    const proof = ['mousemove','mouseover','mousedown','pointermove','pointerover','pointerdown','wheel'];
+    for (const type of proof) {window.addEventListener(type,abandoned,true);}
+    return ()=>{for (const type of proof) {window.removeEventListener(type,abandoned,true);}};
+  },[!!carry,!!drag]);
 
   // Drag reorder. `index` is the position among user-created groups; the sealed Recent group
   // reports -1 and is neither draggable nor a drop target.
@@ -1146,6 +1230,28 @@ function DeleteZone({from,onRelease}:{from:string;onRelease:(armed:boolean)=>voi
   const overNow = useRef(false);
   const armedNow = useRef(false);
   const finished = useRef(false);
+  /**
+   * Start the dwell, unless it is already running.
+   *
+   * Called from both `dragenter` and `dragover`, because neither one alone is reliable.
+   * Entering the zone and stopping dead fires `dragenter` and nothing else, so `dragover` alone
+   * would never light the zone. And carrying a bookmark out of the webview - onto the terminal
+   * panel, or off the window - fires `dragleave` here and resets the zone while Chromium keeps
+   * it as the current drop target, so coming back resumes `dragover` with no `dragenter` at all
+   * and the zone stayed dead for the rest of the drag: never highlighted, never armed, with no
+   * way out but to drop and start again.
+   */
+  function wake() {
+    if (overNow.current) {return;}
+    overNow.current = true;
+    setOver(true);
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(()=>{
+      if (!overNow.current) {return;}
+      armedNow.current = true;
+      setArmed(true);
+    }, motion('--dur-arm').duration);
+  }
   function releaseIfOver(event:DragEvent) {
     const rect = zone.current?.getBoundingClientRect();
     const inside = !!rect && event.clientX>=rect.left && event.clientX<=rect.right && event.clientY>=rect.top && event.clientY<=rect.bottom;
@@ -1172,18 +1278,9 @@ function DeleteZone({from,onRelease}:{from:string;onRelease:(armed:boolean)=>voi
       // destructive action on `armed`, so an early release remains a no-op.
       event.preventDefault();
       if (event.dataTransfer) {event.dataTransfer.dropEffect = 'move';}
+      wake();
     }}
-    onDragEnter={()=>{
-      if (overNow.current) {return;}
-      overNow.current = true;
-      setOver(true);
-      window.clearTimeout(timer.current);
-      timer.current = window.setTimeout(()=>{
-        if (!overNow.current) {return;}
-        armedNow.current = true;
-        setArmed(true);
-      }, motion('--dur-arm').duration);
-    }}
+    onDragEnter={wake}
     onDragLeave={event=>{
       const to=event.relatedTarget as Node|null;
       if (to && (event.currentTarget as HTMLElement).contains(to)) {return;}
