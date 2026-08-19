@@ -7,13 +7,14 @@ Project instructions for coding agents working on Landing Page.
 - [DEVELOP.md](DEVELOP.md) explains the build, test, browser harness, and packaging workflow.
 - [DECISIONS.md](DECISIONS.md) records product and architecture decisions. Change that file when a durable decision changes. Do not turn this file into a change log.
 - [README.md](README.md) describes the extension from a user's point of view.
+- [TODO.md](TODO.md) holds ordered, in-flight work with a definition of done. Durable rules belong in DECISIONS.md, not there.
 
 ## Architecture
 
 Landing Page is a VS Code extension with three parts:
 
 1. `src/extension.ts` runs in the extension host. It may use the `vscode` API, Node APIs, and the filesystem.
-2. `src/LandingPage/webview/main.tsx` renders the Preact page inside a sandboxed webview. It cannot call `vscode`, require modules, or read files.
+2. `src/LandingPage/webview/` renders the Preact page inside a sandboxed webview. It cannot call `vscode`, require modules, or read files. `main.tsx` is the entry and owns all page state; see the webview map below.
 3. `src/LandingPage/communication.ts` dispatches messages between the page and the extension host.
 
 Put dialogs, filesystem access, clipboard access, VS Code commands, persistence, and recently opened history in the extension host. Put rendering and pointer or keyboard interaction in the webview.
@@ -35,6 +36,23 @@ Put dialogs, filesystem access, clipboard access, VS Code commands, persistence,
 | `uri-name-parts.ts` | Split URI labels and extensions |
 
 Keep `communication.ts` as a dispatcher. Put new host behavior in the module that answers the relevant question.
+
+## Webview code map
+
+Vite bundles all of these into the single IIFE the template inlines, so the split is for reading, not loading. The import graph is acyclic and must stay that way: nothing may import `main.tsx`.
+
+| Module | Responsibility |
+|---|---|
+| `main.tsx` | Entry, mount, and `App`, which owns every piece of page state |
+| `components.tsx` | Leaf components; they render what `App` hands them and post intent |
+| `bookmark-filter.ts` | Match and order bookmarks. Pure, and the only DOM-free code here |
+| `drag-geometry.ts` | Live measurement for dragging and FLIP |
+| `motion.ts` | Motion tokens, `stillness()`, and surface anchoring |
+| `presentation.tsx` | Model values to icons, glyphs, and shade keys |
+| `bridge.ts` | `post()` and the `acquireVsCodeApi` handle |
+| `types.ts` | Types more than one module needs |
+
+`bookmark-filter.ts` is pure on purpose. It is the only part of the page unit-testable without a browser, so keep DOM access out of it.
 
 ## Build rules
 
