@@ -81,3 +81,9 @@ scripts/design-agent.sh
 # Scratch screenshots taken while working on the page. Referenced by nothing.
 board.png
 board-*.png
+
+# Playwright run output. Baselines under `e2e/__aria__` and `e2e/__screenshots__` ARE committed -
+# they are the ground truth. These three are per-run artefacts and are not.
+playwright-report/
+blob-report/
+test-results/

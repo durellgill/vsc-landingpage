@@ -1,0 +1,102 @@
+- region "Work":
+  - button "Collapse Work" [expanded]:
+    - img
+  - heading "Work" [level=2]
+  - text: "4"
+  - button "Add to Work":
+    - img
+  - 'button "Work layout: list. Change layout"':
+    - img
+  - button "Settings for Work":
+    - img
+  - button "landing-page":
+    - img
+    - text: ""
+    - img
+    - text: main /Users/dev/Projects
+    - button "Copy path":
+      - img
+    - button "More actions":
+      - img
+  - button "api":
+    - img
+    - text: ""
+    - img
+    - text: feature/very-long-branch-name-here /Users/dev/Projects
+    - button "Copy path":
+      - img
+    - button "More actions":
+      - img
+  - button "notes.md":
+    - img
+    - text: notes.md /Users/dev/Documents
+    - button "Copy path":
+      - img
+    - button "More actions":
+      - img
+  - button "moved-away":
+    - img
+    - text: moved-away /Users/dev/Projects
+    - button "Copy path":
+      - img
+    - button "More actions":
+      - img
+- region "Playground":
+  - button "Collapse Playground" [expanded]:
+    - img
+  - heading "Playground" [level=2]
+  - text: "3"
+  - button "Add to Playground":
+    - img
+  - 'button "Playground layout: grid. Change layout"':
+    - img
+  - button "Settings for Playground":
+    - img
+  - button "shader-toys":
+    - img
+    - text: shader-toys /Users/dev/play
+    - button "Copy path":
+      - img
+    - button "More actions":
+      - img
+  - button "everything.code-workspace":
+    - img
+    - text: everything.code-workspace /Users/dev/play
+    - button "Copy path":
+      - img
+    - button "More actions":
+      - img
+  - button "scratch":
+    - img
+    - text: scratch /Users/dev
+    - button "Copy path":
+      - img
+    - button "More actions":
+      - img
+- region "Recent":
+  - button "Collapse Recent" [expanded]:
+    - img
+  - heading "Recent" [level=2]
+  - text: "2"
+  - button "Refresh the recently-opened list":
+    - img
+  - 'button "Recent layout: compact. Change layout"':
+    - img
+  - button "Settings for Recent":
+    - img
+  - button "vsc-landingpage":
+    - img
+    - text: ""
+    - img
+    - text: main /Users/dev/Projects
+    - button "Copy path":
+      - img
+    - button "More actions":
+      - img
+  - button "scratch":
+    - img
+    - text: scratch /Users/dev
+    - button "Copy path":
+      - img
+    - button "More actions":
+      - img

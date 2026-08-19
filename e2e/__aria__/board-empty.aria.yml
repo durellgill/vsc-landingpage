@@ -1,0 +1,19 @@
+- main:
+  - heading "Landing Page" [level=1]
+  - button "Open":
+    - img
+    - text: ""
+  - button "New":
+    - img
+    - text: ""
+    - img
+  - button "Clone a repository":
+    - img
+  - button "Settings":
+    - img
+  - heading "Nothing bookmarked yet" [level=2]
+  - paragraph: Make a group, then drag folders into it.
+  - button "New group":
+    - img
+    - text: ""
+  - status

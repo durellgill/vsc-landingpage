@@ -58,7 +58,7 @@
       },
       {
         "command": "vsc-landingpage.addToGroup",
-        "title": "➕ Add to Landing Page Group..."
+        "title": "\u2795 Add to Landing Page Group..."
       }
     ],
     "keybindings": [
@@ -129,7 +129,7 @@
     "install-local": "node scripts/install-local.mjs",
     "compile-tests": "node scripts/compile-tests.mjs",
     "watch-tests": "node scripts/compile-tests.mjs --watch",
-    "typecheck": "npm run typecheck:src && npm run typecheck:scripts",
+    "typecheck": "npm run typecheck:src && npm run typecheck:scripts && npm run typecheck:e2e",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test --fail-zero",
@@ -138,9 +138,15 @@
     "fallow": "fallow",
     "fallow:audit": "fallow audit --base origin/main",
     "typecheck:src": "tsc -p . --noEmit",
-    "typecheck:scripts": "tsc --noEmit --allowJs --checkJs --target es2022 --module nodenext --moduleResolution nodenext --skipLibCheck scripts/compile-tests.mjs scripts/motion-check.mjs"
+    "typecheck:scripts": "tsc --noEmit --allowJs --checkJs --target es2022 --module nodenext --moduleResolution nodenext --skipLibCheck scripts/compile-tests.mjs scripts/motion-check.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:update": "playwright test --update-snapshots",
+    "test:e2e:ui": "playwright test --ui",
+    "typecheck:e2e": "tsc --noEmit --strict --target es2022 --module esnext --moduleResolution bundler --skipLibCheck --types node playwright.config.ts e2e/*.spec.ts",
+    "test:e2e:docker": "docker run --rm --network host -v \"$PWD\":/w -w /w mcr.microsoft.com/playwright:v1.62.1-noble npx playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@preact/preset-vite": "^2.10.6",
     "@types/mocha": "^10.0.10",
     "@types/node": "^20.19.43",

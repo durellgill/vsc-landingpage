@@ -52,3 +52,9 @@ CLAUDE.md
 # Upstream's demo GIFs, which were the whole size of the extension. Nothing embeds them - the
 # readme only mentions the folder in passing - so shipping them cost 1.4 MB for no benefit.
 doc/**
+
+# Browser tests. Nothing here belongs in an installed extension.
+e2e/**
+playwright.config.ts
+playwright-report/**
+test-results/**

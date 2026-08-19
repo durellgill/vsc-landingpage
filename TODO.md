@@ -8,37 +8,37 @@ Decision and rationale: [D020](DECISIONS.md). This list is the how, not the why.
 
 The order matters. Each phase leaves the repository in a working state, and no phase depends on a later one. Do not start the port in phase 5 until phases 1 through 4 have run green at least once.
 
-### Phase 1: Install, without changing any existing check
+### Phase 1: Install, without changing any existing check - DONE
 
-- [ ] `npm i -D @playwright/test` and pin the version. `npx playwright install --with-deps chromium` for local runs. Chromium only; this page renders inside an Electron webview, so Firefox and WebKit prove nothing about the product.
-- [ ] Add `playwright.config.ts`. Required settings, each for a stated reason:
+- [x] `npm i -D @playwright/test` and pin the version. `npx playwright install --with-deps chromium` for local runs. Chromium only; this page renders inside an Electron webview, so Firefox and WebKit prove nothing about the product.
+- [x] Add `playwright.config.ts`. Required settings, each for a stated reason:
   - `webServer` pointing at `npm run harness` on port 5599, with `reuseExistingServer: !process.env.CI`, so the suite starts and stops the harness itself and stops leaking a server on failure.
   - `use: { viewport: { width: 1440, height: 640 } }` fixed, because a baseline is meaningless at a floating size.
   - `snapshotPathTemplate` including `{platform}` and `{projectName}`, so a macOS baseline and a Linux baseline never overwrite each other.
-  - `expect.toHaveScreenshot: { maxDiffPixels: 100 }` as the starting tolerance. Tighten it once the suite has run a few times; do not loosen it to make a failure go away.
-- [ ] Add `npm run test:e2e` and `npm run test:e2e:update`. Leave `npm run motion-check` exactly as it is.
-- [ ] Done when: `npm run test:e2e` runs and reports zero tests without error.
+  - `expect.toHaveScreenshot: { maxDiffPixels: 0 }`. It started at 100 and that was wrong: a deliberate shade-token change, green to blue, passed every visual spec. This board draws its accent as a 4px by 20px capsule (D017), so the whole mark is 80 pixels and the real diff measured 50 - the tolerance was larger than the thing it was meant to protect. Zero is stable across repeated runs here. Do not loosen it to make a failure go away.
+- [x] Add `npm run test:e2e`, `test:e2e:update`, `test:e2e:ui`, `test:e2e:docker`, and `typecheck:e2e`. `npm run motion-check` is unchanged.
+- [x] Done: 13 specs pass.
 
-### Phase 2: Aria snapshots, which need no baseline discipline
+### Phase 2: Aria snapshots, which need no baseline discipline - DONE
 
-- [ ] One spec covering the four states the harness already serves: default, `?empty`, `?theme=light`, `?healthy`.
-- [ ] Assert with `toMatchAriaSnapshot()`. These are text, they diff in a pull request, and they are identical on every platform, so they can be generated anywhere and reviewed by eye.
-- [ ] This is the enforcement D015 currently lacks. Cover at minimum: a bookmark card exposes its label and path, a missing target is announced, and no card carries an `aria-label` that would replace its accessible content name.
-- [ ] Done when: reverting a card to `aria-label` makes the suite fail. Observe that failure before accepting the work, per D016.
+- [x] `e2e/accessibility.spec.ts`: three aria snapshots plus five explicit D015 assertions.
+- [x] Done: adding `aria-label={project.label}` to the card in `components.tsx` made `no bookmark card carries an aria-label` fail, and reverting it passed. Observed, per D016.
+- Two lessons worth keeping. Assert on the browser's **computed** accessible name, not on attributes: an earlier version read only `aria-label` and `textContent` and called the row menus nameless, when they are named through `title`. And check that a generated baseline is not empty: `board-empty.aria.yml` first came out at zero bytes, because the empty state renders outside `.content`, and a zero-byte baseline is a test that can never fail.
 
-### Phase 3: Pixel baselines, in the container only
+### Phase 3: Pixel baselines, in the container only - DONE except the Linux set
 
-- [ ] `toHaveScreenshot()` for the same four states. `animations: 'disabled'` and `caret: 'hide'` are already the defaults, so do not restate them; `toHaveScreenshot` also waits until two consecutive screenshots agree before comparing, which handles a page still settling.
-- [ ] Generate and verify baselines **only** inside `mcr.microsoft.com/playwright:v<version>-noble`, matching the pinned dependency. A baseline generated on macOS will not match a Linux runner, because host font rasterization differs. This is the whole reason pixel diffs are quarantined here and aria snapshots are not.
-- [ ] Add a `npm run test:e2e:docker` wrapper so nobody has to remember the image tag.
+- [x] `e2e/appearance.spec.ts`, tagged `@visual`, covering the default board, light theme, empty state, a focused card, and a grid group. `animations: 'disabled'` and `caret: 'hide'` are already the defaults, so do not restate them; `toHaveScreenshot` also waits until two consecutive screenshots agree before comparing, which handles a page still settling.
+- [x] macOS baselines generated at `e2e/__screenshots__/darwin/`. **Linux baselines are still missing** - Docker was not available on the machine this was set up on. Generate and verify them inside `mcr.microsoft.com/playwright:v<version>-noble`, matching the pinned dependency. A baseline generated on macOS will not match a Linux runner, because host font rasterization differs. This is the whole reason pixel diffs are quarantined here and aria snapshots are not.
+- [x] `npm run test:e2e:docker` wraps the pinned image.
+- [ ] **Next action:** run `npm run test:e2e:docker -- --update-snapshots`, commit `e2e/__screenshots__/linux/`, then delete `--grep-invert @visual` from the browser job in `.github/workflows/ci.yml`.
 - [ ] Mask anything genuinely volatile with `mask:` rather than raising the tolerance.
-- [ ] Done when: changing a colour token in `landingpage.scss` fails the suite, and reverting it passes.
+- [x] Done: shifting `--shade-color` for green from `#39B457` to `#39B4FF` failed three specs at 50 differing pixels, and reverting passed three runs in a row. Observed, per D016.
 
-### Phase 4: Wire into CI
+### Phase 4: Wire into CI - DONE except the `@visual` grep
 
-- [ ] Add a job to `.github/workflows/ci.yml` running the Playwright suite in the same pinned container.
-- [ ] Upload `playwright-report/` and the trace on failure with `actions/upload-artifact`, so a red run is diagnosable without reproducing it locally.
-- [ ] Done when: a deliberately broken commit fails the workflow and the uploaded trace shows the failure.
+- [x] `browser` job added, running in `mcr.microsoft.com/playwright:v1.62.1-noble`, the same image as `test:e2e:docker`.
+- [x] Report and traces uploaded on failure, 7 day retention.
+- [ ] Done when a deliberately broken commit fails the workflow. **Not yet observed** - this has not run on GitHub. Verify on the first push.
 
 ### Phase 5: Port `motion-check.mjs`, last
 
