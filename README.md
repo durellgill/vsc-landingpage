@@ -1,6 +1,12 @@
 # Landing Page
 
-Landing Page is a customizable VS Code start page for bookmark groups and recently opened files, folders, and workspaces. See [AGENTS.md](AGENTS.md) for the agent runbook, [DECISIONS.md](DECISIONS.md) for durable product and architecture decisions, and [DEVELOP.md](DEVELOP.md) for the contributor workflow.
+[![CI](https://github.com/atechaccount/vsc-landingpage/actions/workflows/ci.yml/badge.svg)](https://github.com/atechaccount/vsc-landingpage/actions/workflows/ci.yml)
+
+Landing Page is a customizable VS Code start page for bookmark groups and recently opened files, folders, and workspaces.
+
+![The board: two user groups in list and grid layout, a missing target marked, and Recent below](doc/img/landing-page-dark.png)
+
+See [AGENTS.md](AGENTS.md) for the agent runbook, [DECISIONS.md](DECISIONS.md) for durable product and architecture decisions, and [DEVELOP.md](DEVELOP.md) for the contributor workflow.
 
 ## Running it locally
 
@@ -295,6 +301,8 @@ group* action is deliberately not offered on Recent entries.
 The page adopts your editor theme rather than bringing its own. Every colour resolves to a
 `--vscode-*` theme variable, so light, dark and high-contrast all work. The only fixed colours
 are the accent palette you pick bookmark shades from.
+
+![The same board under a light theme, unchanged except for the colours it inherits](doc/img/landing-page-light.png)
 
 ## Settings
 

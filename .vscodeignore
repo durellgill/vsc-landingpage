@@ -22,7 +22,23 @@ DECISIONS.md
 # package. None of this belongs in a VSIX regardless.
 .claude/**
 .agents/**
+.codex/**
+.fallow/**
+.fallowrc.json
+.impeccable/**
 skills-lock.json
+
+# CI configuration. Runs on GitHub, means nothing inside an installed extension.
+.github/**
+
+# Working scratch: standalone HTML the design tooling serves, dated worklogs, and the
+# tool-generated design and product briefs. All of these are gitignored too - `.vscodeignore`
+# does not inherit from `.gitignore`, so anything added there has to be added here as well or
+# it silently ships.
+live-preview/**
+WORKLOG-*.md
+DESIGN.md
+PRODUCT.md
 
 # Scratch screenshots taken while working on the page. Referenced by nothing.
 board.png
