@@ -121,7 +121,7 @@ Reason: Dragging is easier to trigger accidentally than choosing a menu action. 
 
 Considered instead: Setting `dropEffect` to `none` before the zone arms, which is invalid - a stationary pointer can retain that old verdict and suppress the final drop event entirely. Also considered: a small target instead of a dwell, rejected because it trades an accidental delete for a missed one.
 
-Consequences: The label moves from "Drag here" to "Hold" to "Release". The browser drop target remains enabled throughout the dwell; the drop handler gates the destructive action. `scripts/motion-check.mjs` asserts both halves - an early release is refused, an armed stationary release removes - so change the check with the behaviour.
+Consequences: The label moves from "Drag here" to "Hold" to "Release". The browser drop target remains enabled throughout the dwell; the drop handler gates the destructive action. `e2e/delete-zone.spec.ts` asserts both halves - an early release is refused, an armed stationary release removes - so change the check with the behaviour.
 
 ## D009: Persist before acknowledging a model change
 
@@ -217,7 +217,7 @@ Reason: The page has several visual-only actions and mixed layouts where documen
 
 Considered instead: `aria-label` on the bookmark card. Rejected because it replaces the accessible content name and hides the path and the missing-target state - the two things a screen reader user most needs from a bookmark. Also considered: document-order tab navigation, rejected because grid and compact layouts put the visually adjacent card several tab stops away.
 
-Consequences: Controls inside a card handle their own keyboard events. Opening a surface moves focus into it and closing restores focus. Do not put `aria-label` on a bookmark card. This contract is currently enforced by review rather than by automation: the colocated Mocha tests are host-only and cannot see the DOM, and `scripts/motion-check.mjs` asserts focus rings but no ARIA relationship. Treat a change here as unguarded and verify it by hand.
+Consequences: Controls inside a card handle their own keyboard events. Opening a surface moves focus into it and closing restores focus. Do not put `aria-label` on a bookmark card. The colocated Mocha tests are host-only and cannot see the DOM, so this contract is held by `e2e/accessibility.spec.ts`, which asserts the computed accessible names directly.
 
 ## D016: Tests are layered by what they can prove
 
@@ -241,7 +241,7 @@ Reason: The board previously spent the accent four ways in the space of two rows
 
 Considered instead: Keeping the full-height band and reducing its saturation. Rejected because the fusing problem is geometric, not chromatic - any full-height band on adjacent same-shade cards still reads as one stripe.
 
-Consequences: Do not restore a full-height spine, a shade plate, a shade-tinted card background, or a badge-style count. `--spine-scale` expresses the resting fraction (.5 unpainted, .75 painted, 1 hovered or focused) against a 4px box; `scripts/motion-check.mjs` asserts that box width, so change both together. The count stays a bare tabular numeral: VS Code reserves its own badge for unread or actionable counts, which this is not.
+Consequences: Do not restore a full-height spine, a shade plate, a shade-tinted card background, or a badge-style count. `--spine-scale` expresses the resting fraction (.5 unpainted, .75 painted, 1 hovered or focused) against a 4px box; `e2e/affordances.spec.ts` asserts that box width, so change both together. The count stays a bare tabular numeral: VS Code reserves its own badge for unread or actionable counts, which this is not.
 
 ## D018: The board is a centred column, and its controls span it
 
@@ -275,6 +275,6 @@ Decision: Browser tests that are committed, run unattended, and gate a merge are
 
 Reason: The two tools sit at different layers rather than competing. Ground truth is by definition committed and unattended, which is a test runner's job: per-test isolation, retries on flake, parallel workers, a reporter, and a trace viewer that replays a failed drag with a DOM timeline. Playwright also namespaces snapshot baselines per platform through `snapshotPathTemplate`, which is what makes a pixel baseline shot on macOS survive a Linux runner. `expect(page).toHaveScreenshot()` additionally waits until two consecutive screenshots agree before comparing, so a page still settling does not fail the run.
 
-Considered instead: Building the snapshot suite on `agent-browser`, which is already the idiom here and is npm-installable (0.34.0), so it could be pinned and run in CI. Rejected on three counts. Its interface is a synchronous shell-out, so waiting, retrying, and settling are hand-rolled - `scripts/motion-check.mjs` spawns a whole Node process per `sleep()` and JSON-double-parses every `evaluate()`, both forced by that boundary. It has no runner, so one script crashes out of every check after the failure. And its screenshot baselines are single-file, so one platform's font rasterization becomes the baseline for all of them.
+Considered instead: Building the snapshot suite on `agent-browser`, which is already the idiom here and is npm-installable (0.34.0), so it could be pinned and run in CI. Rejected on three counts. Its interface is a synchronous shell-out, so waiting, retrying, and settling are hand-rolled - the script this replaced spawned a whole Node process per `sleep()` and JSON-double-parsed every `evaluate()`, both forced by that boundary. It has no runner, so one script crashes out of every check after the failure. And its screenshot baselines are single-file, so one platform's font rasterization becomes the baseline for all of them.
 
-Consequences: This leaves two browser stacks in the repository until `scripts/motion-check.mjs` is ported, which is deliberate - those 25 checks encode behaviour that was expensive to learn, and porting them is separate work from adding new coverage. Do not add new committed browser checks to `motion-check.mjs`; add them to the Playwright suite. Pixel baselines are generated and verified only inside the pinned `mcr.microsoft.com/playwright` image, never from a developer machine, because host font rendering will not match the runner. Aria snapshots carry no such constraint and may be generated anywhere.
+Consequences: `scripts/motion-check.mjs` has been ported and deleted, so Playwright is the only committed browser stack. Its 25 assertions live in `e2e/flip.spec.ts`, `e2e/menus.spec.ts`, `e2e/delete-zone.spec.ts`, `e2e/affordances.spec.ts`, `e2e/fold.spec.ts` and `e2e/reduced-motion.spec.ts`, and they now run in CI, which the script never did - it needed a Homebrew `agent-browser` and a harness on 5599, so it gated no merge. Pixel baselines are generated and verified only inside the pinned `mcr.microsoft.com/playwright` image, never from a developer machine, because host font rendering will not match the runner. Aria snapshots carry no such constraint and may be generated anywhere.

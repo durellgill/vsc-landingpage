@@ -21,11 +21,11 @@
   "icon": "assets/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/atechaccount/vsc-landingpage"
+    "url": "https://github.com/Durellg/vsc-landingpage"
   },
-  "homepage": "https://github.com/atechaccount/vsc-landingpage#readme",
+  "homepage": "https://github.com/Durellg/vsc-landingpage#readme",
   "bugs": {
-    "url": "https://github.com/atechaccount/vsc-landingpage/issues"
+    "url": "https://github.com/Durellg/vsc-landingpage/issues"
   },
   "pricing": "Free",
   "activationEvents": [
@@ -134,12 +134,11 @@
     "lint": "eslint src",
     "test": "vscode-test --fail-zero",
     "harness": "npm run compile && npm run build:harness && node scripts/harness.mjs",
-    "motion-check": "node scripts/motion-check.mjs",
     "fallow": "fallow",
     "fallow:audit": "fallow audit --base origin/main",
     "impeccable": "impeccable",
     "typecheck:src": "tsc -p . --noEmit",
-    "typecheck:scripts": "tsc --noEmit --allowJs --checkJs --target es2022 --module nodenext --moduleResolution nodenext --skipLibCheck scripts/compile-tests.mjs scripts/motion-check.mjs",
+    "typecheck:scripts": "tsc --noEmit --allowJs --checkJs --target es2022 --module nodenext --moduleResolution nodenext --skipLibCheck scripts/compile-tests.mjs",
     "test:e2e": "playwright test",
     "test:e2e:update": "playwright test --update-snapshots",
     "test:e2e:ui": "playwright test --ui",

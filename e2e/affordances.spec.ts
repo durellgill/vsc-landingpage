@@ -1,0 +1,68 @@
+import { expect, test } from '@playwright/test';
+import { cards, openBoard, stillness } from './board';
+
+/**
+ * The spine and the focus ring: the two things that answer "which bookmark am I on".
+ *
+ * Keyboard navigation is the most repeated action on this page, so the ring must not ease - a
+ * 150ms colour transition on every arrow-key move reads as lag. The spine has been lost twice,
+ * both times to an unrelated refactor rather than to anyone repeating a mistake, which is what
+ * makes it worth a test rather than a review note.
+ */
+
+test('the focus ring does not ease, and focus reaches the full spine', async ({ page }) => {
+  // The ring eased its colour over 150ms on every arrow-key move, and the spine stopped
+  // responding to focus entirely when it moved from `width` to `transform`.
+  //
+  // The original check had to skip itself when the OS window was unfocused, because `:focus`
+  // does not match in a background window and a red run would have been a lie. Headless
+  // Chromium is deterministically focused, so the skip is gone and this now always runs.
+  await openBoard(page);
+
+  const focused = await cards(page).first().evaluate(card => {
+    card.focus();
+    const style = getComputedStyle(card);
+    const properties = style.transitionProperty.split(',').map(s => s.trim());
+    const durations = style.transitionDuration.split(',').map(s => s.trim());
+    const outline = properties.indexOf('outline-color');
+    return {
+      matchesFocus: card.matches(':focus'),
+      outlineDuration: outline >= 0 ? durations[outline] : 'absent',
+      scale: style.getPropertyValue('--spine-scale').trim(),
+      // 4px is the spine's full box - see `.spine` in landingpage.scss. What is asserted is that
+      // focus reaches it, not the number itself.
+      width: +card.querySelector('.spine')!.getBoundingClientRect().width.toFixed(1)
+    };
+  });
+
+  expect(focused.matchesFocus, 'the card never took focus, so nothing below means anything').toBe(true);
+  expect(focused.outlineDuration, 'the focus ring eases its colour').toBe('0s');
+  expect(focused.scale, 'focus did not grow the spine').toBe('1');
+  expect(focused.width, 'the focused spine is not at its full width').toBe(4);
+});
+
+test('a painted bookmark still grows its spine on hover', async ({ page }) => {
+  // A specificity trap, not a value. `--spine-scale` has to be declared only on `.project` and
+  // `.project:hover`; putting the painted variant's resting size on the same property would
+  // place it on `.project[data-shade]:not([data-shade=""])`, which outranks `:hover`, and
+  // painted bookmarks - the overwhelming majority of a real board - would become the only ones
+  // that ignored the pointer.
+  //
+  // Driven by a real pointer, because `:hover` cannot be faked from script.
+  await openBoard(page);
+
+  const painted = page.locator('.project[data-shade]:not([data-shade=""])').first();
+  const resting = await painted.evaluate(card => getComputedStyle(card).getPropertyValue('--spine-scale').trim());
+  expect(resting, 'no painted bookmark on the board, so the trap is untested').not.toBe('1');
+
+  await painted.hover();
+  await page.waitForFunction(() => !!document.querySelector('.project[data-shade]:not([data-shade=""]):hover'));
+  await stillness(page);
+
+  const hovered = await painted.evaluate(card => ({
+    scale: getComputedStyle(card).getPropertyValue('--spine-scale').trim(),
+    width: +card.querySelector('.spine')!.getBoundingClientRect().width.toFixed(1)
+  }));
+  expect(hovered.scale, 'a painted bookmark ignored the pointer').toBe('1');
+  expect(hovered.width, 'the hovered spine is not at its full width').toBe(4);
+});

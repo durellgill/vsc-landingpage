@@ -66,6 +66,7 @@ yarn.lock
 scripts/agent-chrome.sh
 .impeccable/
 skills-lock.json
+paseo.json
 
 # Working scratch from UI sessions: standalone HTML the design tooling serves, and dated
 # worklogs. Durable decisions belong in DECISIONS.md, not in a file named after a day.

@@ -244,7 +244,7 @@ function App() {
    * cancelled, which is the only way to get the real layout box back. The difference is the
    * offset, and it is **added, not subtracted**. Cancelling also keeps `boxes` clean, so the next
    * render compares against a layout position rather than a half-finished animation.
-   * `motion-check` asserts this direction; see `flip-direction`.
+   * `e2e/flip.spec.ts` asserts this direction; see "an interrupted flight keeps its direction".
    */
   const boxes = useRef(new Map<string,{left:number; top:number}>());
   const flights = useRef(new Map<string,Animation>());

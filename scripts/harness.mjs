@@ -62,7 +62,7 @@ const model = {
         {guid: 'p-5', label: 'everything.code-workspace', path: 'file:///Users/dev/play/everything.code-workspace', icon: 'workspace'},
         // Deliberately the same GUID as the `Recent` entry below. A bookmark that is also in
         // the recently-opened list appears twice on the board under one GUID, which is the
-        // state the `mru-twin` check in scripts/motion-check.mjs exists for. It twins the second
+        // state the twin check in e2e/flip.spec.ts exists for. It twins the second
         // `Recent` entry rather than the first, because only that one changes position when
         // `Recent` switches layout - and a twin that never moves proves nothing.
         {guid: 'MRU:b', label: 'scratch', path: 'file:///Users/dev/scratch', icon: 'folder'}

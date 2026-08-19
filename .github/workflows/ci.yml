@@ -24,10 +24,6 @@ jobs:
       # in order, and runs ESLint - so lint and build are covered here rather than as separate
       # steps. The suite itself downloads the pinned VS Code from `.vscode-test.mjs` and runs in
       # a real extension host, which needs a display; `xvfb-run` supplies one.
-      #
-      # `npm run motion-check` is deliberately absent. It drives a real browser through the
-      # `agent-browser` CLI against a running harness, neither of which exists on a runner. It
-      # stays a local check for UI changes, as AGENTS.md requires.
       - run: xvfb-run -a npm test
 
   # Browser-level checks against the real page, served by the harness. Runs in the Playwright

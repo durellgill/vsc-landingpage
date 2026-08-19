@@ -5,8 +5,8 @@ import { cards, openBoard } from './board';
  * The enforcement D015 did not have.
  *
  * Until this file existed the accessibility contract was held up by review alone: the
- * extension-host suite runs outside a DOM, and `motion-check` asserts focus rings but not one
- * accessible name. An aria snapshot is text, identical on every platform, and diffs in a pull
+ * extension-host suite runs outside a DOM, and the interaction specs assert focus rings but not
+ * one accessible name. An aria snapshot is text, identical on every platform, and diffs in a pull
  * request - so a change that collapses a card's accessible name shows up as a line, in words.
  */
 
