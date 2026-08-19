@@ -236,7 +236,7 @@ const stub = `<script>
 const server = createServer(async (request, response) => {
   const url = new URL(request.url, 'http://localhost');
   const payload = url.searchParams.has('empty') ? {groups: []} : model;
-  let html = (await renderer())('/assets', "'self'", harnessCspNonce);
+  let html = (await renderer())("'self'", harnessCspNonce);
   // The stub must be installed before the bundle runs, so it goes ahead of the page script.
   // ?healthy suppresses the missing-target verdict, for checking the undecorated board.
   const missing = url.searchParams.has('healthy') ? [] : ['p-6'];

@@ -23,10 +23,10 @@ DECISIONS.md
 .claude/**
 .agents/**
 .codex/**
-.fallow/**
-.fallowrc.json
 .impeccable/**
 skills-lock.json
+.fallowrc.json
+.fallow/**
 
 # CI configuration. Runs on GitHub, means nothing inside an installed extension.
 .github/**

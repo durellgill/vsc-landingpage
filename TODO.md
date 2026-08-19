@@ -30,7 +30,7 @@ The order matters. Each phase leaves the repository in a working state, and no p
 - [x] `e2e/appearance.spec.ts`, tagged `@visual`, covering the default board, light theme, empty state, a focused card, and a grid group. `animations: 'disabled'` and `caret: 'hide'` are already the defaults, so do not restate them; `toHaveScreenshot` also waits until two consecutive screenshots agree before comparing, which handles a page still settling.
 - [x] macOS baselines generated at `e2e/__screenshots__/darwin/`. **Linux baselines are still missing** - Docker was not available on the machine this was set up on. Generate and verify them inside `mcr.microsoft.com/playwright:v<version>-noble`, matching the pinned dependency. A baseline generated on macOS will not match a Linux runner, because host font rasterization differs. This is the whole reason pixel diffs are quarantined here and aria snapshots are not.
 - [x] `npm run test:e2e:docker` wraps the pinned image.
-- [ ] **Next action:** run `npm run test:e2e:docker -- --update-snapshots`, commit `e2e/__screenshots__/linux/`, then delete `--grep-invert @visual` from the browser job in `.github/workflows/ci.yml`.
+- [ ] **Next action, and it is not local.** Colima is installed and `npm run test:e2e:docker` now runs green, but its VM is aarch64 while `ubuntu-latest` is x86_64. With `maxDiffPixels: 0` an arm64 baseline is not evidence about an amd64 runner even inside the identical image, so generating `e2e/__screenshots__/linux/` here would commit a baseline that fails the first time CI compares against it. Generate them on the runner instead: push the branch, let the browser job run with `--update-snapshots`, download the artifact, commit it, then delete `--grep-invert @visual` from `.github/workflows/ci.yml`. Blocked until the GitHub remote is settled; see below.
 - [ ] Mask anything genuinely volatile with `mask:` rather than raising the tolerance.
 - [x] Done: shifting `--shade-color` for green from `#39B457` to `#39B4FF` failed three specs at 50 differing pixels, and reverting passed three runs in a row. Observed, per D016.
 
@@ -38,7 +38,7 @@ The order matters. Each phase leaves the repository in a working state, and no p
 
 - [x] `browser` job added, running in `mcr.microsoft.com/playwright:v1.62.1-noble`, the same image as `test:e2e:docker`.
 - [x] Report and traces uploaded on failure, 7 day retention.
-- [ ] Done when a deliberately broken commit fails the workflow. **Not yet observed** - this has not run on GitHub. Verify on the first push.
+- [ ] Done when a deliberately broken commit fails the workflow. **Not yet observed** - this has not run on GitHub. Verify on the first push. Both jobs were verified locally instead, in the pinned image: `npm ci` and the non-visual suite pass there.
 
 ### Phase 5: Port `motion-check.mjs`, last - NOT STARTED
 
@@ -66,5 +66,7 @@ neither authoritative, which is worse than either alone. Port the lot in one cha
 - Replacing `agent-browser` for interactive work. D020 keeps it deliberately.
 
 ## Unrelated, still open
+
+- [ ] The GitHub remote is `atechaccount/vsc-landingpage` and `main` is 44 commits ahead of `origin/main`. It has to move to the intended account before anything is pushed, and the Playwright pixel baselines are blocked behind it, because they can only be generated on an x86_64 runner. Nothing should be pushed until this is decided.
 
 - [ ] `publisher` in `package.json` is the placeholder `local`. It must become a real Marketplace publisher before `vsce publish`, and changing it re-namespaces stored bookmarks, so an installed development build and a published build will not share data.

@@ -63,6 +63,7 @@ yarn.lock
 .agents/
 .claude/
 .codex/
+scripts/agent-chrome.sh
 .impeccable/
 skills-lock.json
 
@@ -78,9 +79,11 @@ DESIGN.md
 PRODUCT.md
 scripts/design-agent.sh
 
-# Scratch screenshots taken while working on the page. Referenced by nothing.
-board.png
-board-*.png
+# Scratch screenshots taken while working on the page. Referenced by nothing. Anchored with a
+# leading slash: unanchored, `board-*.png` also swallowed the committed Playwright baselines
+# under `e2e/__screenshots__/`, and Playwright writes a missing baseline and passes on retry.
+/board.png
+/board-*.png
 
 # Playwright run output. Baselines under `e2e/__aria__` and `e2e/__screenshots__` ARE committed -
 # they are the ground truth. These three are per-run artefacts and are not.

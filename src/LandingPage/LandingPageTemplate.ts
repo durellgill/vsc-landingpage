@@ -1,4 +1,3 @@
-import type * as vscode from 'vscode';
 import { randomUUID } from 'node:crypto';
 import { icons } from './iconography';
 
@@ -14,20 +13,18 @@ import landingpageJs from './content/dist/landingpage-preact.js?raw';
  * Kept separate from {@link LandingPageTemplate} so the browser harness in
  * `scripts/harness.mjs` can render exactly the page the extension host renders.
  *
- * @param assetPath Webview URI of the extension's `assets/` folder, as a string.
  * @param cspSource Origin the webview serves local resources from.
  * @param cspNonce Single-use content security policy nonce for the inline bundle and styles.
  * @returns Complete HTML document.
  */
-export function renderLandingPage(assetPath:string, cspSource:string, cspNonce:string):string
+export function renderLandingPage(cspSource:string, cspNonce:string):string
 {
   let s:string = landingpageHtml;
 
   s = s.replaceAll('/*%landingpage.scss%*/',landingpageCss)
     .replaceAll('/*%landingpage-preact.js%*/',landingpageJs)
     .replaceAll('%cspSource%',cspSource)
-    .replaceAll('%cspNonce%',cspNonce)
-    .replaceAll('%assetPath%',assetPath);
+    .replaceAll('%cspNonce%',cspNonce);
 
   for (const [key, value] of Object.entries(icons)) //replace all ${iconname} placeholders with actual SVG source from iconography.ts
   {
@@ -44,14 +41,13 @@ export class LandingPageTemplate
 {
   /**
    * Generates the HTML source to be injected into the webview.
-   * @param assetPath Path of extension assets converted to Webview URL, see [Loading Local Content](https://code.visualstudio.com/api/extension-guides/webview#loading-local-content)
    * @param cspSource Value of `webview.cspSource`, the origin the webview serves local
-   *                  resources from. Required in the Content-Security-Policy meta tag,
-   *                  otherwise the custom mouse cursors in the SCSS are blocked.
+   *                  resources from. Required in the Content-Security-Policy meta tag's
+   *                  `img-src`.
    * @returns HTML
    */
-  public makeHTML(assetPath:vscode.Uri, cspSource:string):string
+  public makeHTML(cspSource:string):string
   {
-    return renderLandingPage(assetPath.toString(), cspSource, randomUUID());
+    return renderLandingPage(cspSource, randomUUID());
   }
 }

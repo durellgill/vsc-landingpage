@@ -84,6 +84,8 @@ Any regression check added for a bug must be observed failing against the broken
 
 Stop every harness or development server you start and confirm its port is free. Close every browser automation session you create.
 
+Container checks run on Colima, not Docker Desktop. Run `colima start` before `npm run test:e2e:docker` and `colima stop` afterwards; the `docker` CLI alone has no daemon behind it. The VM is aarch64 and CI is x86_64, so never generate Linux pixel baselines here. See [DEVELOP.md](DEVELOP.md).
+
 ## Releases
 
 Do not push, publish, rewrite history, or change the Marketplace publisher unless the user explicitly asks. `npx vsce package` is safe for local packaging. Update `CHANGELOG.md` and the package version only as part of an approved release.

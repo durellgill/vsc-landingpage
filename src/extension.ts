@@ -89,24 +89,20 @@ export function activate(context: vscode.ExtensionContext)
 					vscode.ViewColumn.One,
 					{
 							enableScripts: true,
-							// The webview only ever loads the cursor PNGs and the panel icon,
-							// so restrict local content to the assets folder.
-							localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'assets')],
+							// The page inlines its own CSS and JS, so it needs no local content at all.
+							localResourceRoots: [],
 							// retainContextWhenHidden: true,
 					}
 			);
 
 			landingpageWebviewPanel.iconPath = panelIconPath;
 
-			/** Webview-accessible path to extension assets, required to load custom cursors. */
-			const assetPath:vscode.Uri = landingpageWebviewPanel.webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, 'assets'));
-
 			model = context.globalState.get<LandingPageModel>('landingPageModel')|| {groups:[]};
 
 			landingpageWebviewPanel.webview.onDidReceiveMessage(async message => {
 				await runLandingPageAction(() => handleMessageFromWebview(message, landingpageWebviewPanel!, model));
 			}, undefined, context.subscriptions);
-			landingpageWebviewPanel.webview.html = new LandingPageTemplate().makeHTML(assetPath, landingpageWebviewPanel.webview.cspSource);
+			landingpageWebviewPanel.webview.html = new LandingPageTemplate().makeHTML(landingpageWebviewPanel.webview.cspSource);
 
 			landingpageWebviewPanel.onDidDispose(()=>{landingpageWebviewPanel=null;});
 

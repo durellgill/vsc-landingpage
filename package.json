@@ -137,13 +137,14 @@
     "motion-check": "node scripts/motion-check.mjs",
     "fallow": "fallow",
     "fallow:audit": "fallow audit --base origin/main",
+    "impeccable": "impeccable",
     "typecheck:src": "tsc -p . --noEmit",
     "typecheck:scripts": "tsc --noEmit --allowJs --checkJs --target es2022 --module nodenext --moduleResolution nodenext --skipLibCheck scripts/compile-tests.mjs scripts/motion-check.mjs",
     "test:e2e": "playwright test",
     "test:e2e:update": "playwright test --update-snapshots",
     "test:e2e:ui": "playwright test --ui",
     "typecheck:e2e": "tsc --noEmit --strict --target es2022 --module esnext --moduleResolution bundler --skipLibCheck --types node playwright.config.ts e2e/*.spec.ts",
-    "test:e2e:docker": "docker run --rm --network host -v \"$PWD\":/w -w /w mcr.microsoft.com/playwright:v1.62.1-noble npx playwright test"
+    "test:e2e:docker": "docker run --rm -v \"$PWD\":/w -v /w/node_modules -w /w mcr.microsoft.com/playwright:v1.62.1-noble sh -c 'npm ci --no-audit --no-fund && npx playwright test \"$@\"' sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
@@ -156,7 +157,8 @@
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.1.0",
     "eslint": "^10.8.0",
-    "fallow": "^3.14.0",
+    "fallow": "^3.17.0",
+    "impeccable": "^3.6.0",
     "sass": "^1.83.1",
     "typescript": "^5.7.2",
     "vite": "^8.2.0"

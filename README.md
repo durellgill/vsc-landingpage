@@ -4,6 +4,8 @@
 
 Landing Page is a customizable VS Code start page for bookmark groups and recently opened files, folders, and workspaces.
 
+A fork of [René Bühling's Landing Page](https://github.com/renebuehling/vsc-landingpage), MIT licensed. Published under a separate publisher id so it installs alongside the original rather than replacing it.
+
 ![The board: two user groups in list and grid layout, a missing target marked, and Recent below](doc/img/landing-page-dark.png)
 
 See [AGENTS.md](AGENTS.md) for the agent runbook, [DECISIONS.md](DECISIONS.md) for durable product and architecture decisions, and [DEVELOP.md](DEVELOP.md) for the contributor workflow.

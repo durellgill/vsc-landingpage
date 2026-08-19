@@ -12,6 +12,8 @@ Use Node.js 20.19 or newer, or Node.js 22.12 or newer. Run `npm install` once af
 | `npm test` | Runs the extension tests in the pinned VS Code 1.125 Extension Development Host. | Host logic, commands, storage, packaging, and before a commit. |
 | `npm run harness` | Builds and serves the real webview with a stubbed host at `http://localhost:5599`. | Webview behavior and visual work. |
 | `npm run motion-check` | Exercises browser-only interaction regressions against a running harness. | Webview behavior, layout, drag and drop, menus, focus, or motion. |
+| `npm run test:e2e` | Drives the real page in Chromium through the harness and checks accessible names, geometry, focus, and appearance. | Webview behavior and visual work. |
+| `npm run test:e2e:docker` | Runs the same suite inside the pinned Playwright Linux image. | Reproducing a CI browser failure, or touching a Linux pixel baseline. |
 | `npm run vsix` | Builds the installable package and runs the prepublish build. | Before release or manual installation testing. |
 
 One Windows-only shell-quoting test is expected to be skipped on macOS and Linux. Every other skipped, flaky, or failed check needs an explanation.
@@ -30,6 +32,16 @@ Run `npm run harness`, open `http://localhost:5599`, and stop the server when fi
 
 The harness renders the same HTML, CSS, and Preact bundle as the extension. It records outgoing messages on `window.__posted`. Assert messages and state for behavior; use screenshots only for appearance.
 
+## Container runs
+
+The container runtime on this machine is [Colima](https://github.com/abiosoft/colima), not Docker Desktop. `/opt/homebrew/bin/docker` is only the CLI client, so every container command fails with a daemon connection error until a VM is running.
+
+- `colima start` before `npm run test:e2e:docker`, and `colima stop` when finished. Starting it is what creates the `colima` Docker context.
+- The script installs dependencies inside the container, into an anonymous volume mounted over `/w/node_modules`. It cannot reuse the host tree, because that holds darwin-arm64 native binaries for Rollup and Oxc that Linux cannot load.
+- `package-lock.json` must stay valid on both platforms. A lock file resolved only on macOS omits the Linux-only optional branch, and `npm ci` then refuses to install on any Linux machine, including both CI jobs. Regenerate it inside the Linux image, not on the host, and confirm `npm ci --dry-run` still passes on macOS afterwards.
+
+Architecture matters here, and only for pixel baselines. Colima's default VM is aarch64; GitHub's `ubuntu-latest` is x86_64. Aria snapshots are text and identical on every platform, which is why they carry no `{platform}` in their path template and run everywhere from the first commit. Screenshots are not: `maxDiffPixels` is 0, so a baseline rendered on arm64 Linux is not trustworthy against an amd64 runner even inside the identical image. Generate `e2e/__screenshots__/linux/` on the runner and commit the artifact, rather than producing it here under emulation.
+
 ## Adding tests
 
 - Put host and model logic in focused `*.test.ts` files beside the behavior they cover.
@@ -38,6 +50,20 @@ The harness renders the same HTML, CSS, and Preact bundle as the extension. It r
 - Reproduce a bug first and confirm the new regression fails against the broken implementation before applying the fix.
 - Keep the harness message timing and data serialization aligned with the real extension host.
 - Test both the safe and destructive paths for confirmations and drag-to-delete behavior.
+
+## Agent tooling
+
+Two analysis CLIs are ordinary dev dependencies, so `npm install` is all a fresh clone needs to run them:
+
+| Command | Purpose |
+|---|---|
+| `npm run fallow:audit` | Dead code, complexity, duplication, and style drift in the diff against `origin/main`. Configured by `.fallowrc.json`. |
+| `npm run fallow -- health --hotspots` | Any other Fallow subcommand; the script is a passthrough. |
+| `npm run impeccable -- detect http://localhost:5599/` | UI anti-pattern scan of the running harness. It measures a rendered page, so pointing it at source files silently reports nothing. |
+
+Neither is wired into `pretest`. They are advisory and their findings are noisy on this codebase, so read them, do not gate on them.
+
+Both packages also ship agent skills, which are a separate install: `npx impeccable install`. Skills land in `.claude/skills/`, which is Git-ignored on purpose - the entries there are symlinks into `.agents/`, outside the repository, and committing them would publish broken links. Anything those skills generate (`.impeccable/`, `DESIGN.md`, `PRODUCT.md`, `scripts/design-agent.sh`) is ignored for the same reason.
 
 ## Recommended future coverage
 
