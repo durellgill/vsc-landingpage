@@ -2,9 +2,15 @@
 /**
  * Motion regression check.
  *
- * Eight things on this page were broken in ways a build, a typecheck and a lint all pass through
- * happily, because every one of them is a *behaviour* rather than a value. Each check below is a
- * bug that actually shipped here, reduced to the smallest assertion that would have caught it:
+ * Fourteen checks, 25 assertions. Every one covers a *behaviour* rather than a value, which is
+ * why a build, a typecheck and a lint all pass through them happily.
+ *
+ * Entries 1 to 11 are bugs that actually shipped here, each reduced to the smallest assertion
+ * that would have caught it. Entries 12 to 14 guard a rule that has not been broken yet.
+ *
+ * Do not delete a check because its bug is fixed - that is what makes it a regression check.
+ * The spine's focus response alone has been lost twice (see 5), both times by an unrelated
+ * refactor rather than by anyone repeating a mistake. See D016 and D020 in DECISIONS.md.
  *
  *   1. flip-direction      an interrupted card flight flew the wrong way, because
  *                          getBoundingClientRect() reports an in-progress transform and the
@@ -35,6 +41,15 @@
  *  11. mru-twin           a bookmark that is also in `Recent` appears twice under one GUID, and
  *                          the two cards shared one FLIP baseline - so switching `Recent` between
  *                          layouts flew the group's copy across its neighbour and back.
+ *  12. spine-hover        a painted bookmark must still grow its spine on hover. Guards a
+ *                          specificity trap: `--spine-scale` has to be declared only on
+ *                          `.project`, or a painted card's own rule wins and the hover is lost.
+ *  13. scrim-stacking     the scrim dims by colour, never by opacity, because an animated
+ *                          opacity creates a stacking context and takes the layering with it.
+ *  14. fold-sync          the chevron and the group's height are one gesture expressed twice
+ *                          and must settle together. Asserts a drift threshold, so it is the
+ *                          most flake-prone check here - make it assert ordering when this
+ *                          moves to Playwright (D020).
  *
  * Usage:
  *   npm run harness        # in another shell, or leave one running on 5599
@@ -359,7 +374,9 @@ function focusChecks() {
     return;
   }
   check('focus-instant  focus ring does not ease its colour', r.outlineDuration === '0s', `got ${r.outlineDuration}`);
-  check('focus-instant  focused spine reaches full width', r.spine === '1' && r.spineWidth === 5,
+  // 4px is the spine's full box - see `.spine` in landingpage.scss. What is being asserted is
+  // that focus reaches it, not the number itself.
+  check('focus-instant  focused spine reaches full width', r.spine === '1' && r.spineWidth === 4,
     `scale=${r.spine} width=${r.spineWidth}`);
 }
 
@@ -387,7 +404,7 @@ function spineHover() {
       width:+c.querySelector('.spine').getBoundingClientRect().width.toFixed(1)});
   `);
   check('spine-hover  a painted bookmark still grows its spine on hover',
-    painted.rest !== '1' && hovered.scale === '1' && hovered.width === 5,
+    painted.rest !== '1' && hovered.scale === '1' && hovered.width === 4,
     `rest=${painted.rest} hover=${hovered.scale} width=${hovered.width}`);
 }
 

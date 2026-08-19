@@ -21,6 +21,7 @@ import svgFolderPlus from 'lucide-static/icons/folder-plus.svg?raw';
 import svgAppWindow from 'lucide-static/icons/app-window.svg?raw';
 import svgFileSliders from 'lucide-static/icons/file-sliders.svg?raw';
 import svgFileQuestion from 'lucide-static/icons/file-question.svg?raw';
+import svgFile from 'lucide-static/icons/file.svg?raw';
 import svgSquareMousePointer from 'lucide-static/icons/square-mouse-pointer.svg?raw';
 import svgMove from 'lucide-static/icons/move.svg?raw';
 import svgSettings from 'lucide-static/icons/settings.svg?raw';
@@ -125,6 +126,7 @@ export const icons=
   appWindow : icon(svgAppWindow),
   fileSliders : icon(svgFileSliders),
   fileQuestion : icon(svgFileQuestion),
+  file : icon(svgFile),
   
   squareMousePointer : icon(svgSquareMousePointer),
   move : icon(svgMove),
