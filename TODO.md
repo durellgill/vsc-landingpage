@@ -40,12 +40,23 @@ The order matters. Each phase leaves the repository in a working state, and no p
 - [x] Report and traces uploaded on failure, 7 day retention.
 - [ ] Done when a deliberately broken commit fails the workflow. **Not yet observed** - this has not run on GitHub. Verify on the first push.
 
-### Phase 5: Port `motion-check.mjs`, last
+### Phase 5: Port `motion-check.mjs`, last - NOT STARTED
+
+Scoping note from reading the source. The 25 checks are not thin wrappers over Playwright
+primitives; they inject instrumentation into the page - monkey-patching `Element.prototype.animate`
+to capture FLIP keyframes, `requestAnimationFrame` sampling loops to measure a gap across 43
+frames, synthetic `DataTransfer` drag sequences. Playwright removes the plumbing (`waitUntil`,
+the process-spawning `sleep`, the JSON double-parse) but not the instrumentation, which has to
+move across roughly as-is.
+
+Do not port them piecemeal. A half-ported suite means two files covering the same behaviour, with
+neither authoritative, which is worse than either alone. Port the lot in one change, or leave
+`motion-check.mjs` as the incumbent.
 
 - [ ] Port the 25 checks in `scripts/motion-check.mjs` to Playwright, one behaviour per test so a failure no longer skips everything after it.
 - [ ] Port the assertions, not the plumbing. `waitUntil`, `sleep` and the JSON double-parse in `evaluate` exist only because the `agent-browser` boundary is a synchronous shell-out; Playwright's auto-waiting and in-process `evaluate` replace all three. The header comment in that file explains what each check caught in production - carry those explanations across, they are the reason the checks exist.
 - [ ] Keep the checks that assert *geometry* as geometry. A pixel diff showing a red rectangle is worse than an assertion that says the focus ring escaped its clip.
-- [ ] Add the check that would have caught D019: nothing that indicates state may be clipped by an ancestor. Assert the painted outline rect against the nearest ancestor with a non-visible `overflow`.
+- [x] `e2e/clipping.spec.ts` adds the check that would have caught D019, in both list and grid. It asserts the painted outline rect against the nearest ancestor with a non-visible `overflow`, rather than asserting `outline-offset === -2px`: the value check would pass for a future change that reintroduced the bug another way, and fail for a correct one that used a box-shadow. Observed failing by restoring `outline-offset: 1px`, which reported `escapes its clip on the left, received 3` in both layouts. This is the only phase 5 item done, and it adds coverage rather than duplicating `motion-check`.
 - [ ] Done when: every check in the old file has an equivalent, each was observed failing against the broken behaviour it describes, and `scripts/motion-check.mjs` is deleted in the same change. Remove the two-stack note from D020's consequences at that point.
 
 ### Not in scope
