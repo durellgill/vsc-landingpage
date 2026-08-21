@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { icons } from './iconography';
 
 import landingpageHtml from './content/landingpage-preact.html?raw';
-import landingpageCss from './content/landingpage.scss?inline';
+import landingpageCss from './content/landingpage.css?inline';
 import landingpageJs from './content/dist/landingpage-preact.js?raw';
 
 /**
@@ -12,7 +12,7 @@ export function renderLandingPage(cspSource:string, cspNonce:string):string
 {
   let s:string = landingpageHtml;
 
-  s = s.replaceAll('/*%landingpage.scss%*/',landingpageCss)
+  s = s.replaceAll('/*%landingpage.css%*/',landingpageCss)
     .replaceAll('/*%landingpage-preact.js%*/',landingpageJs)
     .replaceAll('%cspSource%',cspSource)
     .replaceAll('%cspNonce%',cspNonce);

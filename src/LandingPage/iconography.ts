@@ -76,7 +76,7 @@ import svgSearch from 'lucide-static/icons/search.svg?raw';
 import svgFolderOpen from 'lucide-static/icons/folder-open.svg?raw';
 
 /**
- * Strips the fixed 24x24 sizing off a raw Lucide SVG so the SCSS controls icon size.
+ * Strips the fixed 24x24 sizing off a raw Lucide SVG so the CSS controls icon size.
  *
  * The webpack build used svg-inline-loader, which removed those attributes for us. Vite's
  * `?raw` import returns the file untouched, so the same normalisation happens here.

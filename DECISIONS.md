@@ -32,7 +32,7 @@ Every entry uses the same five fields, so a specific field can be searched acros
 
 Status: active
 
-Decision: `src/LandingPage/webview/main.tsx` is the only page implementation. `LandingPageTemplate.ts` inlines its compiled JavaScript, `landingpage.scss`, and `landingpage-preact.html` into the VS Code webview.
+Decision: `src/LandingPage/webview/main.tsx` is the only page implementation. `LandingPageTemplate.ts` inlines its compiled JavaScript, `landingpage.css`, and `landingpage-preact.html` into the VS Code webview.
 
 Reason: Parallel page implementations drift, keep dead message handlers alive, and make a change look complete when only one path was updated.
 
@@ -193,7 +193,7 @@ Shade keys are persisted user data and cannot be casually renamed.
 
 Status: active
 
-Decision: Motion uses the curves and durations declared at the top of `landingpage.scss`. JavaScript animations read the same tokens through `motion()`.
+Decision: Motion uses the curves and durations declared at the top of `landingpage.css`. JavaScript animations read the same tokens through `motion()`.
 
 Reason: Independent values drift and make parts of one gesture settle at different times.
 
@@ -265,11 +265,26 @@ Considered instead: Letting the column fill the full width. Rejected because the
 Consequences: Do not give a page-level element its own max-width. The filter is body size, not enlarged: it filters a list already on screen and is not a search hero. It is not rendered at all when the board has no groups, because a filter over nothing is a control that cannot act - the `/` shortcut checks for the field before it swallows the keystroke.
 Filtering temporarily reveals collapsed groups without changing persisted collapse state, and a group with no visible matches is omitted.
 
-Consequences: A card is guaranteed 6px outside itself and no more, so any future outline, shadow, or halo on `.project` must fit in it. The margin has no per-axis form in Chromium, so it also lets content past the block edges: while a group expands, the next row's spine showed as a 6px fragment below the fold edge. `components.tsx` therefore zeroes the margin for the flight and restores it on finish - nothing has to escape the box mid-fold, since a ring only needs to be whole at rest. `e2e/clipping.spec.ts` asserts the general rule, measuring against the clip edge including its margin rather than against the bare box, and `e2e/fold.spec.ts` holds the mid-flight case. This remains the general case of the boundary noted in D014: the popover top layer solves it for surfaces, and ordinary in-page elements have to be given room explicitly.
+## D019: Focus indicators use reserved paint room outside the card
+
+Status: active
+
+Decision: A focused bookmark card draws its ring outside its box with a 2px `outline-offset`.
+At rest, `.foldable` grants 6px through `overflow-clip-margin`; while a group folds, `components.tsx` temporarily removes that margin so the next row cannot leak into the animation.
+
+Reason: Drawing the ring inside the card overlapped the shade spine in its leading gutter.
+Drawing it outside without reserved paint room let the fold clip cut off whole sides in list and grid layouts.
+
+Considered instead: Keeping the ring inside the card, rejected because the ring and spine then occupy the same pixels.
+Also considered lifting the fold clip, rejected because the surviving clipped container is what gives the fold animation a box after its cards unmount.
+
+Consequences: A card is guaranteed 6px outside itself and no more, so any future resting outline, shadow, or halo on `.project` must fit inside that allowance.
+The margin has no per-axis form in Chromium, so `e2e/fold.spec.ts` retains the mid-flight guard and focus-indicator changes must be inspected in both list and grid layouts through the harness.
+This remains the in-page counterpart to D014: the popover top layer solves clipping for surfaces, while ordinary elements must be granted paint room explicitly.
 
 ## D020: Committed browser tests use Playwright; agent-browser stays interactive
 
-Status: accepted, not yet implemented. See `TODO.md` for the migration steps.
+Status: active
 
 Decision: Browser tests that are committed, run unattended, and gate a merge are written with Playwright. `agent-browser` remains the tool for interactive and exploratory work, where an agent drives the page one command at a time.
 
@@ -277,4 +292,7 @@ Reason: The two tools sit at different layers rather than competing. Ground trut
 
 Considered instead: Building the snapshot suite on `agent-browser`, which is already the idiom here and is npm-installable (0.34.0), so it could be pinned and run in CI. Rejected on three counts. Its interface is a synchronous shell-out, so waiting, retrying, and settling are hand-rolled - the script this replaced spawned a whole Node process per `sleep()` and JSON-double-parsed every `evaluate()`, both forced by that boundary. It has no runner, so one script crashes out of every check after the failure. And its screenshot baselines are single-file, so one platform's font rasterization becomes the baseline for all of them.
 
-Consequences: `scripts/motion-check.mjs` has been ported and deleted, so Playwright is the only committed browser stack. Its 25 assertions live in `e2e/flip.spec.ts`, `e2e/menus.spec.ts`, `e2e/delete-zone.spec.ts`, `e2e/affordances.spec.ts`, `e2e/fold.spec.ts` and `e2e/reduced-motion.spec.ts`, and they now run in CI, which the script never did - it needed a Homebrew `agent-browser` and a harness on 5599, so it gated no merge. Pixel baselines are generated and verified only inside the pinned `mcr.microsoft.com/playwright` image, never from a developer machine, because host font rendering will not match the runner. Aria snapshots carry no such constraint and may be generated anywhere.
+Consequences: `scripts/motion-check.mjs` has been ported and deleted, so Playwright is the only committed browser stack and browser checks live under `e2e/`.
+Normal extension users download no test browser.
+Contributors install Playwright's pinned Chromium only when they need the browser suite; CI uses the pinned Playwright image.
+Pixel baselines come from the matching CI architecture because host and CPU-specific font rendering can differ, while aria snapshots are text and may be generated anywhere.

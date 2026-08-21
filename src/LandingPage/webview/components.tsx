@@ -53,7 +53,7 @@ export function GroupShelf({group,index,needles,composer,setComposer,openMenu,re
   // Named regions, and a heading level below the page's own. Every group used to render an
   // `<h1>`, so a board of six groups had seven of them and navigating by heading gave no
   // hierarchy at all; the `<section>` had no accessible name, so it was not exposed as a region
-  // either. The SCSS hooks `.group-label` rather than the tag, so the level is free to change.
+  // either. The CSS hooks `.group-label` rather than the tag, so the level is free to change.
   const groupLabelId=`grp-${group.guid}-label`;
   return <section class={`group${sealed?' sealed':''}${dragging?' dragging':''}${collapsed?' collapsed':''}`} aria-labelledby={groupLabelId} data-guid={group.guid} data-shade={shadeForGroup(group)} data-drop={drop||undefined} data-receiving={receiving?'yes':undefined}
     onContextMenu={event=>openMenu(event,group.guid)}
@@ -93,7 +93,7 @@ export function BookmarkCard({project,missing,branch,openMenu,carried,onCarry,dr
   const labelId=`bm-${project.guid}-label`; const descId=`bm-${project.guid}-desc`;
   return <article class={`project interactable${carried?' dragging':''}`} tabIndex={0} role="button" aria-labelledby={labelId} aria-describedby={descId} data-guid={project.guid} data-shade={shade} data-kind={type} data-missing={missing?'yes':undefined} data-pinned={project.pinned?'yes':undefined} data-drop={dropEdge}
     // `translate`, not `transform`: the card transitions its scale and its slide at different
-    // speeds (see `.project` in the SCSS), which one `transform` declaration cannot do.
+    // speeds (see `.project` in the CSS), which one `transform` declaration cannot do.
     style={shift ? `translate: 0 ${shift}px` : undefined}
     draggable onDragStart={event=>{if (event.dataTransfer) {event.dataTransfer.effectAllowed='copyMove'; event.dataTransfer.setData('text/plain',project.guid);} onCarry(project.guid, event.currentTarget as HTMLElement);}} onClick={event=>{if (!(event.target as Element).closest('button')) {post('open',{guid:project.guid, newWindow:(event.ctrlKey||event.metaKey) && opensInWindow(project)});}}} onContextMenu={event=>openMenu(event,project.guid)}><div class="spine"/><div class="pictoral"><Svg name={iconFor(project)}/></div><div class="textblock"><div class="project-label" id={labelId}>{project.label}</div><div class="project-path" id={descId}>{missing && <span class="missing-badge"><Svg name="triangleAlert"/>Missing</span>}{branch && <span class="branch-badge"><Svg name="gitBranch"/><span class="branch-name">{branch}</span></span>}{project.pinned && <span class="sr-only">Pinned. </span>}<span class="path-text">{parent}</span></div></div>{project.pinned && <span class="pin-marker" role="img" aria-label="Pinned to the top of this group"><Svg name="pin"/></span>}{project.path && <button class="rowcopy" data-copied={copied?'yes':undefined} title={copied?'Path copied':'Copy path'} aria-label={copied?'Path copied':'Copy path'} onClick={()=>post('copyPath',{guid:project.guid})}><Svg name={copied?'check':'copy'}/></button>}<button class="rowmenu" title="More actions" onClick={event=>openMenu(event,project.guid)}><Svg name="ellipsis"/></button></article>;
 }

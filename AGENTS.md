@@ -60,7 +60,7 @@ It is the only part of the page unit-testable without a browser, so keep it free
 `npm run compile` runs two Vite builds in order. The webview bundle must be built before the extension bundle because `LandingPageTemplate.ts` imports the generated webview JavaScript as text.
 
 - `src/LandingPage/content/dist/`, `dist/`, and `out/` are generated. Never edit them.
-- `LandingPageTemplate.ts` imports `landingpage.scss` with `?inline`. There is no standalone CSS build or generated CSS file.
+- `LandingPageTemplate.ts` imports `landingpage.css` with `?inline`. There is no standalone CSS build or generated CSS file.
 - `iconography.ts` may strip `width` and `height` only from the opening `<svg>` tag. Child geometry must remain untouched.
 - Vite 8 uses `minify: 'oxc'`; esbuild is not bundled.
 - `tsconfig.json` must keep `"include": ["src"]` so TypeScript does not pull Vite configuration files under `rootDir`.
@@ -72,7 +72,7 @@ It is the only part of the page unit-testable without a browser, so keep it free
 - Persist model changes with `await saveLandingPageModel(...)` before posting the updated model back to the page.
 - Colors must resolve to VS Code theme variables except for the user-facing bookmark shade palette.
 - Every interactive feature must work from the keyboard. Opening surfaces take focus and return it to their trigger.
-- Use the shared motion tokens in `landingpage.scss`. Reduced motion removes movement while retaining feedback and destructive safeguards.
+- Use the shared motion tokens in `landingpage.css`. Reduced motion removes movement while retaining feedback and destructive safeguards.
 - The delete zone is armed by dwell. Releasing before it arms does nothing; releasing after it arms must post `remove` or `hideRecent` even if the pointer stayed still.
 
 Read [DECISIONS.md](DECISIONS.md) before changing these constraints. Update the decision record when the product rule changes.

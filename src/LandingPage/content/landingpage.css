@@ -1,0 +1,1829 @@
+/*
+ *--- tokens and base --------------------------------------------------------
+ * Everything the rest of the file resolves against, plus the page's own type and colour.
+ * Kept as one rule: `.landingpage` is the scope every other selector is written under, and
+ * splitting it would put the same selector in two places, which is the thing this file was
+ * cleaned up to stop doing.
+ */
+.landingpage {
+  --gapspace: 16px;
+  --gapspace-s: 8px;
+  --ctrlspace: 2px;
+  --radius: 6px;
+  --radius-s: 4px;
+  --radius-full: 99px;
+  --buttonsize: 24px;
+  /*
+   * `--rail-width` remains zero only because existing offset rules still consume it.
+   */
+  --rail-width: 0px;
+  --page-max: 920px;
+  --mono: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, Menlo, monospace);
+  /*
+   * The three curves mean arrival or response, movement, and hover color. Choose by motion purpose, not component.
+   */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-move: cubic-bezier(.2, .7, .3, 1);
+  --ease-hover: ease;
+  --dur-press: .1s; /* press and release feedback, the fastest thing on the page */
+  --dur-hover: .15s; /* anything tracking the pointer: hover colour, the spine, drag feedback */
+  --dur-enter: .18s; /* something appearing: a card, a menu, a tick, the hover popover */
+  --dur-move: .22s; /* something travelling: FLIP, group height, the fold chevron */
+  /*
+   * `--dur-enter` is animation-only, pointer-following feedback uses `--dur-hover`, and the continuous clone spinner is outside the transition scale.
+   */
+  --dur-arm: .3s;
+  --accent-color: var(--vscode-focusBorder);
+  --danger-color: var(--vscode-errorForeground);
+  --hairline: var(--vscode-editorWidget-border, var(--vscode-panel-border));
+  --shadow-s: 0 2px 8px rgb(0 0 0 / .24);
+  --shadow-m: 0 4px 12px rgb(0 0 0 / .28);
+  --shadow-l: 0 6px 18px rgb(0 0 0 / .36);
+  /*
+   * The webview body does not inherit the editor font unless we ask for it. Without this
+   * the whole page renders in the browser default and looks nothing like VS Code.
+   */
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-foreground);
+  background-color: var(--vscode-editor-background);
+  /*
+   * Disable text selection during drag but keep paths selectable.
+   */
+  user-select: none;
+}
+.landingpage .project-path, .landingpage .project-label {
+  user-select: text;
+}
+.landingpage h1, .landingpage h2, .landingpage p {
+  margin: 0;
+  padding: 0;
+  font-weight: 400;
+}
+/*
+ * Text for screen readers only: the live region that announces a copied path, a finished
+ * Recent refresh and the filter's result count, plus the pinned state, which is otherwise
+ * carried by an icon alone. Clipped to a 1px box rather than hidden with `display: none` or
+ * `visibility: hidden`, both of which take it out of the accessibility tree along with the
+ * layout - which would defeat the entire point. `white-space: nowrap` stops a long
+ * announcement being wrapped into a tall invisible column that still scrolls the page.
+ */
+.landingpage .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.landingpage div[data-prototype] {
+  display: none !important;
+  --shade-color: fuchsia;
+}
+.landingpage .hidden {
+  display: none !important;
+}
+.landingpage *[data-shade=red] {
+  --shade-color: #E24942;
+} /* L .62 C .19 H 27 */
+.landingpage *[data-shade=orange] {
+  --shade-color: #F19024;
+} /* L .74 C .16 H 62 */
+.landingpage *[data-shade=yellow] {
+  --shade-color: #EDD13D;
+} /* L .86 C .16 H 98 */
+.landingpage *[data-shade=green] {
+  --shade-color: #39B457;
+} /* L .68 C .17 H 148 */
+.landingpage *[data-shade=teal] {
+  --shade-color: #05908B;
+} /* L .59 C .125 H 190 */
+.landingpage *[data-shade=pink] {
+  --shade-color: #C1297E;
+} /* L .55 C .20 H 352 */
+.landingpage *[data-shade=purple] {
+  --shade-color: #A459CC;
+} /* L .60 C .18 H 312 */
+.landingpage *[data-shade=blue] {
+  --shade-color: #3A5FC9;
+} /* L .52 C .17 H 266 */
+.landingpage *[data-shade=cyan] {
+  --shade-color: #37B2E8;
+} /* L .72 C .13 H 232 */
+.landingpage *[data-shade=gray] {
+  --shade-color: #A4A4A4;
+} /* L .72 C 0 */
+.landingpage *[data-shade=silver] {
+  --shade-color: #7D89A5;
+} /* L .63 C .045 H 268 */
+.landingpage *[data-shade=brown] {
+  --shade-color: #895433;
+} /* L .50 C .085 H 52 */
+.landingpage *[data-shade=white] {
+  --shade-color: #D4D4D4;
+} /* L .87 C 0 */
+.landingpage *[data-shade=black] {
+  --shade-color: #424242;
+} /* L .38 C 0 */
+/*
+ * The same accent, made safe to write *text* in. Several of the fourteen literals above are
+ * illegible as a foreground - worst case against the page background is 1.02:1, where small
+ * text needs 4.5:1.
+ *
+ * Mixing toward the theme's own foreground keeps the hue recognisable while pinning lightness
+ * to something the theme already guarantees is readable. **30% is the measured floor and 40%
+ * fails outright**, measured against the *card* background rather than the page, because the
+ * badge sits on a card and the two differ by enough to matter. Worst case at 30% is 5.18:1.
+ * The palette and this mix have to be changed together.
+ *
+ * Fills keep the literal. This variable is only for places that draw glyphs and words.
+ */
+.landingpage *[data-shade]:not([data-shade=""]) {
+  --shade-readable: color-mix(in srgb, var(--shade-color) 30%, var(--vscode-foreground));
+}
+.landingpage .sealed .ifn-sealed {
+  display: none !important;
+}
+/*
+ *--- icons -----------------------------------------------------------------
+ * Every icon is an `<svg>` inside a `<span class="icon">` - see `Svg()` in `webview/presentation.tsx`, which has
+ * to wrap because it sets the markup with `dangerouslySetInnerHTML`.
+ *
+ * The span must not establish a line box. As a block container it did, and an inline `<svg>`
+ * sits on the text baseline inside one, so a 16px icon rendered into a 19px span with the 3px
+ * of descender space underneath it. The span is what flexbox centres, so every icon beside a
+ * label came out 1.5px high - visible on the "New" button, where a plus and a chevron both
+ * floated above the word between them. `display: flex` removes the line box, and the span then
+ * shrinks to the icon it holds.
+ *
+ * This was previously patched one selector at a time (the fold chevron, the hovercard, the
+ * pictoral rows). Those local overrides are gone; fix it here or it stays fixed nowhere.
+ */
+.landingpage .icon {
+  display: flex;
+}
+.landingpage .lucide {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.5px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+.landingpage button {
+  display: flex;
+  /* Anchors `.tooltiptext`, which is positioned absolutely against its button. */
+  position: relative;
+  padding: var(--ctrlspace);
+  justify-content: center;
+  align-items: center;
+  gap: var(--gapspace-s);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--vscode-icon-foreground);
+  background-color: transparent;
+  border: none;
+  border-radius: var(--radius-s);
+  transition: background-color var(--dur-hover) var(--ease-hover), outline-color var(--dur-hover) var(--ease-hover), transform var(--dur-press) var(--ease-out);
+}
+.landingpage button:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+.landingpage button:focus-visible {
+  outline: 1px solid var(--accent-color);
+  outline-offset: 1px;
+}
+.landingpage button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.landingpage button:disabled {
+  cursor: default;
+  opacity: 0.28;
+}
+.landingpage .btn-primary, .landingpage .btn-secondary {
+  padding: 6px 12px;
+  border-radius: var(--radius-s);
+  white-space: nowrap;
+  gap: 6px;
+}
+.landingpage .btn-primary {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+.landingpage .btn-primary:hover {
+  background-color: var(--vscode-button-hoverBackground);
+}
+.landingpage .btn-secondary {
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+.landingpage .btn-secondary:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}
+.landingpage .btn-ghost {
+  color: var(--vscode-input-placeholderForeground);
+}
+.landingpage .btn-ghost:hover {
+  color: var(--vscode-foreground);
+  background-color: transparent;
+}
+/*
+ *--- paint picker ----------------------------------------------------------
+ */
+.landingpage .palette {
+  position: absolute;
+  border: 1px solid var(--vscode-menu-border, var(--hairline));
+  min-width: 4px;
+  min-height: 4px;
+  background-color: var(--vscode-menu-background);
+  box-shadow: var(--shadow-m);
+  top: 20px;
+  left: 20px;
+  border-radius: var(--radius);
+  /*
+   * Palettes reuse the menu anchoring, clamping, and origin-aware entrance.
+   */
+  transform-origin: var(--origin-x, left) var(--origin-y, top);
+  animation: menu-in var(--dur-enter) var(--ease-out);
+  display: flex;
+  flex-wrap: nowrap;
+  flex-direction: row;
+  gap: 6px;
+  padding: var(--gapspace-s);
+}
+/*
+ * This selector must stay scoped to palette swatches. Groups and bookmarks also use
+ * data-shade as state, and styling every matching div turned whole groups into circles.
+ * The palette renders `button`s: this rule once said `div` and silently stopped matching the moment the
+ * swatches became real controls, which left the whole palette as a row of blank rounded
+ * rectangles - no fill, no circle, no hatch on the clear slot. Nothing failed; the selector
+ * just quietly addressed nothing, which is this file's most repeated failure mode.
+ *
+ * Buttons, not divs. These were bare `<div>`s with a click handler: unreachable by keyboard,
+ * nameless to a screen reader, and with no focus style anywhere - and because `ActionMenu`
+ * returns the palette *instead of* the menu, activating "Accent colour" without a mouse
+ * landed in a modal containing nothing focusable at all. The tag is also what scopes this
+ * rule safely: `data-shade` is model state carried on groups and bookmark cards, so a
+ * selector loose enough to reach those would turn a whole group into a patterned circle.
+ */
+.landingpage .palette button[data-shade] {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 50%;
+  /*
+   * Was `rgba(0, 0, 0, 0.3)`. A black edge separates nothing from a dark editor background,
+   * so the `black` swatch had no discernible boundary on exactly the themes where it needs
+   * one most, and the clear slot's hatch disappeared with it. Both now come from the theme.
+   */
+  border: 1px solid var(--vscode-contrastBorder, color-mix(in srgb, var(--vscode-foreground) 35%, transparent));
+  background-color: var(--shade-color);
+  transition: transform var(--dur-press) var(--ease-out);
+}
+.landingpage .palette button[data-shade][data-shade=""] {
+  background-image: linear-gradient(45deg, color-mix(in srgb, var(--vscode-foreground) 30%, transparent) 5.56%, transparent 5.56%, transparent 50%, color-mix(in srgb, var(--vscode-foreground) 30%, transparent) 50%, color-mix(in srgb, var(--vscode-foreground) 30%, transparent) 55.56%, transparent 55.56%, transparent 100%);
+  background-size: 4px 4px;
+}
+.landingpage .palette button[data-shade]:hover {
+  transform: scale(1.18);
+}
+.landingpage .palette button[data-shade]:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+.landingpage .glyphpalette {
+  position: absolute;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--ctrlspace);
+  padding: var(--gapspace-s);
+  top: 20px;
+  left: 20px;
+  transform-origin: var(--origin-x, left) var(--origin-y, top);
+  animation: menu-in var(--dur-enter) var(--ease-out);
+  background-color: var(--vscode-menu-background);
+  border: 1px solid var(--vscode-menu-border, var(--hairline));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-m);
+}
+.landingpage .glyphpalette button {
+  width: 28px;
+  height: 28px;
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+}
+.landingpage .glyphpalette button .lucide {
+  width: 18px;
+  height: 18px;
+}
+.landingpage .glyphpalette button:hover {
+  background-color: var(--vscode-menu-selectionBackground, var(--vscode-toolbar-hoverBackground));
+}
+.landingpage .glyphpalette .glyph-clear {
+  color: var(--vscode-descriptionForeground);
+}
+.landingpage .glyphslot {
+  position: absolute;
+  bottom: -4px;
+  right: -5px;
+  display: flex;
+  padding: 1px;
+  border-radius: var(--radius-s);
+  background-color: var(--vscode-activityBar-background);
+}
+.landingpage .glyphslot .lucide {
+  width: 10px;
+  height: 10px;
+  stroke-width: 2.5px;
+}
+.landingpage .modal {
+  position: fixed;
+  left: var(--rail-width);
+  right: 0;
+  top: 0;
+  bottom: 0;
+  /*
+   * Scrim derived from the editor background, so it dims in dark themes instead of
+   * washing the page white the way a hardcoded rgba(255,255,255,.5) did.
+   *
+   * The alpha MUST live in the colour, not in `opacity`. `opacity` on a parent creates a
+   * stacking context that children cannot exceed, so an opacity scrim silently rendered
+   * the picker itself at 60% too - a child `opacity: 1` cannot undo it.
+   */
+  background-color: color-mix(in srgb, var(--vscode-editor-background) 60%, transparent);
+  z-index: 98;
+  /*
+   * The dim fades in rather than snapping on, and it fades by animating `background-color`
+   * for the same reason the alpha lives there in the first place. Animating `opacity` would
+   * create the stacking context described above for the length of the animation, so the
+   * palette sitting inside would be dimmed by its own scrim on the way in - a child
+   * `opacity: 1` cannot escape it.
+   *
+   * Only a `from` is declared: a keyframe that names one end takes the element's own computed
+   * value for the other, so the target stays whatever the `color-mix` above resolves to and
+   * there is no second copy of that expression to keep in step.
+   */
+  animation: scrim-in var(--dur-enter) var(--ease-out);
+}
+.landingpage .ctxmenu {
+  position: fixed;
+  z-index: 200;
+  min-width: 184px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background-color: var(--vscode-menu-background);
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  border: 1px solid var(--vscode-menu-border, var(--hairline));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-m);
+  /*
+   * `useAnchored` flips and clamps the menu and writes the actual transform origin.
+   */
+  transform-origin: var(--origin-x, left) var(--origin-y, top);
+  animation: menu-in var(--dur-enter) var(--ease-out);
+}
+.landingpage .ctxmenu button {
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 6px 10px;
+  color: inherit;
+  font-size: 0.9em;
+  white-space: nowrap;
+}
+.landingpage .ctxmenu button:hover {
+  background-color: var(--vscode-menu-selectionBackground, var(--vscode-toolbar-hoverBackground));
+  color: var(--vscode-menu-selectionForeground, inherit);
+}
+.landingpage .ctxmenu button.danger:hover {
+  color: var(--danger-color);
+}
+.landingpage .ctxmenu .ctxsep {
+  height: 1px;
+  margin: 4px 2px;
+  background-color: var(--vscode-menu-separatorBackground, var(--hairline));
+}
+.landingpage .ctxmenu .ctxrename {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 2px 2px;
+}
+.landingpage .ctxmenu .ctxrename input {
+  min-width: 0;
+  flex: 1 1 120px;
+  padding: 5px 7px;
+  color: var(--vscode-input-foreground);
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, var(--hairline));
+  border-radius: var(--radius-s);
+  font: inherit;
+  outline: none;
+}
+.landingpage .ctxmenu .ctxrename input:focus {
+  border-color: var(--accent-color);
+}
+.landingpage .ctxmenu .ctxrename button {
+  padding: 5px 7px;
+}
+.landingpage .ctxmenu[data-renaming=yes] .ctxrename {
+  display: flex;
+  animation: card-in var(--dur-enter) var(--ease-out);
+}
+.landingpage .ctxmenu button[data-confirm] {
+  animation: confirm-arm var(--dur-arm) var(--ease-out);
+}
+.landingpage .rowmenu, .landingpage .rowcopy {
+  flex: none;
+  opacity: 0;
+  color: var(--vscode-descriptionForeground);
+  transition: opacity var(--dur-hover) var(--ease-out), background-color var(--dur-hover) var(--ease-hover), color var(--dur-hover) var(--ease-hover), transform var(--dur-press) var(--ease-out);
+}
+.landingpage .rowmenu:hover, .landingpage .rowmenu:focus-visible, .landingpage .rowcopy:hover, .landingpage .rowcopy:focus-visible {
+  color: var(--vscode-foreground);
+}
+/*
+ * Grid action buttons stay out of flow so they do not add height to cards.
+ */
+.landingpage .project .rowmenu, .landingpage .project .rowcopy {
+  position: absolute;
+  top: 4px;
+  z-index: 2;
+  background-color: var(--vscode-editorWidget-background);
+}
+.landingpage .project .rowmenu:hover, .landingpage .project .rowcopy:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+.landingpage .project .rowmenu {
+  right: 4px;
+}
+.landingpage .project .rowcopy {
+  right: 26px;
+}
+/*
+ * ...except on the single-line layouts, where the row *is* one line and a top-pinned button
+ * sits 9px above the label it belongs to. Measured, not guessed: on a 46px list row the icon
+ * and label centre at the row's midpoint and these two landed 9px high, which reads as the
+ * buttons floating off the row every time the pointer crosses it. Grid keeps the corner, where
+ * the card is tall and there is no line to align to.
+ *
+ * Centred with `margin-block: auto` against a stretched inset rather than `translateY(-50%)`,
+ * because the button base rule already owns `transform` for its `:active` press and the two
+ * would fight - the press would snap the button back to the top of the row.
+ */
+.landingpage .projects.list .project .rowmenu, .landingpage .projects.list .project .rowcopy, .landingpage .projects.compact .project .rowmenu, .landingpage .projects.compact .project .rowcopy {
+  top: 0;
+  bottom: 0;
+  height: fit-content;
+  margin-block: auto;
+}
+/*
+ * Copy is the point of the button, so the result has to be visible on the button itself -
+ * the tick is driven by the host's `pathCopied` reply and stays up while it is shown, even
+ * after the pointer has left the card.
+ */
+.landingpage .project .rowcopy[data-copied] {
+  --tick: var(--vscode-terminal-ansiGreen, var(--vscode-charts-green));
+  opacity: 1;
+  color: var(--tick);
+}
+.landingpage .project .rowcopy[data-copied]:hover {
+  color: var(--tick);
+}
+.landingpage .project .rowcopy[data-copied] .icon {
+  animation: tick-pop var(--dur-enter) var(--ease-out);
+}
+.landingpage .project:hover .rowmenu, .landingpage .project:hover .rowcopy,
+.landingpage .titlebar:hover .rowmenu,
+.landingpage .project:focus-within .rowmenu, .landingpage .project:focus-within .rowcopy,
+.landingpage .rowmenu:focus-visible, .landingpage .rowcopy:focus-visible {
+  opacity: 1;
+}
+.landingpage .page {
+  margin-inline: auto;
+  max-width: calc(var(--page-max) + var(--rail-width));
+  /*
+   * The generous bottom padding is not decoration: the last bookmark on the board needs
+   * room beneath it for its hover card, and the page has to be able to scroll far enough
+   * to expose that room. Without it the final row sits flush against the viewport edge and
+   * its card has nowhere to open.
+   */
+  padding: calc(var(--gapspace) * 1.5) var(--gapspace) 140px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gapspace);
+}
+.landingpage .page-header .titlerow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gapspace);
+  flex-wrap: wrap;
+}
+/*
+ * The title area shrinks before header actions so actions do not wrap into a second row.
+ */
+.landingpage .page-header .titletext {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.landingpage .page-header .header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--gapspace-s);
+  flex: none;
+}
+.landingpage .page-header .header-actions .btn-ghost {
+  color: var(--vscode-foreground);
+  padding: 7px;
+}
+.landingpage .page-header .header-actions .btn-ghost:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+.landingpage .page-header .header-actions .btn-small {
+  padding: 5px;
+}
+.landingpage .page-header .header-actions .btn-small .icon {
+  width: 16px;
+  height: 16px;
+}
+.landingpage .page-header .header-actions .menu-anchor {
+  position: relative;
+  display: flex;
+}
+.landingpage .page-header .popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  min-width: 240px;
+  padding: 4px;
+  background-color: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  border-radius: var(--radius);
+  outline: 1px solid var(--hairline);
+  box-shadow: var(--shadow-l);
+  transform-origin: top right;
+  animation: menu-in var(--dur-enter) var(--ease-out);
+}
+.landingpage .page-header .popover > button {
+  justify-content: flex-start;
+  gap: var(--gapspace-s);
+  padding: 6px 10px;
+  border-radius: var(--radius-s);
+  white-space: nowrap;
+}
+.landingpage .page-header .popover > button:hover {
+  background-color: var(--vscode-menu-selectionBackground, var(--vscode-toolbar-hoverBackground));
+}
+.landingpage .page-header .popover hr {
+  border: none;
+  border-top: 1px solid var(--hairline);
+  margin: 4px 6px;
+  width: auto;
+}
+.landingpage .page-header .popover-clone {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--gapspace-s);
+  min-width: 340px;
+  padding: 8px;
+}
+.landingpage .page-header .popover-clone input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 5px 8px;
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: none;
+  border-radius: var(--radius-s);
+  outline: 1px solid var(--hairline);
+  font-family: inherit;
+  font-size: inherit;
+}
+.landingpage .page-header .popover-clone input:focus {
+  outline-color: var(--accent-color);
+}
+.landingpage .page-header .popover-clone input::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+.landingpage .page-header h1 {
+  font-size: 1.75rem;
+  font-weight: 250;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.landingpage .commandbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gapspace-s);
+  width: 100%;
+}
+.landingpage .commandbar .field {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--gapspace-s);
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border-radius: var(--radius);
+  outline: 1px solid var(--hairline);
+  padding: 4px 4px 4px 10px;
+  transition: outline-color var(--dur-hover) var(--ease-hover);
+}
+.landingpage .commandbar .field:hover, .landingpage .commandbar .field:focus-within {
+  outline-color: var(--accent-color);
+}
+.landingpage .commandbar .field .field-icon {
+  display: flex;
+  color: var(--vscode-input-placeholderForeground);
+  transition: color var(--dur-hover) var(--ease-hover);
+}
+.landingpage .commandbar .field:focus-within .field-icon {
+  color: var(--accent-color);
+}
+.landingpage .commandbar .field input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  border: none;
+  outline: none;
+  padding: 4px 0;
+}
+.landingpage .commandbar .field input::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+.landingpage .commandbar .field-filter {
+  padding: 6px 6px 6px 12px;
+}
+.landingpage .commandbar .field-filter .field-icon {
+  color: var(--vscode-foreground);
+}
+.landingpage .commandbar .field-filter .btn-ghost {
+  color: var(--vscode-input-placeholderForeground);
+}
+.landingpage .commandbar .field-filter .btn-ghost:hover {
+  color: var(--vscode-foreground);
+}
+/*
+ * Stagger only the first-run empty state, never transient filter results. Do not animate the parent and children together because opacity multiplies.
+ */
+.landingpage .placeholder > * {
+  animation: card-in var(--dur-enter) var(--ease-out) backwards;
+}
+.landingpage .placeholder:not([data-transient]) > *:nth-child(2) {
+  animation-delay: 60ms;
+}
+.landingpage .placeholder:not([data-transient]) > *:nth-child(3) {
+  animation-delay: 120ms;
+}
+.landingpage .placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--gapspace-s);
+  padding: calc(var(--gapspace) * 3) var(--gapspace);
+  color: var(--vscode-descriptionForeground);
+}
+.landingpage .placeholder .placeholder-icon {
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.5;
+}
+.landingpage .placeholder .placeholder-icon .lucide {
+  width: 40px;
+  height: 40px;
+  stroke-width: 1px;
+}
+.landingpage .placeholder h2 {
+  font-size: 1.15rem;
+  color: var(--vscode-foreground);
+}
+.landingpage .placeholder p {
+  max-width: 46ch;
+  line-height: 1.5;
+}
+.landingpage .placeholder .placeholder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--gapspace-s);
+  margin-top: var(--gapspace-s);
+}
+.landingpage .content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gapspace);
+}
+.landingpage .content .group {
+  position: relative;
+  /*
+   * Two accents, and the split is the same one as on the bookmark card: `--group-accent` is
+   * painted as a fill (the header tab, the divider, the drop line), `--group-accent-text` is
+   * written in (the count badge, the title on hover, the composer's group name). A group can
+   * be given any of the fourteen shades from the palette, so the text form has to go through
+   * `--shade-readable` or a yellow group's title becomes invisible the moment it is hovered.
+   */
+  --group-accent: var(--vscode-descriptionForeground);
+  --group-accent-text: var(--vscode-descriptionForeground);
+  /*
+   * Groups settle in on load, slightly staggered. `backwards` and not `both` on purpose:
+   * a forwards fill would pin opacity to 1 and beat the `.dragging` rule below, because
+   * animation values outrank normal declarations. Backwards only fills the delay.
+   */
+  animation: card-in var(--dur-move) var(--ease-out) backwards;
+}
+.landingpage .content .group[data-shade]:not([data-shade=""]) {
+  --group-accent: var(--shade-color);
+  --group-accent-text: var(--shade-readable);
+}
+.landingpage .content .group:nth-child(1) {
+  animation-delay: 0ms;
+}
+.landingpage .content .group:nth-child(2) {
+  animation-delay: 30ms;
+}
+.landingpage .content .group:nth-child(3) {
+  animation-delay: 60ms;
+}
+.landingpage .content .group:nth-child(4) {
+  animation-delay: 90ms;
+}
+.landingpage .content .group:nth-child(5) {
+  animation-delay: 120ms;
+}
+.landingpage .content .group:nth-child(6) {
+  animation-delay: 150ms;
+}
+/*
+ * Draw group drop position with a pseudo-element so no placeholder reflows the list.
+ */
+.landingpage .content .group.dragging {
+  opacity: 0.4;
+}
+.landingpage .content .group[data-drop]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: var(--radius-full);
+  background-color: var(--vscode-focusBorder, var(--group-accent));
+  pointer-events: none;
+  /*
+   * The pseudo-element is created when the attribute is set, so there is no previous
+   * value for a transition to run from - it has to be an animation.
+   */
+  animation: line-in-x var(--dur-hover) var(--ease-out);
+}
+.landingpage .content .group[data-drop=before]::after {
+  top: calc(var(--gapspace) / -2);
+}
+.landingpage .content .group[data-drop=after]::after {
+  bottom: calc(var(--gapspace) / -2);
+}
+/*
+ * Use outline for group receiving state to avoid reflow, and never decorate Recent as a destination.
+ */
+.landingpage .content .group[data-receiving] {
+  outline: 1px dashed var(--vscode-focusBorder);
+  outline-offset: 6px;
+  border-radius: var(--radius);
+}
+/*
+ * The card being carried, and the line showing where it would land. The card clips its
+ * own children so the spine follows its rounded corners, which also clips away a line
+ * drawn in the gap outside it - hence the overflow override while it is a landing point.
+ */
+.landingpage .content .group .project.dragging {
+  opacity: 0.4;
+}
+.landingpage .content .group .project[data-drop] {
+  overflow: visible;
+}
+.landingpage .content .group .project[data-drop]::before {
+  content: "";
+  position: absolute;
+  border-radius: var(--radius-full);
+  background-color: var(--vscode-focusBorder);
+  pointer-events: none;
+}
+/*
+ * Bookmark insertion lines are horizontal in list and vertical in wrapping layouts, matching geometry.
+ */
+.landingpage .content .group .projects.list .project[data-drop]::before {
+  left: 0;
+  right: 0;
+  height: 2px;
+  animation: line-in-x var(--dur-hover) var(--ease-out);
+}
+.landingpage .content .group .projects.list .project[data-drop][data-drop=before]::before {
+  top: calc(var(--gapspace-s) / -2);
+}
+.landingpage .content .group .projects.list .project[data-drop][data-drop=after]::before {
+  bottom: calc(var(--gapspace-s) / -2);
+}
+.landingpage .content .group .projects.grid .project[data-drop]::before,
+.landingpage .content .group .projects.compact .project[data-drop]::before {
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  animation: line-in-y var(--dur-hover) var(--ease-out);
+}
+.landingpage .content .group .projects.grid .project[data-drop][data-drop=before]::before,
+.landingpage .content .group .projects.compact .project[data-drop][data-drop=before]::before {
+  left: calc(var(--gapspace) / -2);
+}
+.landingpage .content .group .projects.grid .project[data-drop][data-drop=after]::before,
+.landingpage .content .group .projects.compact .project[data-drop][data-drop=after]::before {
+  right: calc(var(--gapspace) / -2);
+}
+.landingpage .content .group .draghandle {
+  cursor: grab;
+}
+.landingpage .content .group .titlebar[draggable=true]:active .draghandle {
+  cursor: grabbing;
+}
+.landingpage .content .group .titlebar {
+  margin-bottom: var(--gapspace);
+  display: flex;
+  align-items: center;
+  gap: var(--gapspace-s);
+}
+.landingpage .content .group .titlebar::before {
+  content: "";
+  width: 4px;
+  height: 20px;
+  flex: none;
+  border-radius: var(--radius-full);
+  background-color: var(--group-accent);
+  opacity: 0.8;
+  transition: opacity var(--dur-hover) var(--ease-out);
+}
+.landingpage .content .group .titlebar .group-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--vscode-foreground);
+  border-radius: var(--radius-s);
+  flex: none;
+  transition: color var(--dur-hover) var(--ease-hover);
+}
+.landingpage .content .group .titlebar .group-fold {
+  width: 20px;
+  height: 28px;
+  padding: 0;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--vscode-descriptionForeground);
+  background: transparent;
+}
+.landingpage .content .group .titlebar .group-fold:hover {
+  color: var(--vscode-foreground);
+  background: transparent;
+}
+.landingpage .content .group .titlebar .group-fold .lucide {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2px;
+}
+/*
+ * Rotate one chevron instead of swapping icons, and time it with the group height animation.
+ */
+.landingpage .content .group .titlebar .group-fold .icon {
+  transition: transform var(--dur-move) var(--ease-move);
+}
+.landingpage .content .group .titlebar .group-fold[aria-expanded=false] .icon {
+  transform: rotate(-90deg);
+}
+.landingpage .content .group .titlebar .group-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+}
+.landingpage .content .group .titlebar .group-icon .lucide {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2px;
+}
+.landingpage .content .group .titlebar .group-count {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.75rem;
+  line-height: 1;
+  color: var(--vscode-descriptionForeground);
+  flex: none;
+}
+.landingpage .content .group .titlebar .group-count:empty {
+  display: none;
+}
+.landingpage .content .group .titlebar .rule {
+  flex: 1 1 auto;
+  height: 1px;
+  min-width: var(--gapspace-s);
+  background: linear-gradient(to right, var(--hairline), var(--hairline));
+  background-repeat: no-repeat;
+  transition: background-image var(--dur-hover) var(--ease-hover);
+  /*
+   * Scale the full-width hairline instead of animating background size; transform avoids repaint and does not affect flex layout.
+   */
+  transform-origin: left center;
+  transition: transform var(--dur-hover) var(--ease-out);
+}
+.landingpage .content .group .titlebar .tools {
+  display: flex;
+  gap: var(--ctrlspace);
+}
+.landingpage .content .group .titlebar .tools button {
+  aspect-ratio: 1;
+  padding: 3px;
+}
+.landingpage .content .group .titlebar .tools [data-role=layout] {
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  background-color: var(--vscode-button-secondaryBackground, var(--vscode-toolbar-hoverBackground));
+}
+.landingpage .content .group .titlebar .tools [data-role=layout]:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground, var(--vscode-toolbar-hoverBackground));
+}
+/*
+ * Refreshing Recent is a round trip to the extension host. Without a visible busy
+ * state, a refresh that returns an unchanged list looks like a dead button.
+ */
+.landingpage .content .group .titlebar .tools [data-role=refresh][data-busy] .lucide {
+  animation: landingpage-spin 0.8s linear infinite;
+}
+.landingpage .content .group .titlebar .tools [data-role=refresh]:disabled {
+  cursor: default;
+}
+.landingpage .content .group .titlebar:hover .group-label {
+  color: var(--group-accent-text);
+}
+.landingpage .content .group .titlebar:hover .rule {
+  background-image: linear-gradient(to right, var(--group-accent), transparent);
+}
+.landingpage .content .group .titlebar:hover::before {
+  opacity: 1;
+}
+.landingpage .content .group .titlebar:not(:hover) .hover-only button {
+  visibility: hidden;
+}
+.landingpage .content .group .group-composer {
+  /*
+   * FLIP handles movement caused by opening the composer, so the composer itself only fades.
+   */
+  animation: card-in var(--dur-enter) var(--ease-out) backwards;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--gapspace-s);
+  margin: calc(var(--gapspace-s) * -0.5) 0 var(--gapspace);
+  padding: var(--gapspace-s) 10px;
+  border-radius: var(--radius);
+  color: var(--vscode-foreground);
+  background-color: color-mix(in srgb, var(--group-accent) 13%, var(--vscode-editorWidget-background));
+  outline: 1px solid color-mix(in srgb, var(--group-accent) 45%, var(--hairline));
+}
+.landingpage .content .group .group-composer .composer-label {
+  color: var(--vscode-descriptionForeground);
+  margin-right: 2px;
+}
+.landingpage .content .group .group-composer .composer-label b {
+  color: var(--group-accent-text);
+  font-weight: 600;
+}
+.landingpage .content .group .group-composer .btn-secondary {
+  padding: 5px 9px;
+}
+.landingpage .content .group .group-composer .btn-ghost {
+  padding: 5px 7px;
+}
+/*
+ * Wrapper that gives the fold something to animate. A group renders no cards at all when
+ * collapsed - they are tab stops, so hiding them with CSS would leave them focusable -
+ * which means the height has to come from a container that survives the unmount. The
+ * animation itself is driven from GroupShelf, because the cards appear and disappear in
+ * the same commit that flips the class and a CSS transition has nothing to run from.
+ *
+ * All this rule owns is the clip. `overflow` is named on *both* axes deliberately: give
+ * CSS one axis and it computes the other as `auto`, which would put a scrollbar on every
+ * group and clip anything escaping it.
+ *
+ * `clip` rather than `hidden`, so that `overflow-clip-margin` applies - `hidden` is a
+ * scroll container and ignores it. The margin exists for exactly one thing: a focused
+ * card's ring is drawn outside its box and reaches 4px (2px offset plus a 2px stroke), and
+ * in every layout some card is flush against this clip - both edges in `list`, the leading
+ * one in the first `grid` column. Clipped at the box, those cards lost whole sides of the
+ * ring. 6px rather than 4px so the ring is not riding the limit: it is the smallest value
+ * that still leaves headroom at a fractional device pixel ratio.
+ */
+.landingpage .content .foldable {
+  overflow-x: clip;
+  overflow-y: clip;
+  overflow-clip-margin: 6px;
+}
+/*
+ * A group receiving a drop slides its cards down to open a gap, and the clip above would
+ * eat the one that ends up past the bottom edge. Same override, and for the same reason,
+ * as `.project[data-drop] { overflow: visible }`. Both axes again, deliberately: naming
+ * one lets CSS compute the other as `auto`. A group is never folding and receiving a drop
+ * at the same time, so nothing is given up by lifting the clip here.
+ */
+.landingpage .content .group[data-receiving] .foldable {
+  overflow-x: visible;
+  overflow-y: visible;
+}
+/*
+ * The bookmark card, in every layout. `.projects.grid`, `.projects.list` and
+ * `.projects.compact` below specialise it; each of those outranks this rule on
+ * specificity, so nothing here depends on where it sits in the file.
+ */
+.landingpage .content .projects .project {
+  outline: none;
+  border: none;
+  overflow: hidden;
+  background: var(--vscode-editorWidget-background);
+  color: var(--vscode-foreground);
+  /*
+   * `translate` is the gap that opens under a dragged bookmark. It is a property in its
+   * own right rather than part of `transform`, which is what the FLIP effect animates, so
+   * the two compose into the same matrix without ever colliding over one declaration.
+   *
+   * It is timed at `--dur-hover` rather than `--dur-move` because it is not a considered
+   * transition between two states - it retargets continuously as the pointer crosses the
+   * board, and a gap that takes the full move duration to open is a gap that is always
+   * behind the pointer. The curve stays `--ease-move`, because what it is doing is still
+   * travelling.
+   */
+  transition: background-color var(--dur-hover) var(--ease-hover), translate var(--dur-hover) var(--ease-move);
+  /*
+   * How far the spine is drawn, as a fraction of its 4px box (D017). Both declarations sit here on
+   * the card rather than on `.spine` so that the only thing separating them is `:hover` -
+   * see the note on `.spine` below for what happens when they are not.
+   */
+  --spine-scale: var(--spine-rest, .5);
+  /*
+   * Bookmarks settle in on load, on a layout change and whenever the filter narrows the
+   * board. `backwards`, not `both`: a forwards fill would hold opacity at 1 and outrank
+   * the `.project.dragging` fade, since animation values beat normal declarations.
+   */
+  animation: card-in var(--dur-enter) var(--ease-out) backwards;
+}
+.landingpage .content .projects .project:nth-child(1) {
+  animation-delay: 0ms;
+}
+.landingpage .content .projects .project:nth-child(2) {
+  animation-delay: 22ms;
+}
+.landingpage .content .projects .project:nth-child(3) {
+  animation-delay: 44ms;
+}
+.landingpage .content .projects .project:nth-child(4) {
+  animation-delay: 66ms;
+}
+.landingpage .content .projects .project:nth-child(5) {
+  animation-delay: 88ms;
+}
+.landingpage .content .projects .project:nth-child(6) {
+  animation-delay: 110ms;
+}
+.landingpage .content .projects .project:nth-child(7) {
+  animation-delay: 132ms;
+}
+.landingpage .content .projects .project:nth-child(8) {
+  animation-delay: 154ms;
+}
+.landingpage .content .projects.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--gapspace);
+}
+.landingpage .content .projects.grid .project {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  align-content: start;
+  column-gap: 10px;
+  row-gap: 2px;
+  padding: 12px 14px;
+  position: relative;
+}
+/*
+ * Anchor the grid icon to the label first line so wrapped labels do not misalign neighboring cards.
+ */
+.landingpage .content .projects.grid .project .pictoral {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
+  margin-top: -3px;
+}
+.landingpage .content .projects.grid .project .pictoral .lucide {
+  width: 19px;
+  height: 19px;
+}
+.landingpage .content .projects.grid .project .textblock {
+  min-width: 0;
+  /*
+   * `display: contents` lets the label and path take part in the card's own grid.
+   * Both therefore need explicit placement: auto-placement would drop the path
+   * into column 1, underneath the icon.
+   */
+  display: contents;
+}
+.landingpage .content .projects.grid .project .textblock .project-label {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  font-weight: 600;
+  line-height: 1.35;
+  padding-right: 44px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.landingpage .content .projects.grid .project .textblock .project-path {
+  grid-column: 2;
+  grid-row: 2;
+}
+.landingpage .content .projects.list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.landingpage .content .projects.list .project {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 10px;
+  padding: 9px 46px 9px 14px;
+  position: relative;
+  border-radius: 0;
+  background: transparent;
+  overflow: clip;
+  overflow-clip-margin: 8px;
+}
+/*
+ * Draw one divider per row junction and use `clip` so it may extend into the gap.
+ */
+.landingpage .content .projects.list .project + .project::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -4px;
+  height: 1px;
+  background-color: var(--hairline);
+}
+.landingpage .content .projects.list .project .textblock {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--gapspace);
+}
+.landingpage .content .projects.list .project .textblock .project-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.landingpage .content .projects.list .project .textblock .project-path {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.landingpage .content .projects.grid .project, .landingpage .content .projects.compact .project {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: transparent;
+}
+.landingpage .content .projects.compact {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--gapspace-s) var(--gapspace);
+}
+.landingpage .content .projects.compact .project {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--gapspace-s);
+  padding: 6px 46px 6px 10px;
+  position: relative;
+}
+.landingpage .content .projects.compact .project .textblock {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--gapspace-s);
+}
+.landingpage .content .projects.compact .project .textblock .project-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.landingpage .content .projects.compact .project .textblock .project-path {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.landingpage .content .projects .project:hover {
+  background: var(--vscode-list-hoverBackground, var(--vscode-editorWidget-background));
+  --spine-scale: 1;
+}
+/*
+ * Cards are tab stops, so arrow-key navigation needs a focus ring clearly stronger
+ * than hover - it is the only thing telling you what Enter will open.
+ *
+ * Deliberately `:focus`, not `:focus-visible`. Arrow navigation moves focus with a
+ * programmatic .focus(), and whether that counts as focus-visible depends on the
+ * engine's heuristic about the preceding input - too fragile for the one affordance
+ * telling you what Enter will open. The usual reason to prefer :focus-visible does
+ * not apply here anyway: clicking a card opens its project immediately, so a ring is
+ * never left sitting on the page after a click.
+ */
+.landingpage .content .projects .project:focus {
+  box-shadow: -2px 0 0 0 var(--vscode-focusBorder, var(--accent-color));
+  background: var(--vscode-list-hoverBackground, var(--vscode-editorWidget-background));
+  transition: background-color 0s, translate var(--dur-hover) var(--ease-move);
+  --spine-scale: 1;
+}
+/*
+ * The spine snaps rather than eases, for the same reason the ring does: it is drawn to its
+ * full height the instant focus lands, not 150ms later behind the next arrow keypress.
+ */
+.landingpage .content .projects .project:focus .spine {
+  transition-duration: 0s;
+  opacity: 1;
+}
+.landingpage .content .projects .project[data-missing] .spine {
+  background-color: var(--vscode-errorForeground);
+  opacity: 1;
+}
+/*
+ * The icon dims; the label does not. `.textblock > div:first-child` is the label, and
+ * at 60% over the Light+ editor background it composites to roughly 2.3:1 - under the
+ * 4.5:1 floor for body text. Dimming it punished exactly the card the user most needs
+ * to read in order to fix it, and the state is already carried three other ways: the
+ * red spine, the `Missing` text badge, and the notice in the hover detail.
+ */
+.landingpage .content .projects .project[data-missing] .pictoral {
+  opacity: 0.6;
+}
+.landingpage .content .projects .project .pin-marker {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  /*
+   * `--shade-readable`, not the raw literal - this draws a glyph, not a fill. The .75
+   * opacity that used to quieten a fully saturated accent goes with it: the mixed colour
+   * is already calm, and stacking the two put the icon back under the 3:1 floor.
+   */
+  color: var(--shade-readable, var(--vscode-descriptionForeground));
+  pointer-events: none;
+}
+.landingpage .content .projects .project .pin-marker .lucide {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.5px;
+}
+.landingpage .content .projects .project:hover .pin-marker, .landingpage .content .projects .project:focus .pin-marker {
+  opacity: 0;
+}
+/*
+ * Health badges arrive after the initial model and therefore fade in without changing layout.
+ */
+.landingpage .content .projects .project .branch-badge, .landingpage .content .projects .project .missing-badge {
+  animation: card-in var(--dur-enter) var(--ease-out);
+}
+.landingpage .content .projects .project .branch-badge {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 3px;
+  margin-right: 6px;
+  max-width: 28ch;
+  overflow: hidden;
+  white-space: nowrap;
+  /*
+   * Real text, at .8em, so this is the one place on the card that needs the full 4.5:1
+   * - hence `--shade-readable` rather than the raw accent. Eight of the fourteen shades
+   * failed here on the light theme, yellow at 1.63:1 and white at 1.04:1.
+   */
+  color: var(--shade-readable, var(--vscode-descriptionForeground));
+}
+.landingpage .content .projects .project .branch-badge .lucide {
+  width: 11px;
+  height: 11px;
+  stroke-width: 2.5px;
+  flex: none;
+}
+/*
+ * The name needs its own block to truncate in. `text-overflow` styles a block
+ * container's own text and does nothing on a flex item, so with the badge itself
+ * as the flex container a long branch was cut mid-word with no ellipsis.
+ */
+.landingpage .content .projects .project .branch-badge > .branch-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.landingpage .content .projects .project .missing-badge {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 3px;
+  margin-right: 6px;
+  font-family: var(--vscode-font-family);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--vscode-errorForeground);
+}
+.landingpage .content .projects .project .missing-badge .lucide {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.5px;
+}
+.landingpage .content .projects .project .spine {
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background-color: var(--shade-color, var(--vscode-descriptionForeground));
+  opacity: var(--shade-presence, 0.35);
+  /*
+   * Spine growth uses scale rather than width. Keep scale variables on the card for specificity and grow from the leading edge to stay within clipping.
+   */
+  width: 4px;
+  transform: translateY(-50%) scaleX(var(--spine-scale));
+  transform-origin: left center;
+  transition: transform var(--dur-hover) var(--ease-out), opacity var(--dur-hover) var(--ease-out);
+}
+.landingpage .content .projects .project:hover .spine {
+  opacity: 1;
+}
+.landingpage .content .projects .project[data-shade]:not([data-shade=""]) {
+  --shade-presence: 1;
+  --spine-rest: .75; /* 3px of the spine's 4px box - see .spine above */
+}
+.landingpage .content .projects .project .textblock {
+  overflow: hidden;
+}
+.landingpage .content .projects .project .pictoral {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+}
+.landingpage .content .projects .project .pictoral .lucide {
+  width: 17px;
+  height: 17px;
+  stroke-width: 1.8px;
+}
+/*
+ * Keep the path row flex-aligned so inline-flex badges do not sit off the text baseline.
+ */
+.landingpage .content .projects .project .project-path {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  font-family: var(--mono);
+  /*
+   * .8em resolved to 10.4px. This is the field that distinguishes two checkouts both
+   * called `api`, so it was the smallest text on the page carrying the highest-stakes
+   * distinction. .85em clears the 11px floor for functional text.
+   */
+  font-size: 0.85em;
+  color: var(--vscode-descriptionForeground);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.landingpage .content .projects .project .project-path:empty {
+  display: none;
+}
+.landingpage .content .projects .project .project-path > .path-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.landingpage .content .projects .project.hidden-by-filter {
+  display: none;
+}
+.landingpage .content .group.filtered-out {
+  display: none;
+}
+/*
+ *--- button tooltips --------------------------------------------------------
+ * The tooltip is positioned against its button, which is why `.landingpage button` carries
+ * `position: relative` up in the base button rule.
+ */
+.landingpage button svg, .landingpage button > .tooltiptext {
+  /* Keeps event.target the button itself rather than the content inside it. */
+  pointer-events: none;
+}
+.landingpage button .tooltiptext {
+  position: absolute;
+  z-index: 100;
+  left: calc(var(--buttonsize) + var(--ctrlspace));
+  top: 0;
+  visibility: hidden;
+  max-width: 250px;
+  width: max-content;
+  background-color: var(--vscode-editorHoverWidget-background, var(--vscode-activityBar-background));
+  border: 1px solid var(--vscode-editorHoverWidget-border, var(--hairline));
+  color: var(--vscode-editorHoverWidget-foreground, var(--vscode-activityBar-foreground));
+  box-shadow: var(--shadow-s);
+  border-radius: var(--radius);
+  padding: var(--gapspace-s);
+  text-align: left;
+  font-family: var(--vscode-font-family);
+  font-size: smaller;
+}
+.landingpage button .tooltiptext h1 {
+  padding: 0;
+  margin: 0;
+  font-size: small;
+  font-weight: 600;
+}
+.landingpage button .tooltiptext h1 light {
+  font-weight: lighter;
+}
+.landingpage button .tooltiptext p {
+  margin: 4px 0 0;
+}
+.landingpage button .tooltiptext p:last-child {
+  margin-bottom: 0;
+}
+.landingpage button .tooltiptext.centered {
+  left: 50%;
+  top: calc(var(--buttonsize) + var(--ctrlspace));
+  transform: translateX(-50%);
+}
+.landingpage button:hover .tooltiptext {
+  visibility: visible;
+}
+.landingpage .dropbin {
+  /*
+   * A box on the right, inset from the edge rather than pinned to it. It sat across the bottom
+   * before, and the bottom edge of the editor area is usually the last thing between the
+   * pointer and the desktop - the panel is often collapsed and the window rarely reaches the
+   * foot of the screen - so a downward gesture that overshot the zone left the window
+   * entirely, and Chromium does not report a drag that ended outside it.
+   *
+   * The inset is the point, not decoration: overshooting to the right now crosses a margin of
+   * dead page before it reaches the window edge, so the gesture has somewhere to be wrong
+   * without escaping. It makes the escape rarer, not impossible.
+   */
+  position: fixed;
+  right: var(--gapspace);
+  /*
+   * Centred with a negative margin of half its own height rather than a `translateY(-50%)`,
+   * because `bin-in` animates `transform` and would drop the centring for the length of the
+   * animation and again at its end. The margin leaves `transform` entirely to the animation.
+   */
+  top: 50%;
+  margin-top: -75px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--gapspace) / 2);
+  /*
+   * The page has no global `box-sizing` reset, so the padding and border would otherwise be
+   * added to these and the box would quietly be 33px larger in each direction.
+   */
+  box-sizing: border-box;
+  width: 150px;
+  height: 150px;
+  padding: var(--gapspace);
+  border: 1px dashed var(--vscode-panel-border, var(--hairline));
+  border-radius: var(--radius);
+  background-color: var(--vscode-editorWidget-background);
+  color: var(--vscode-descriptionForeground);
+  text-align: center;
+  line-height: 1.3;
+  transform-origin: right center;
+  animation: bin-in var(--dur-enter) var(--ease-out);
+  transition: border-color var(--dur-hover) var(--ease-hover), background-color var(--dur-hover) var(--ease-hover), color var(--dur-hover) var(--ease-hover);
+}
+.landingpage .dropbin .lucide {
+  width: 28px;
+  height: 28px;
+}
+.landingpage .dropbin .dropbin-label {
+  font-size: 1em;
+}
+/*
+ * Pointer is inside, but the dwell has not elapsed. Red already, because that is what the
+ * target is - but still dashed, still a wash rather than a fill, and the label still says
+ * to hold, because a release at this moment does nothing.
+ *
+ * The glyph and the label take the error colour *mixed into the foreground*, never the raw
+ * one, which is the same rule the `data-shade` palette follows and for the same reason: the
+ * fill underneath is made of that colour, so writing on it in the colour itself is writing
+ * red on pink. Measured raw against the armed fill at 2.43:1 on light and 3.64:1 on dark,
+ * where small text needs 4.5:1, while passing on high contrast at 5.24:1 - the usual way
+ * this defect hides. 45% into the foreground clears it in all three, worst case 4.89:1 on
+ * light, and against the fainter hover wash it is 5.8:1 or better.
+ */
+.landingpage .dropbin[data-over] {
+  border-color: var(--vscode-errorForeground);
+  background-color: color-mix(in srgb, var(--vscode-errorForeground) 8%, var(--vscode-editorWidget-background));
+  color: color-mix(in srgb, var(--vscode-errorForeground) 45%, var(--vscode-foreground));
+}
+.landingpage .dropbin[data-armed] {
+  border-style: solid;
+  background-color: color-mix(in srgb, var(--vscode-errorForeground) 22%, var(--vscode-editorWidget-background));
+}
+/*
+ * Entrances travel inward so they do not escape clipping or change scroll width. Arriving cards only fade because FLIP owns positional movement.
+ */
+@keyframes card-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes bin-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes line-in-x {
+  from {
+    opacity: 0;
+    transform: scaleX(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+@keyframes line-in-y {
+  from {
+    opacity: 0;
+    transform: scaleY(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+/*
+ * Hover detail uses its measured nearest-trigger origin and no translation that could fight positioning.
+ */
+@keyframes hovercard-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+/*
+ * A destructive confirmation arriving under the pointer that just clicked. The button fades in
+ * and is held non-interactive until the very end, so the click that opened it cannot also
+ * press it. The menu renders only the confirmation button during this state.
+ *
+ * `pointer-events` is not interpolatable, so it animates discretely: a discrete property holds
+ * the `from` value until the next keyframe is reached, which is why the release sits at 99%
+ * rather than being left to flip halfway. The opacity curve is unaffected by that stop.
+ */
+@keyframes confirm-arm {
+  from {
+    opacity: 0;
+    pointer-events: none;
+  }
+  99% {
+    pointer-events: none;
+  }
+  to {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+@keyframes scrim-in {
+  from {
+    background-color: transparent;
+  }
+}
+@keyframes tick-pop {
+  from {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.06);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+/*
+ * Reduced motion removes moving properties and named scale or translation animations while retaining color, opacity, progress, and safeguards. Blanket overrides require `!important`.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .landingpage *, .landingpage *::before, .landingpage *::after {
+    transition-property: opacity, color, background-color, border-color, outline-color, box-shadow !important;
+    /*
+     * The duration list has to be replaced too, not just the property list. Durations are
+     * matched to properties by position and repeat cyclically, so a declaration that said
+     * `background-color .15s, transform .1s` would hand its second duration to whichever
+     * property now sits second - the press duration would end up driving a colour. One value
+     * applies to all six.
+     */
+    transition-duration: var(--dur-hover) !important;
+  }
+  .landingpage [data-drop]::before,
+  .landingpage [data-drop]::after,
+  .landingpage [data-copied] .icon {
+    animation: none !important;
+  }
+  /*
+   * The focus ring is exempt from the duration above, for the same reason it is exempt from
+   * the normal one - see `.project:focus`. Arrow-key navigation is the most repeated action
+   * on this page and the ring is the only thing saying what Enter will open, so it has to be
+   * at its final colour before the next keypress rather than easing over 150ms behind it.
+   * The blanket `transition-duration` in this block was silently handing the defect that rule
+   * exists to prevent straight back to reduced-motion users, who are the least likely to want
+   * it. `scale` and `translate` need no protection here: the property list above has already
+   * dropped them.
+   */
+  .landingpage .project:focus {
+    transition-duration: 0s !important;
+  }
+  .landingpage .project:focus .spine {
+    transition-duration: 0s !important;
+  }
+  .landingpage .hovercard:popover-open,
+  .landingpage .ctxmenu,
+  .landingpage .palette,
+  .landingpage .glyphpalette,
+  .landingpage .dropbin,
+  .landingpage .popover {
+    animation: card-in var(--dur-enter) var(--ease-out) !important;
+  }
+  /*
+   * `confirm-arm` is deliberately left running, and must stay that way. It reads as an
+   * animation but it is a safeguard: it holds a destructive confirmation non-interactive so a
+   * double-click cannot carry through onto it. Reduced motion is a request for less movement,
+   * not for fewer protections, and this one moves nothing - it only fades. Restated here
+   * rather than merely omitted so that a future blanket `animation: none` in this block does
+   * not disarm it by accident.
+   */
+  .landingpage .ctxmenu button[data-confirm] {
+    animation: confirm-arm var(--dur-arm) var(--ease-out) !important;
+  }
+}
+/*
+ *--- hover detail ----------------------------------------------------------
+ * Shown while a bookmark is hovered or keyboard-focused. Uses the Popover API, so the
+ * browser puts it in the top layer: it escapes every `overflow` and stacking context on
+ * the page without a z-index, which is exactly the class of bug that has bitten the
+ * tooltips here before.
+ *
+ * The UA stylesheet gives [popover] `inset: 0; margin: auto; border: solid; padding: .25em`
+ * to centre it on screen. All four have to be undone before it can be placed by hand.
+ */
+.landingpage .hovercard {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 8px 10px;
+  max-width: min(520px, 80vw);
+  width: max-content;
+  border: 1px solid var(--vscode-editorHoverWidget-border, var(--hairline));
+  border-radius: var(--radius);
+  background-color: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
+  color: var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
+  box-shadow: var(--shadow-s);
+  font-size: var(--vscode-font-size);
+  /*
+   * Never interactive: it would otherwise steal the hover that opened it and flicker.
+   * Copy lives on the bookmark card itself, so there is nothing in here to click.
+   */
+  pointer-events: none;
+}
+/*
+ * Setting `display` on a popover at all is a trap: the UA stylesheet hides a closed one
+ * with `[popover]:not(:popover-open) { display: none }`, and *any* author `display` beats
+ * it - author rules win over UA rules regardless of specificity. Without this the closed
+ * popover stayed on the page as a small empty bordered box, parked wherever it was last
+ * positioned. Scope the layout to the open state.
+ */
+.landingpage .hovercard:popover-open {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  /*
+   * Apply transforms only to an open popover, use `data-side` for the trigger-nearest origin, and keep the scale change slight for the wide surface.
+   */
+  transform-origin: left top;
+  animation: hovercard-in var(--dur-enter) var(--ease-out);
+}
+.landingpage .hovercard[data-side=above]:popover-open {
+  transform-origin: left bottom;
+}
+.landingpage .hovercard .hovercard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.landingpage .hovercard .hovercard-name {
+  font-weight: 600;
+}
+.landingpage .hovercard .hovercard-path {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  color: var(--vscode-descriptionForeground);
+  overflow-wrap: anywhere;
+}
+.landingpage .hovercard .hovercard-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: 2px;
+  font-size: 0.9em;
+}
+.landingpage .hovercard .hovercard-branch, .landingpage .hovercard .hovercard-missing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.landingpage .hovercard .hovercard-branch .lucide, .landingpage .hovercard .hovercard-missing .lucide {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.5px;
+}
+.landingpage .hovercard .hovercard-branch {
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--mono);
+}
+.landingpage .hovercard .hovercard-missing {
+  color: var(--vscode-errorForeground);
+  font-weight: 600;
+}
+
+@keyframes landingpage-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

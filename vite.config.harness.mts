@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 /**
  * Builds `out/harness-render.mjs` for `scripts/harness.mjs`.
  *
- * The harness needs the *assembled* page - HTML shell, compiled SCSS, Preact bundle and
+ * The harness needs the *assembled* page - HTML shell, inlined CSS, Preact bundle and
  * inlined icon SVGs - and only the Vite pipeline can produce that. So the pure renderer is
  * bundled once here as ESM that plain Node can import. `vscode` is not referenced (the
  * renderer imports it as a type only) but stays external as a safety net: if someone adds a

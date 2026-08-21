@@ -1,6 +1,22 @@
 # Development
 
-Use Node.js 20.19 or newer, or Node.js 22.12 or newer. Run `npm install` once after cloning.
+Use Node.js 20.19 or newer, or Node.js 22.12 or newer.
+
+Normal extension users do not need Node.js, Playwright, or a separate browser; they install the VSIX and use the Chromium runtime already inside VS Code.
+
+For development, clone the repository and run:
+
+```bash
+npm install
+```
+
+Install Playwright's pinned Chromium only when you need to run the browser suite:
+
+```bash
+npx playwright install chromium
+```
+
+That browser is a disposable test dependency in Playwright's cache, not part of the extension or VSIX.
 
 ## Running it locally
 
@@ -13,7 +29,7 @@ The default *Run Extension* launch config gives that window its own extensions d
 
 The profile also means the dev host keeps its own bookmarks, separate from your real VS Code, so debugging cannot corrupt your actual data. If you ever need your real setup, because a theme or another extension is interfering, pick **Run Extension (with my installed extensions)** from the debug dropdown instead. That one reopens your last folder, so use **Show Landing Page** from the palette to see the page.
 
-After an edit, press `Ctrl/Cmd+R` in the Extension Development Host to reload. `npm run watch` runs both Vite watchers, so you never run a build by hand; `.ts`, `.tsx`, `.scss` and `.html` are all covered. The webview bundle builds first and is then inlined into the extension bundle as text, which is why the two watchers are ordered. A stale webview build would otherwise ship an old page silently.
+After an edit, press `Ctrl/Cmd+R` in the Extension Development Host to reload. `npm run watch` runs both Vite watchers, so you never run a build by hand; `.ts`, `.tsx`, `.css` and `.html` are all covered. The webview bundle builds first and is then inlined into the extension bundle as text, which is why the two watchers are ordered. A stale webview build would otherwise ship an old page silently.
 
 Errors surface in two separate places, because the page is a sandboxed webview with its own console:
 
@@ -55,7 +71,8 @@ A screenshot cannot catch a drag that arms too early, and a click cannot catch a
 
 `e2e/flip.spec.ts`, `e2e/menus.spec.ts`, `e2e/delete-zone.spec.ts`, `e2e/affordances.spec.ts`, `e2e/fold.spec.ts` and `e2e/reduced-motion.spec.ts` came from `scripts/motion-check.mjs`, which they replaced (D020). Almost every test in them is a bug that actually shipped here, reduced to the smallest assertion that would have caught it, and each one carries that history in its own comment.
 
-Do not delete one because its bug is fixed - that is precisely what makes it a regression check, and the spine's focus response has been lost twice already, both times to an unrelated refactor rather than to anyone repeating a mistake.
+Keep a regression test while the behavior it protects remains part of the product contract; a passing build alone is not a reason to delete it.
+When the product decision changes, delete the obsolete test and any dedicated baseline, then update the decision and test documentation in the same commit.
 
 Three of them assert a negative: a scroll starts no flights, a resize flies nobody else's cards, a twin does not fly. Each is paired with its positive half in the same test, because "nothing ever animates" would otherwise pass all three. Keep that pairing when you add one, and keep the guard that proves the gesture happened at all - the group-cohesion check passed vacuously for as long as its drop silently reordered nothing.
 

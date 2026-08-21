@@ -78,7 +78,7 @@ const model = {
 };
 
 /**
- * The `--vscode-*` variables the SCSS resolves against, taken from Dark Modern, Light Modern
+ * The `--vscode-*` variables the CSS resolves against, taken from Dark Modern, Light Modern
  * and Dark High Contrast. Without these every colour in the page falls back to nothing and a
  * visual check is worthless. `?theme=light` and `?theme=hc` render the other two sets.
  *

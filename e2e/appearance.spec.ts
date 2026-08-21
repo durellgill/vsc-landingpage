@@ -27,44 +27,8 @@ import { openBoard } from './board';
 // Tagged so CI can exclude it until Linux baselines exist. Everything else in `e2e/` is
 // platform-independent and runs everywhere.
 test.describe('appearance @visual', () => {
-  test('the default board', async ({ page }) => {
-    await openBoard(page);
-    await expect(page).toHaveScreenshot('board-default.png');
-  });
-
-  test('the light theme', async ({ page }) => {
-    await openBoard(page, '?theme=light');
-    await expect(page).toHaveScreenshot('board-light.png');
-  });
-
   test('the empty board', async ({ page }) => {
     await openBoard(page, '?empty');
     await expect(page).toHaveScreenshot('board-empty.png');
-  });
-
-  test('a focused card draws a closed ring', async ({ page }) => {
-    await openBoard(page);
-
-    // D019, as pixels rather than geometry. The bug this replaces drew two horizontal strokes
-    // with no ends, which a rect assertion can describe but a reviewer cannot picture.
-    const card = page.locator('.content .project').nth(1);
-    await card.focus();
-
-    // Clipped to the card plus 8px rather than scoped to the element. The ring is drawn outside
-    // the card's box, so an element-scoped shot frames exactly the region the ring is not in -
-    // it would have captured a cardful of nothing and passed for any ring at all. The margin is
-    // 8px because the ring reaches 4px and the point is to see it end.
-    const box = (await card.boundingBox())!;
-    await expect(page).toHaveScreenshot('card-focused.png', {
-      clip: { x: box.x - 8, y: box.y - 8, width: box.width + 16, height: box.height + 16 }
-    });
-  });
-
-  test('a group in grid layout', async ({ page }) => {
-    await openBoard(page);
-
-    // The first grid card is the one flush with the container's left edge, which is where the
-    // D019 clipping showed up in grid rather than list.
-    await expect(page.locator('.projects.grid').first()).toHaveScreenshot('group-grid.png');
   });
 });

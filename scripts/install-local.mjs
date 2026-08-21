@@ -32,7 +32,7 @@ function hasCodeCli() {
 }
 
 try {
-  // vsce runs `vscode:prepublish` -> `npm run package`, which compiles the SCSS and bundles,
+  // vsce runs `vscode:prepublish` -> `npm run package`, which inlines the CSS and bundles,
   // so there is no separate build step to run here.
   step(`Packaging ${extensionId} v${pkg.version}`);
   execFileSync('npx', ['-y', '@vscode/vsce', 'package'], { cwd: root, stdio: 'inherit' });
