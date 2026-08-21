@@ -13,7 +13,6 @@ function group(guid:string, ...labels:string[]):LandingPageGroup
   return {guid, label:guid, projects:labels.map(bookmark)};
 }
 
-/** Labels in order, so an assertion reads as the board does. */
 function order(g:LandingPageGroup):string[]
 {
   return g.projects.map(p => p.label);

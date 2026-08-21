@@ -94,16 +94,9 @@ function icon(source:string):string
   return source.replace(/<svg\b[^>]*>/, tag => tag.replace(/\s(?:width|height)="[^"]*"/g, '')).trim();
 }
 
-//TODO: remove unused icons
-/**
- * Collection of icons used in this extension. 
- * This collection object is iterated by HTML template parser
- * and each `key` will replace `${key}` in HTML template with the actual SVG source.
- * This way SVG icons can be injected into the html template file.
- */
 export const icons=
 {
-  arrowRightIcon : icon(svgArrowRight), // return string of an SVG, styling+size in scss!
+  arrowRightIcon : icon(svgArrowRight),
   ellipsis : icon(svgEllipsis), 
   squarePlus : icon(svgSquarePlus), 
   trash2 : icon(svgTrash2), 
@@ -137,7 +130,7 @@ export const icons=
   alignJustify : icon(svgAlignJustify),
   gitBranch : icon(svgGitBranch),
   image : icon(svgImage),
-  folderInput : icon(svgFolderInput), // toolbar button for the icon picker
+  folderInput : icon(svgFolderInput),
   refreshCw : icon(svgRefreshCw),
   triangleAlert : icon(svgTriangleAlert),
   copy : icon(svgCopy),

@@ -1,14 +1,7 @@
 import * as vscode from 'vscode';
 
 /**
- * Clones a git repository by handing off to VS Code's built-in Git extension.
- *
- * The `git.clone` command owns the destination folder picker, the progress notification,
- * credential/SSH handling and the final "Open / Add to Workspace" prompt, so none of that
- * is reimplemented here. Once opened, the clone shows up in the `Recent` group like any
- * other folder.
- *
- * @param url Repository URL entered in the webview.
+ * Delegates cloning to `git.clone`, which owns destination selection, progress, authentication, and the final open prompt.
  */
 export async function cloneRepository(url?:string):Promise<void>
 {

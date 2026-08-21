@@ -1,54 +1,19 @@
-/**
- * Live DOM measurement for dragging and for the FLIP effect.
- *
- * Everything here reads the rendered page rather than the model, because rendered order differs
- * from stored order when bookmarks are pinned - see D007.
- */
 import type { Layout } from './types';
 
 
-/**
- * Whether anything on the card is actually cut off.
- *
- * The hover card exists to reveal what the row could not fit - the label, the path, or the
- * branch. When all three fit, it would pop up to repeat text already on screen, so it stays
- * shut. `scrollHeight` covers the grid layout, where the label is clamped to two lines
- * vertically rather than ellipsised horizontally.
- */
 export function isClipped(card:HTMLElement):boolean {
   const parts = Array.from(card.querySelectorAll<HTMLElement>('.project-label, .path-text, .branch-name'));
   return parts.some(part => part.scrollWidth > part.clientWidth+1 || part.scrollHeight > part.clientHeight+1);
 }
 
 
-/** Every bookmark card currently on the page, in document order. */
 // Array.from rather than spread: tsconfig's `lib` is ES2022 with no DOM.Iterable, so a
 // NodeList is not iterable as far as the compiler is concerned.
 export function cards():HTMLElement[] {return Array.from(document.querySelectorAll<HTMLElement>('.content .project'));}
 
 
 /**
- * Everything the FLIP effect moves: the groups, then the cards inside them.
- *
- * Groups are in the list because reordering one used to move its header, accent bar, rule and
- * count badge in a single frame while its own bookmarks slid to the same place over 220ms - the
- * cards visibly came away from their own header and caught up with it. Measured at a 133px jump
- * against a 250ms glide.
- *
- * Groups come first so their deltas are known before any card is considered, since a card inside
- * a moving group animates only what it does relative to that group.
- *
- * Keys are namespaced because a group and a bookmark are separate GUID spaces and nothing stops
- * them colliding.
- *
- * A GUID does not identify a card on its own either. The same bookmark can sit in a group *and*
- * in `Recent` - opening one from the group puts it in VS Code's recently-opened list, and the
- * overlay then rebuilds a `Recent` entry for it - so two cards on the board carry the same GUID.
- * Keyed on the GUID alone the two share one baseline, each render overwrites it with whichever
- * card was measured last, and the next render reads the *other* card's position as movement:
- * switching `Recent` between layouts flew a card in an untouched group across its neighbour and
- * back, which is the whole bug. Repeats are therefore numbered in DOM order, which is stable
- * across renders for as long as both cards are on the board.
+ * Measures groups before their cards so parent deltas are known. Keys namespace groups and bookmarks, and repeated bookmark GUIDs are numbered by stable DOM occurrence.
  */
 export function movingParts():{key:string; element:HTMLElement; card:boolean}[] {
   const parts:{key:string; element:HTMLElement; card:boolean}[] = [];
@@ -69,14 +34,7 @@ export function movingParts():{key:string; element:HTMLElement; card:boolean}[] 
 
 
 /**
- * Which bookmark a dragged card would land in front of, measured from the cards' rectangles
- * rather than from an index - the same reason `neighbour()` measures.
- *
- * List is a flex column, so the boundary between two cards is horizontal. Grid and compact
- * wrap, so it is vertical and whole rows above the pointer are skipped.
- *
- * @param dragged GUID of the card being carried, which is never its own landing point.
- * @returns GUID of the card to insert before, or null to drop at the end of the group.
+ * List insertion uses horizontal boundaries; grid and compact use vertical position after skipping completed rows. Excludes the dragged card and returns `null` for an end drop.
  */
 export function insertionPoint(event:DragEvent, section:HTMLElement, layout:Layout, dragged:string):string|null {
   const rows = Array.from(section.querySelectorAll<HTMLElement>('.project')).filter(card => card.dataset.guid!==dragged);
@@ -99,12 +57,6 @@ export function insertionPoint(event:DragEvent, section:HTMLElement, layout:Layo
 }
 
 
-/**
- * How far the cards below a landing point have to slide to open a space for a carried card:
- * its own height plus the gap the list already puts between two rows.
- *
- * @param card The card being picked up, measured before anything has moved.
- */
 export function gapFor(card:HTMLElement):number {
   const list = card.parentElement;
   const rowGap = list ? parseFloat(getComputedStyle(list).rowGap)||0 : 0;
@@ -112,18 +64,6 @@ export function gapFor(card:HTMLElement):number {
 }
 
 
-/**
- * Finds the card an arrow key should move focus to, by geometry rather than by index.
- *
- * Index arithmetic cannot work here: list layout is a flex column, grid layout is a CSS grid
- * whose column count depends on the panel width, and compact layout wraps. Measuring where
- * the cards actually are is the only approach that behaves the same in all three and does
- * not need to know which layout a group is using.
- *
- * @param from Card that currently has focus.
- * @param key `ArrowUp`, `ArrowDown`, `ArrowLeft` or `ArrowRight`.
- * @returns The card to focus, or undefined if there is nothing that way.
- */
 export function neighbour(from:HTMLElement, key:string):HTMLElement|undefined {
   const others = cards().filter(card => card!==from);
   if (others.length===0) {return undefined;}

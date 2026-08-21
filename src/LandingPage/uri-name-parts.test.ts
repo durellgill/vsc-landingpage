@@ -33,7 +33,6 @@ suite('parseUriNameParts', () => {
   });
 
   test('a leading dot is a name, not an extension', () => {
-    // `.gitignore` has basename `.gitignore`: the split only happens at a dot past position 0.
     const parts = parseUriNameParts(vscode.Uri.file('/Users/me/.gitignore'));
 
     assert.strictEqual(parts.basename, '.gitignore');

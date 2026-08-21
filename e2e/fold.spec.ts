@@ -68,3 +68,37 @@ test('the chevron does not settle before the group has finished folding', async 
     `the chevron settled at ${settled.chevron}ms while the group was still closing at ${settled.height}ms`
   ).toBeGreaterThanOrEqual(settled.height! - FRAME);
 });
+
+/**
+ * `.foldable` carries an `overflow-clip-margin` so that a focused card's ring - drawn outside
+ * its box since D019 was revisited - is not cut off by the fold's clip. The margin has no
+ * per-axis form in Chromium, so it also lets the next row's spine show below the box edge while
+ * a group expands: a 6px fragment of a 20px mark, arriving from nowhere.
+ *
+ * `components.tsx` suspends the margin for the duration of the height animation. That is three
+ * lines with no visible effect at rest, which is the kind of thing a refactor removes.
+ */
+test('nothing escapes the fold box while it is animating', async ({ page }) => {
+  await openBoard(page);
+
+  const during = await page.evaluate(() => {
+    const group = document.querySelector<HTMLElement>('.group')!;
+    const box = group.querySelector<HTMLElement>('.foldable')!;
+    const atRest = getComputedStyle(box).overflowClipMargin;
+
+    // Read inside the flight. The fold runs on `--dur-move`, so the frame after the click is
+    // comfortably mid-animation.
+    group.querySelector<HTMLElement>('.titlebar [aria-expanded]')!.click();
+    return new Promise<{atRest:string; during:string; animating:boolean}>(done => {
+      requestAnimationFrame(() => done({
+        atRest,
+        during: getComputedStyle(box).overflowClipMargin,
+        animating: box.getAnimations().some(a => a.playState === 'running')
+      }));
+    });
+  });
+
+  expect(during.animating, 'the fold was not running, so nothing below was measured mid-flight').toBe(true);
+  expect(during.atRest, 'the clip margin is gone, and a focused ring is being cut off again').not.toBe('0px');
+  expect(during.during, 'the fold box leaks its margin mid-flight, so a spine shows past the edge').toBe('0px');
+});

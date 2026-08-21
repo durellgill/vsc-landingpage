@@ -6,26 +6,27 @@ Read `Considered instead` before proposing a change. It names the option that al
 
 Every entry uses the same five fields, so a specific field can be searched across the file: `Decision`, `Reason`, `Considered instead`, `Consequences`, and `Status`.
 
-| Looking for | Entry |
-|---|---|
-| Page implementation, webview bundle, template inlining | D001, D003 |
-| Message protocol, host and webview responsibilities | D002 |
-| Recent group, VS Code history, per-entry customization | D004, D005 |
-| Creating bookmarks, groups, folders; destination prompts | D006 |
-| Drag and drop, insertion points, pinning, reordering | D007 |
-| Drag-to-delete, dwell, destructive safeguards | D008 |
-| Persistence, model sync, acknowledgement | D009 |
-| Opening folders, workspaces, and files | D010 |
-| Missing targets, Git branches, filesystem checks | D011 |
-| Theme variables, contrast, bookmark shades | D012, D012a |
-| Motion tokens, durations, reduced motion | D013 |
-| Menus, palettes, popovers, focus restoration | D014 |
-| Keyboard navigation, screen readers, ARIA | D015 |
-| Test layering, harness, regression checks | D016 |
-| Accent marks, gutter, spine geometry | D012a, D017 |
-| Page width, centring, filter sizing | D018 |
-| Focus rings, outlines, ancestor clipping | D019, D014 |
-| Browser test tooling, visual baselines, snapshots | D020, D016 |
+
+| Looking for                                              | Entry       |
+| -------------------------------------------------------- | ----------- |
+| Page implementation, webview bundle, template inlining   | D001, D003  |
+| Message protocol, host and webview responsibilities      | D002        |
+| Recent group, VS Code history, per-entry customization   | D004, D005  |
+| Creating bookmarks, groups, folders; destination prompts | D006        |
+| Drag and drop, insertion points, pinning, reordering     | D007        |
+| Drag-to-delete, dwell, destructive safeguards            | D008        |
+| Persistence, model sync, acknowledgement                 | D009        |
+| Opening folders, workspaces, and files                   | D010        |
+| Missing targets, Git branches, filesystem checks         | D011        |
+| Theme variables, contrast, bookmark shades               | D012, D012a |
+| Motion tokens, durations, reduced motion                 | D013        |
+| Menus, palettes, popovers, focus restoration             | D014        |
+| Keyboard navigation, screen readers, ARIA                | D015        |
+| Test layering, harness, regression checks                | D016        |
+| Accent marks, gutter, spine geometry                     | D012a, D017 |
+| Page width, centring, filter sizing                      | D018        |
+| Focus rings, outlines, ancestor clipping                 | D019, D014  |
+| Browser test tooling, visual baselines, snapshots        | D020, D016  |
 
 ## D001: One Preact webview
 
@@ -73,7 +74,9 @@ Reason: Changes written directly into Recent disappear on the next rebuild. Movi
 
 Considered instead: Treating Recent as an ordinary editable group. Rejected because the rebuild is not optional - VS Code owns the list, so any edit stored against it is erased on the next sync, and the user sees their change silently revert.
 
-Consequences: Dragging out of Recent copies. Dragging into Recent is refused. Hiding an entry affects Landing Page only. Missing entries and hidden entries are removed before `maxRecentItems` is applied so the setting counts what the user sees. This special case is load-bearing in every drag, drop, and menu path; expect to handle Recent separately in each.
+Consequences: Dragging out of Recent copies. Dragging into Recent is refused. Hiding an entry affects Landing Page only. Missing entries and hidden entries are removed before `maxRecentItems` is applied so the setting counts what the user sees.
+Refresh Recent from its page control, the palette command, and whenever a hidden panel becomes visible because VS Code history can change outside the page.
+This special case is load-bearing in every drag, drop, and menu path; expect to handle Recent separately in each.
 
 ## D005: Recent customizations use an overlay
 
@@ -139,13 +142,14 @@ Consequences: Entry-point actions catch rejected promises and show a VS Code err
 
 Status: active, platform constraint
 
-Decision: Folders and workspace files may open in a new window. Plain files open in the current window.
+Decision: Folders and workspace files may open in a new window through the VS Code API. A plain file may too, but only through the `code` CLI, and only where that CLI is on PATH.
 
-Reason: `vscode.openFolder` supports `forceNewWindow`; `vscode.open` for a file does not.
+Reason: `vscode.openFolder` supports `forceNewWindow`; `vscode.open` for a file does not. The CLI's `code -n <file>` does, so the capability exists off the API surface.
 
-Considered instead: Nothing. This is what the VS Code API offers. The decision this project made is only that the same type check applies on every path.
+Considered instead: Withholding the action for files entirely, which is what this project did until 2026-08-20. That was right while the CLI route was unexplored and wrong once it was not. Rejected because the CLI is present on most installations and the action is the one users asked for by name.
 
-Consequences: Ctrl or Cmd click, keyboard shortcuts, and menu items must all apply the same type check.
+Consequences: The CLI is not installed by default on macOS, so its availability is probed in the host and sent to the page, and the menu item is absent - not disabled, and never a no-op - when the probe fails. `offersNewWindow` in `bookmark-filter.ts` answers "does the menu offer this", `opensInWindow` answers the narrower "does the API support this"; every path picks one deliberately. Ctrl or Cmd click keeps the API check, because a modifier click has nowhere to show that the CLI is missing. The CLI is invoked with an argument list and never a shell string: the path is model data.
+VS Code has no workspace-tab API, so Explorer context commands open a window and let macOS native tabs decide its presentation; command wording distinguishes a clicked folder from a file whose parent will open.
 
 ## D011: Filesystem health is observed state
 
@@ -181,7 +185,9 @@ Reason: Contrast, then redundancy. D012 originally put the color on "the spine a
 
 Considered instead: Removing the tint plate but keeping the glyph colored. Rejected because it is not sufficient - the darker shades still only reach 2.87:1 as a bare glyph on the editor background, because a color like `#3A5FC9` is genuinely dark against `#1f1f1f`.
 
-Consequences: One accent per bookmark. Do not reintroduce a colored icon, a tinted icon plate, or a card background wash. `--shade-readable` remains the rule for shade-derived *text*, which is a separate contrast problem with a separate answer.
+Consequences: One accent per bookmark. Do not reintroduce a colored icon, a tinted icon plate, or a card background wash.
+Shade keys are persisted user data and cannot be casually renamed.
+`--shade-readable` remains the rule for shade-derived *text*, which is a separate contrast problem with a separate answer.
 
 ## D013: Motion uses shared tokens
 
@@ -194,6 +200,7 @@ Reason: Independent values drift and make parts of one gesture settle at differe
 Considered instead: Per-component durations chosen where each animation is written. Rejected because a gesture expressed in two places - the chevron rotation and the group height, for instance - then settles at two different times, and nothing catches it.
 
 Consequences: Pointer feedback uses `--dur-hover`, travel uses `--dur-move`, presses use `--dur-press`, and entrances use `--dur-enter`. Reduced motion removes translation and scale while preserving color, opacity, focus feedback, and destructive safeguards.
+`stillness()` is JavaScript's reduced-motion counterpart.
 
 ## D014: Menus, palettes, and hover details manage their own boundaries
 
@@ -217,7 +224,9 @@ Reason: The page has several visual-only actions and mixed layouts where documen
 
 Considered instead: `aria-label` on the bookmark card. Rejected because it replaces the accessible content name and hides the path and the missing-target state - the two things a screen reader user most needs from a bookmark. Also considered: document-order tab navigation, rejected because grid and compact layouts put the visually adjacent card several tab stops away.
 
-Consequences: Controls inside a card handle their own keyboard events. Opening a surface moves focus into it and closing restores focus. Do not put `aria-label` on a bookmark card. The colocated Mocha tests are host-only and cannot see the DOM, so this contract is held by `e2e/accessibility.spec.ts`, which asserts the computed accessible names directly.
+Consequences: Controls inside a card handle their own keyboard events. Opening a surface moves focus into it and closing restores focus.
+Arrow-up from the top bookmark moves focus to the filter.
+Do not put `aria-label` on a bookmark card. The colocated Mocha tests are host-only and cannot see the DOM, so this contract is held by `e2e/accessibility.spec.ts`, which asserts the computed accessible names directly.
 
 ## D016: Tests are layered by what they can prove
 
@@ -254,18 +263,9 @@ Reason: An editor group can be anything from a split pane to a 32" monitor. A 92
 Considered instead: Letting the column fill the full width. Rejected because the measure then runs past comfortable reading length on a wide monitor, which is the problem the cap exists to solve.
 
 Consequences: Do not give a page-level element its own max-width. The filter is body size, not enlarged: it filters a list already on screen and is not a search hero. It is not rendered at all when the board has no groups, because a filter over nothing is a control that cannot act - the `/` shortcut checks for the field before it swallows the keystroke.
+Filtering temporarily reveals collapsed groups without changing persisted collapse state, and a group with no visible matches is omitted.
 
-## D019: The focus ring is drawn inside the card
-
-Status: active
-
-Decision: A focused bookmark card draws its ring with a negative `outline-offset`, inside its own box.
-
-Reason: `.foldable` clips both axes so the fold animation has a box to animate, and in every layout a card is flush against that clip on at least one side - both sides in `list`, the left edge in the first `grid` column. A positive offset put the ring outside the clip, so a focused list row drew two horizontal strokes with no ends and a focused first grid card drew three sides.
-
-Considered instead: Lifting the clip on `.foldable` while a card inside it has focus. Rejected because the clip is load-bearing - `.foldable` is the only box that survives the cards unmounting on collapse, so the fold has nothing else to animate against. Also considered: padding the container so cards are never flush, rejected as a layout change to fix a paint problem.
-
-Consequences: Keep the ring inside the card box. A card is never guaranteed room outside itself, so any future resting outline, shadow, or halo on `.project` has the same constraint. This is the general case of the boundary noted in D014: the popover top layer solves it for surfaces, and ordinary in-page elements have to solve it themselves.
+Consequences: A card is guaranteed 6px outside itself and no more, so any future outline, shadow, or halo on `.project` must fit in it. The margin has no per-axis form in Chromium, so it also lets content past the block edges: while a group expands, the next row's spine showed as a 6px fragment below the fold edge. `components.tsx` therefore zeroes the margin for the flight and restores it on finish - nothing has to escape the box mid-fold, since a ring only needs to be whole at rest. `e2e/clipping.spec.ts` asserts the general rule, measuring against the clip edge including its margin rather than against the bare box, and `e2e/fold.spec.ts` holds the mid-flight case. This remains the general case of the boundary noted in D014: the popover top layer solves it for surfaces, and ordinary in-page elements have to be given room explicitly.
 
 ## D020: Committed browser tests use Playwright; agent-browser stays interactive
 

@@ -23,7 +23,6 @@ suite('findItemByGuid', () => {
   });
 
   test('finds a bookmark, and names the group holding it', () => {
-    // `ownerGroup` is what tells every caller whether it is looking at a bookmark or a group.
     const found = findItemByGuid('p3', model());
 
     assert.ok(found);

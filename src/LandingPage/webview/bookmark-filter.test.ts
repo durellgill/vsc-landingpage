@@ -1,13 +1,6 @@
 import * as assert from 'assert';
 import type { LandingPageGroup, LandingPageProject } from '../LandingPageModel';
-import { displayPath, groupMatches, haystack, matches, opensInWindow, pinnedFirst, terms } from './bookmark-filter';
-
-/**
- * These run in the extension host like every other suite here, even though the code under test
- * ships in the webview. That works because `bookmark-filter.ts` imports nothing at runtime - it
- * is the one part of the page with no DOM, no Preact and no bridge. Keep it that way and this
- * file keeps working; add a single DOM read and it stops compiling here.
- */
+import { displayPath, groupMatches, haystack, matches, opensInWindow, offersNewWindow, pinnedFirst, terms } from './bookmark-filter';
 
 const project = (over:Partial<LandingPageProject> = {}):LandingPageProject => ({
   guid: 'p-1', label: 'api', path: 'file:///Users/dev/Projects/api', ...over
@@ -38,7 +31,6 @@ suite('haystack', () => {
 
 suite('terms and matches', () => {
   test('every term must match, in any order', () => {
-    // The documented case: `vsc land` finds `vsc-landingpage`.
     const bookmark = project({label:'vsc-landingpage', path:'file:///Users/dev/Projects/vsc-landingpage'});
 
     assert.strictEqual(matches(bookmark, terms('vsc land')), true);
@@ -46,7 +38,6 @@ suite('terms and matches', () => {
   });
 
   test('terms may match across the label and the path separately', () => {
-    // `dev api` picks one `api` out of several checkouts: one term hits the path, one the label.
     const bookmark = project({label:'api', path:'file:///Users/dev/Projects/api'});
 
     assert.strictEqual(matches(bookmark, terms('dev api')), true);
@@ -92,7 +83,6 @@ suite('pinnedFirst', () => {
   });
 
   test('two pinned bookmarks keep their stored order, not the order they were pinned in', () => {
-    // D007: pinning sorts, it does not reorder. This is the assertion that says so.
     const ordered = pinnedFirst([
       project({guid:'a', pinned:true}), project({guid:'b'}), project({guid:'c', pinned:true})
     ]);
@@ -125,8 +115,25 @@ suite('opensInWindow', () => {
   });
 
   test('a plain file may not, because vscode.open has no new-window form', () => {
-    // D010. Withheld rather than offered and quietly ignored.
+    // `opensInWindow` answers API support; `offersNewWindow` additionally accounts for the CLI.
     assert.strictEqual(opensInWindow(project({icon:'file'})), false);
     assert.strictEqual(opensInWindow(project({icon:undefined})), false);
+  });
+});
+
+suite('offersNewWindow', () => {
+  test('a file is offered a new window only when the CLI resolves', () => {
+    assert.strictEqual(offersNewWindow(project({icon:'file'}), true), true);
+    assert.strictEqual(offersNewWindow(project({icon:'file'}), false), false);
+  });
+
+  test('folders and workspaces do not wait on the CLI, because the API route always exists', () => {
+    assert.strictEqual(offersNewWindow(project({icon:'folder'}), false), true);
+    assert.strictEqual(offersNewWindow(project({icon:'workspace'}), false), true);
+  });
+
+  test('an untyped bookmark is never offered one, CLI or not', () => {
+    // `icon:undefined` renders as a file but is not one, so the CLI branch must not catch it.
+    assert.strictEqual(offersNewWindow(project({icon:undefined}), true), false);
   });
 });

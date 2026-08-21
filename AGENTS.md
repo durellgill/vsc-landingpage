@@ -52,7 +52,8 @@ Vite bundles all of these into the single IIFE the template inlines, so the spli
 | `bridge.ts` | `post()` and the `acquireVsCodeApi` handle |
 | `types.ts` | Types more than one module needs |
 
-`bookmark-filter.ts` is pure on purpose. It is the only part of the page unit-testable without a browser, so keep DOM access out of it.
+`bookmark-filter.ts` is pure on purpose.
+It is the only part of the page unit-testable without a browser, so keep it free of DOM, Preact, and bridge imports.
 
 ## Build rules
 
@@ -89,3 +90,13 @@ Container checks run on Colima, not Docker Desktop. Run `colima start` before `n
 ## Releases
 
 Do not push, publish, rewrite history, or change the Marketplace publisher unless the user explicitly asks. `npx vsce package` is safe for local packaging. Update `CHANGELOG.md` and the package version only as part of an approved release.
+
+## Testing and Verification
+
+After making code changes that affect the extension behavior:
+
+1. Run `npm run install-local` to package and install the extension locally
+2. Confirm the command succeeded and extension was installed
+3. Notify the user it's ready and they should reload VS Code (Cmd+Shift+P -> "Developer: Reload Window")
+
+This ensures the user can test your changes immediately without manual packaging steps.

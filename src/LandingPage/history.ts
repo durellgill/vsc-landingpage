@@ -3,27 +3,20 @@ import { LandingPageProject } from "./LandingPageModel";
 import { parseUriNameParts } from "./uri-name-parts";
 
 /**
- * Workspace bookmark in MRU list provided in {@link RecentlyOpenedItems.workspaces}.
- * (Schema guessed from debugger.)
+ * Models the undocumented `_workbench.getRecentlyOpened` response, inferred from runtime behavior.
  */
 interface RecentWorkspace
 {
-  /** If this workspace bookmark refers to a workspace file, this property describes the path to it. */
   workspace:
   {
-    /** Path to workspace file. */
     configPath?:Uri;
-    /** Some ID (???). */
     id?:string;
   },
-  /** If this workspace bookmark refers to a folder, this property is present (only). */
   folderUri?:Uri;
 }
 
 /**
- * File bookmark in MRU list provided in {@link RecentlyOpenedItems.files}.
- * 
- * (Schema guessed from debugger.)
+ * Models the undocumented `_workbench.getRecentlyOpened` response, inferred from runtime behavior.
  */
 interface RecentFile
 {  
@@ -32,9 +25,7 @@ interface RecentFile
 }
 
 /**
- * Model for results of command [_workbench.getRecentlyOpened](https://github.com/microsoft/vscode/blob/main/src/vs/workbench/browser/actions/workspaceCommands.ts#L311).
- * 
- * (Schema guessed from debugger.)
+ * Models the undocumented `_workbench.getRecentlyOpened` response, inferred from runtime behavior.
  */
 interface RecentlyOpenedItems
 {
@@ -59,12 +50,6 @@ function mruGuid(uri:Uri):string
   return 'MRU:'+uri.toString();
 }
 
-/**
- * Reads the most recently used items from VS Code and returns it
- * as Landing Page Model presentation. Can include files, folders or workspaces.
- *
- * @returns Items from VS Code's history.
- */
 export async function importVscRecentList():Promise<LandingPageProject[]>
 {
   const recentWorkspaces: RecentlyOpenedItems = await commands.executeCommand("_workbench.getRecentlyOpened");
@@ -100,23 +85,14 @@ export async function importVscRecentList():Promise<LandingPageProject[]>
       guid:mruGuid(recentFile.fileUri),
       path:recentFile.fileUri.toString(),
       label:recentFile.label||nameParts.basename+'.'+nameParts.ext,
-      //icon:'file'
     });
   }
 
-    // console.log("👽 :=",result);
-
-  // Deliberately uncapped. `maxRecentItems` limits how many entries are *shown*, and
-  // capping here applied it before hidden and missing entries were removed - so a user who
-  // had hidden five entries saw fifteen rather than twenty. The cap belongs after the
-  // exclusions, in populateVscMru(), which needs to reach further down this list to fill
-  // the quota. See {@link recentLimit}.
   return result;
 }
 
 /**
- * How many `Recent` entries to show. `0` means no limit.
- * @returns The configured `maxRecentItems`.
+ * `maxRecentItems: 0` means unlimited.
  */
 export function recentLimit():number
 {

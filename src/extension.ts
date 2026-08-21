@@ -6,7 +6,6 @@ import { syncModelInWebview } from './LandingPage/webview-messages';
 import { LandingPageModel } from './LandingPage/LandingPageModel';
 import { LandingPageTemplate } from './LandingPage/LandingPageTemplate';
 
-/** Runs an extension action and reports failures without leaving a rejected command promise. */
 async function runLandingPageAction(action:()=>Promise<void>):Promise<void>
 {
 	try
@@ -47,13 +46,11 @@ export function activate(context: vscode.ExtensionContext)
 	});
 	context.subscriptions.push(cmdReload);
 
-	// Same code path as the refresh control on the Recent group header, see communication.ts.
 	const cmdRefreshRecents = vscode.commands.registerCommand('vsc-landingpage.refreshRecents', async () => {
 		if (landingpageWebviewPanel) {await refreshRecents(landingpageWebviewPanel, model);}
 	});
 	context.subscriptions.push(cmdRefreshRecents);
 
-	// Same code path as the Clone button in the webview, see communication.ts.
 	const cmdClone = vscode.commands.registerCommand('vsc-landingpage.cloneRepository', async () => {
 		await cloneRepository();
 	});
@@ -67,6 +64,34 @@ export function activate(context: vscode.ExtensionContext)
 		await runLandingPageAction(() => bookmarkUris(selection, model, landingpageWebviewPanel));
 	});
 	context.subscriptions.push(cmdAddBookmark);
+
+		const openInNewWorkspace = async (uri?:vscode.Uri, uris?:vscode.Uri[]) => {
+		const targetUri = (uris && uris.length>0) ? uris[0] : uri;
+		if (!targetUri) {return;}
+
+		let folderUri = targetUri;
+		try {
+			const stat = await vscode.workspace.fs.stat(targetUri);
+			if (stat.type !== vscode.FileType.Directory) {
+				folderUri = vscode.Uri.joinPath(targetUri, '..');
+			}
+		} catch (error) {
+			console.error('Failed to stat URI:', error);
+			return;
+		}
+
+		await vscode.commands.executeCommand('vscode.openFolder', folderUri, { forceNewWindow: true });
+
+		if (process.platform === 'darwin' && vscode.workspace.getConfiguration('window').get('nativeTabs') !== true) {
+			const enable = 'Enable native tabs';
+			const choice = await vscode.window.showInformationMessage('Opened in a new window. Enable macOS native tabs to open these as tabs instead.', enable);
+			if (choice === enable) {
+				await vscode.workspace.getConfiguration('window').update('nativeTabs', true, vscode.ConfigurationTarget.Global);
+			}
+		}
+	};
+	context.subscriptions.push(vscode.commands.registerCommand('vsc-landingpage.openInNewWorkspace', openInNewWorkspace));
+	context.subscriptions.push(vscode.commands.registerCommand('vsc-landingpage.openParentInNewWorkspace', openInNewWorkspace));
 
 	const cmdShowWelcomePage = vscode.commands.registerCommand('vsc-landingpage.showWelcomePage', async() => 
 	{
@@ -89,9 +114,8 @@ export function activate(context: vscode.ExtensionContext)
 					vscode.ViewColumn.One,
 					{
 							enableScripts: true,
-							// The page inlines its own CSS and JS, so it needs no local content at all.
-							localResourceRoots: [],
-							// retainContextWhenHidden: true,
+								// The page inlines its assets, so its webview requires no local resource roots.
+								localResourceRoots: [],
 					}
 			);
 
@@ -106,16 +130,10 @@ export function activate(context: vscode.ExtensionContext)
 
 			landingpageWebviewPanel.onDidDispose(()=>{landingpageWebviewPanel=null;});
 
-			// The Recent group mirrors VS Code's history, which changes while this panel sits in a
-			// background tab - opening a project in another window is the usual case. Refresh when
-			// the panel comes back into view so the user never reads a stale list.
-			landingpageWebviewPanel.onDidChangeViewState(async event => {
+				landingpageWebviewPanel.onDidChangeViewState(async event => {
 				if (event.webviewPanel.visible) {await refreshRecents(event.webviewPanel, model);}
 			}, undefined, context.subscriptions);
-
-			// (No MRU read here: the webview's `documentReady` message triggers
-			// populateVscMru() immediately afterwards, so doing it here only duplicated the work.)
-		}
+			}
 		catch (err: any) 
 		{
 			console.error(`vsc-landingpage: Exception opening extension: ${JSON.stringify(err.message)}`);

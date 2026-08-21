@@ -46,12 +46,18 @@ test.describe('appearance @visual', () => {
     await openBoard(page);
 
     // D019, as pixels rather than geometry. The bug this replaces drew two horizontal strokes
-    // with no ends, which a rect assertion can describe but a reviewer cannot picture. Scoped to
-    // the one card so the rest of the board's churn cannot mask it.
+    // with no ends, which a rect assertion can describe but a reviewer cannot picture.
     const card = page.locator('.content .project').nth(1);
     await card.focus();
 
-    await expect(card).toHaveScreenshot('card-focused.png');
+    // Clipped to the card plus 8px rather than scoped to the element. The ring is drawn outside
+    // the card's box, so an element-scoped shot frames exactly the region the ring is not in -
+    // it would have captured a cardful of nothing and passed for any ring at all. The margin is
+    // 8px because the ring reaches 4px and the point is to see it end.
+    const box = (await card.boundingBox())!;
+    await expect(page).toHaveScreenshot('card-focused.png', {
+      clip: { x: box.x - 8, y: box.y - 8, width: box.width + 16, height: box.height + 16 }
+    });
   });
 
   test('a group in grid layout', async ({ page }) => {

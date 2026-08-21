@@ -1,11 +1,7 @@
-/**
- * The leaf components of the board. `App` owns all the state; these render what it hands them
- * and post user intent back through `bridge`.
- */
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { LandingPageGroup, LandingPageProject } from '../LandingPageModel';
 import { post } from './bridge';
-import { displayPath, groupMatches, matches, opensInWindow, pinnedFirst } from './bookmark-filter';
+import { displayPath, groupMatches, matches, offersNewWindow, opensInWindow, pinnedFirst } from './bookmark-filter';
 import { motion, stillness, useAnchored } from './motion';
 import { Svg, glyphs, iconFor, shadeForGroup, shades, typeShades } from './presentation';
 import type { Layout } from './types';
@@ -13,62 +9,22 @@ import type { Layout } from './types';
 
 export function GroupShelf({group,index,needles,composer,setComposer,openMenu,refreshing,refresh,health,dragging,drop,onDragStart,onDragOver,onDrop,carried,landing,gap,onCarry,onDropBookmark,copiedGuid}:{group:LandingPageGroup;index:number;total:number;needles:string[];composer:boolean;setComposer:(id:string|null)=>void;openMenu:(event:MouseEvent,guid:string)=>void;refreshing:boolean;refresh:()=>void;health:{missing:string[];branches:Record<string,string>};dragging:boolean;drop:'before'|'after'|null;onDragStart:()=>void;onDragOver:(event:DragEvent,index:number,group:LandingPageGroup)=>void;onDrop:()=>void;carried:string|undefined;landing:string|null|undefined;gap:number;onCarry:(guid:string,card:HTMLElement)=>void;onDropBookmark:(event:DragEvent,group:LandingPageGroup,section:HTMLElement)=>void;copiedGuid:string|null}) {
   const sealed=group.guid==='@vsc-mru';
-  // Naming the group shows all of it; otherwise each bookmark is matched on its own.
-  // Missing entries are excluded from Recent by the host, not here - the count in the header
-  // has to agree with what is rendered, and `maxRecentItems` is a count of visible entries,
-  // so the exclusion has to happen before the cap. See takeExisting() in communication.ts.
+  // A matching group label reveals all its bookmarks. The host filters missing Recent entries before the visible cap so the header count and rendered rows agree.
   const projects=pinnedFirst(groupMatches(group,needles) ? group.projects : group.projects.filter(project=>matches(project,needles)));
   const layout=group.layout||'list';
-  // A filter overrides the stored fold. Searching a board and being shown a collapsed group
-  // that silently contains the hit is the worst of both - the query is a temporary intent,
-  // so it wins for as long as it lasts and the stored state is left untouched.
   const collapsed=!!group.collapsed && needles.length===0;
   const next:Record<Layout,Layout>={list:'grid',grid:'compact',compact:'list'};
   // Undefined means a carried bookmark is somewhere else; null means it would land at the end
   // of this group.
   const receiving = landing!==undefined;
-  // A drop at the end of the group is drawn on the last card that is not the one being
-  // carried - marking the carried card itself would draw the line where it already is.
+  // For an end drop, place the marker on the last non-carried card.
   let tail = projects.length-1;
   while (tail>=0 && projects[tail].guid===carried) {tail--;}
 
-  // Cards from the landing point down slide out of the way, so the space the bookmark would
-  // take is actually open rather than described by a line drawn in the crack between two rows.
-  // The shift is a transform: the list does not reflow, which is the whole reason this can run
-  // on every dragover without the jitter a real placeholder element caused.
-  //
-  // List layout only. In grid and compact a card would have to move to the end of the previous
-  // row or the start of the next one as the rows re-wrap, and a transform cannot do that - so
-  // those two keep the insertion line, which is honest about where the drop lands without
-  // pretending the reflow has already happened.
+  // List layout opens a transform-only gap. Grid and compact retain an insertion line because transforms cannot represent row rewrapping.
   const opening = receiving && layout==='list' && landing!==null ? projects.findIndex(project=>project.guid===landing) : -1;
 
-  /*
-   * The group's body height, animated on *any* change rather than only on the fold: folding,
-   * switching between list, grid and compact, and filtering all resize it, and a group whose
-   * header snaps to its new position while its cards glide to theirs looks broken. Everything
-   * below on the board moves with it, so this is what makes the layout switch read as one
-   * movement instead of two.
-   *
-   * A CSS transition cannot do this. The cards mount and unmount in the same commit that flips
-   * the class, so the box has no content to interpolate against and snaps in both directions -
-   * measured at 0px to 220px inside three frames. The cards stay unmounted when folded, which
-   * is the rule that matters: they are tab stops and arrow-key targets, and `cards()` would
-   * still find them behind a `display: none`.
-   *
-   * The height is read from the *child*, never from the box. The box may be part-way through
-   * one of these animations when another render lands, and reading its interpolated height
-   * would record a value the layout never had and animate from the wrong place next time. The
-   * child is not animated, so it always reports the height the content actually wants.
-   *
-   * The duration depends on which gesture caused the change, which is the one thing this effect
-   * cannot read off the height alone. A fold, a layout switch and a filter are considered
-   * changes and take `--dur-move`. The space that opens under a dragged bookmark is pointer
-   * feedback: the cards slide into it on a `--dur-hover` transition, so the box has to arrive
-   * with them rather than 70ms later - see the note on `motion()`. The gap is the only height
-   * change this component makes that is driven by the pointer, and it is exactly the renders
-   * where the reserved padding changes, so that is what the comparison below detects.
-   */
+  /* Animate the persistent wrapper for any content-height change while folded cards remain unmounted. Measure the unanimated child, never an in-flight wrapper, and use hover duration only for drag-gap changes. */
   const foldable = useRef<HTMLDivElement>(null);
   const bodyHeight = useRef(-1);
   const reserved = useRef(0);
@@ -81,9 +37,17 @@ export function GroupShelf({group,index,needles,composer,setComposer,openMenu,re
     const byPointer = padding!==reserved.current;
     bodyHeight.current = height;
     reserved.current = padding;
-    // First paint: the group is arriving, not resizing.
     if (previous<0 || Math.abs(previous-height)<1 || stillness()) {return;}
-    box.animate([{height:`${previous}px`},{height:`${height}px`}], motion(byPointer ? '--dur-hover' : '--dur-move'));
+    const flight = box.animate([{height:`${previous}px`},{height:`${height}px`}], motion(byPointer ? '--dur-hover' : '--dur-move'));
+    // `.foldable` carries an `overflow-clip-margin` so a focused card's ring, which is drawn
+    // outside its box, is not cut off by this clip. That margin leaks on all four sides, and
+    // Chromium has no per-axis form of it, so while the box is animating its height it also
+    // lets the next row's spine show below the edge - a 6px fragment of a 20px mark, appearing
+    // out of nowhere as a group expands. Nothing needs to escape the box mid-fold: a ring only
+    // has to be whole once the group is at rest. So the margin is suspended for the flight.
+    box.style.overflowClipMargin = '0px';
+    const restore = () => {box.style.overflowClipMargin = '';};
+    flight.finished.then(restore, restore);
   });
 
   // Named regions, and a heading level below the page's own. Every group used to render an
@@ -108,15 +72,10 @@ export function GroupShelf({group,index,needles,composer,setComposer,openMenu,re
         and arrow-key targets, and a display:none body would still be found by `cards()`.
         `.foldable` stays mounted either way, which is what the fold animates - the cards
         themselves cannot animate out when they no longer exist. */}
-    {/* The gap is made of transforms, which take up no room - so the last card slides past the
-        bottom of the group and straight into the one below it, and `.foldable` clips it away
-        entirely. Reserving the same distance as padding gives the group the height the open
-        gap needs. It is one reflow when the gap first opens, not one per dragover, because the
-        distance does not change while the drag runs. */}
+    {/* Transformed cards occupy no layout space, so reserve equivalent bottom padding while an end gap is open. */}
     <div class="foldable" ref={foldable}>{!collapsed && <div class={`projects ${layout}`} style={opening>=0 ? `padding-bottom: ${gap}px` : undefined}>{projects.map((project,position)=><BookmarkCard key={project.guid} project={project} missing={health.missing.includes(project.guid)} branch={health.branches[project.guid]} openMenu={openMenu}
       carried={carried===project.guid} onCarry={onCarry} copied={copiedGuid===project.guid}
       shift={opening>=0 && position>=opening && project.guid!==carried ? gap : 0}
-      // The line is what grid and compact use; where the gap opens, the gap *is* the indicator.
       dropEdge={!receiving || opening>=0 ? undefined : landing===project.guid ? 'before' : (landing===null && position===tail) ? 'after' : undefined}/>)}</div>}</div>
   </section>;
 }
@@ -140,21 +99,12 @@ export function BookmarkCard({project,missing,branch,openMenu,carried,onCarry,dr
 }
 
 
-export function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,picker,setPicker,close,renameTarget,chooseShade,chooseGlyph,groupIndex,groupCount}:any) {
+export function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,picker,setPicker,close,renameTarget,chooseShade,chooseGlyph,groupIndex,groupCount,codeCliAvailable}:any) {
   const group=target.group as LandingPageGroup; const project=!('projects' in target.item); const sealed=group.guid==='@vsc-mru';
   // Positioning is owned by `useAnchored`, which measures and clamps after render - so no
   // inline left/top here, or a re-render would put the surface back at the raw click point.
   const anchor = useAnchored(menu.x, menu.y);
-  // Focus moves into the menu when it opens, and `closeMenu` hands it back to whatever opened
-  // it. Without this the menu rendered at the end of `<main>`, after every group, so opening
-  // one from the first card meant tabbing past the entire board to reach it.
-  //
-  // On mount only. The menu stays mounted while the rename row and the destructive confirmation
-  // swap in and out, and both of those move focus themselves - re-running here would take it
-  // straight back off the rename input.
-  //
-  // Queried rather than held on a ref, because which item comes first depends on the target: a
-  // bookmark opens with Open, a group with Rename, and sealed Recent with Accent colour.
+  // Focus the first applicable control only when the menu mounts; later rename and confirmation states manage their own focus.
   useEffect(()=>{anchor.current?.querySelector('button')?.focus();},[]);
   if (picker==='shade') return <Palette type="shade" x={menu.x} y={menu.y} choose={chooseShade} close={close}/>;
   if (picker==='glyph') return <Palette type="glyph" x={menu.x} y={menu.y} choose={chooseGlyph} close={close}/>;
@@ -164,7 +114,7 @@ export function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,pick
   // mode and take away the plain Tab navigation that actually works here.
   return <div id="ctxmenu" class="ctxmenu" role="dialog" aria-label={`Actions for ${target.item.label}`} ref={anchor} data-renaming={rename!==null ? 'yes' : undefined}>
     {project && <button onClick={()=>{post('open',{guid:target.item.guid});close();}}><Svg name="arrowRightIcon"/><span>Open</span></button>}
-    {project && opensInWindow(target.item) && <button onClick={()=>{post('open',{guid:target.item.guid,newWindow:true});close();}}><Svg name="appWindow"/><span>Open in new window</span></button>}
+    {project && offersNewWindow(target.item, codeCliAvailable) && <button onClick={()=>{post('open',{guid:target.item.guid,newWindow:true});close();}}><Svg name="appWindow"/><span>Open in new window</span></button>}
     {project && <button onClick={()=>{post('copyPath',{guid:target.item.guid});close();}}><Svg name="copy"/><span>Copy path</span></button>}
     {project && <button onClick={()=>{post('patch',{guid:target.item.guid,field:'pinned',value:!target.item.pinned});close();}}><Svg name={target.item.pinned?'pinOff':'pin'}/><span>{target.item.pinned?'Unpin':'Pin to top'}</span></button>}
     {!sealed && <>{rename!==null ? <div class="ctxrename"><input autoFocus value={rename} onInput={(event:any)=>setRename(event.currentTarget.value)} onKeyDown={(event:any)=>{if(event.key==='Enter')renameTarget();if(event.key==='Escape')close();}}/><button onClick={renameTarget}>Save</button><button onClick={close}>Cancel</button></div> : <button onClick={()=>setRename(target.item.label)}><Svg name="textCursorInput"/><span>Rename</span></button>}</>}
@@ -186,15 +136,7 @@ export function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,pick
 
 
 /**
- * The detail shown while a bookmark is hovered or focused: the full path, plus branch and
- * missing state when they apply.
- *
- * The card truncates its path to fit, so this is the only place the whole target is legible.
- * A native `title` tooltip cannot show the branch alongside it, cannot be styled to match the
- * editor, and appears on its own schedule.
- *
- * Always rendered, empty when nothing is hovered: `showPopover()` needs an element already in
- * the document, and mounting one on hover would mean measuring it before it had been laid out.
+ * The shared detail popover reveals clipped path and health data that native titles cannot combine. It stays mounted so it can be measured before opening.
  */
 export function HoverCard({reference,project,branch,missing}:{reference:any;project:LandingPageProject|null;branch?:string;missing:boolean}) {
   return <div class="hovercard" popover="manual" ref={reference}>
@@ -238,31 +180,6 @@ export function Palette({type,x,y,choose,close}:any) {
   </div>;
 }
 
-/**
- * The place a bookmark goes to be got rid of. Rendered only while one is being carried.
- *
- * A drag is far easier to make by accident than a menu item is to click, so this cannot simply
- * post `remove` when something lands on it. It is **armed by dwell**: entering the zone starts a
- * `--dur-arm` timer and only a drop after that timer has run does anything. Same safeguard and
- * same duration as the menu's `Remove?` confirmation, which is held non-interactive while it
- * fades in so a double-click cannot carry through onto it. A flick across releases nothing.
- *
- * Three states, and the labels name all three because the dwell is otherwise invisible: "Drag
- * here to remove", "Hold to remove" once inside but before the timer runs, "Release to remove"
- * after. The middle one matters most - the zone turns red on hover, since that is what the
- * target is, so something other than colour has to say that releasing now would do nothing.
- *
- * The label says which of the two things will happen, because they are genuinely different
- * actions. Recent is generated from VS Code's history and cannot be edited, so an entry dragged
- * here is *hidden* from this page through `hideRecent` - reversible from the Recent group's own
- * menu - while a bookmark in a user group is removed. This is the same split the action menu
- * already makes, and the reason the zone reads the carried bookmark's origin rather than
- * assuming.
- *
- * `aria-hidden`, and deliberately so: it is a drop target and nothing else, it cannot be
- * operated from a keyboard at all, and both actions it offers are already on the bookmark's
- * menu, which is reachable. Exposing an inoperable control would be worse than omitting it.
- */
 export function DeleteZone({from,onRelease}:{from:string;onRelease:(armed:boolean)=>void}) {
   const [over,setOver] = useState(false);
   const [armed,setArmed] = useState(false);
@@ -296,7 +213,8 @@ export function DeleteZone({from,onRelease}:{from:string;onRelease:(armed:boolea
   function releaseIfOver(event:DragEvent) {
     const rect = zone.current?.getBoundingClientRect();
     const inside = !!rect && event.clientX>=rect.left && event.clientX<=rect.right && event.clientY>=rect.top && event.clientY<=rect.bottom;
-    if (finished.current || !inside) {return;}
+    const cancelled = event.dataTransfer?.dropEffect === 'none';
+    if (finished.current || !inside || cancelled) {return;}
     finished.current = true;
     window.clearTimeout(timer.current);
     onRelease(armedNow.current);
@@ -336,10 +254,4 @@ export function DeleteZone({from,onRelease}:{from:string;onRelease:(armed:boolea
     <span class="dropbin-label">{!over ? `Drag here to ${verb}` : armed ? `Release to ${verb}` : `Hold to ${verb}`}</span>
   </div>;
 }
-
-
-// One sentence and one button. The copy used to offer three routes in ("create a group, clone a
-// repository, or open a folder") under a single New group button, so two thirds of it pointed at
-// controls the reader had to go find in the header. It names the next step instead, and carries
-// the drag hint that used to sit permanently under the page title.
 export function EmptyState() {return <div class="placeholder"><h2>Nothing bookmarked yet</h2><p>Make a group, then drag folders into it.</p><button class="btn-secondary" onClick={()=>post('createGroup')}><Svg name="plus"/>New group</button></div>}

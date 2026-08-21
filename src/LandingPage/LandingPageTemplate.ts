@@ -1,21 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { icons } from './iconography';
 
-// Vite inlines all three at build time. The SCSS is compiled by Vite itself via `?inline`;
-// the Preact bundle is produced by the separate webview build, which must run first.
 import landingpageHtml from './content/landingpage-preact.html?raw';
 import landingpageCss from './content/landingpage.scss?inline';
 import landingpageJs from './content/dist/landingpage-preact.js?raw';
 
 /**
- * Builds the page HTML from plain strings, with no dependency on the `vscode` module.
- *
- * Kept separate from {@link LandingPageTemplate} so the browser harness in
- * `scripts/harness.mjs` can render exactly the page the extension host renders.
- *
- * @param cspSource Origin the webview serves local resources from.
- * @param cspNonce Single-use content security policy nonce for the inline bundle and styles.
- * @returns Complete HTML document.
+ * Has no `vscode` dependency, so the harness and extension render exactly the same page.
  */
 export function renderLandingPage(cspSource:string, cspNonce:string):string
 {
@@ -26,7 +17,7 @@ export function renderLandingPage(cspSource:string, cspNonce:string):string
     .replaceAll('%cspSource%',cspSource)
     .replaceAll('%cspNonce%',cspNonce);
 
-  for (const [key, value] of Object.entries(icons)) //replace all ${iconname} placeholders with actual SVG source from iconography.ts
+  for (const [key, value] of Object.entries(icons))
   {
     s = s.replaceAll('${'+key+'}',value);
   }
@@ -34,17 +25,10 @@ export function renderLandingPage(cspSource:string, cspNonce:string):string
   return s;
 }
 
-/**
- * Loads content/html and performs parsing of css/js/icon-svgs.
- */
 export class LandingPageTemplate
 {
   /**
-   * Generates the HTML source to be injected into the webview.
-   * @param cspSource Value of `webview.cspSource`, the origin the webview serves local
-   *                  resources from. Required in the Content-Security-Policy meta tag's
-   *                  `img-src`.
-   * @returns HTML
+   * The generated CSP must include `cspSource` in `img-src`.
    */
   public makeHTML(cspSource:string):string
   {

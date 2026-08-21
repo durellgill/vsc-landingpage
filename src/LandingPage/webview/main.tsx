@@ -1,10 +1,3 @@
-/**
- * The Preact page. `App` owns every piece of page state; the modules beside it are pure helpers,
- * live measurement, or leaf components that render what they are handed.
- *
- * This is still the only page implementation (D001). Splitting it into modules does not change
- * that - Vite bundles them all into the one IIFE the template inlines.
- */
 import { render } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { LandingPageGroup, LandingPageModel, LandingPageProject } from '../LandingPageModel';
@@ -28,26 +21,13 @@ function App() {
   const [popover,setPopover] = useState<'create'|'clone'|null>(null);
   // `over` is the insertion index the drop indicator is drawn at, in user-group coordinates.
   const [drag,setDrag] = useState<{guid:string;over:number|null}|null>(null);
-  // A bookmark being dragged. `from` is the group it started in, which decides whether the
-  // drop moves it or copies it: Recent is generated, so a bookmark taken out of it is copied.
-  // `into`/`before` are where it would land - `before` null means the end of that group.
-  // `gap` is how far the cards below the landing point slide to open a space for it: the
-  // carried card's own height plus the row gap, measured once at dragstart because it does
-  // not change while the drag runs and re-measuring it per dragover would be a layout read
-  // on every pointer move.
+  // Carry state records origin, destination, landing GUID, and the drag-start gap measurement. Recent origins copy instead of move.
   const [carry,setCarry] = useState<{guid:string;from:string;into:string|null;before:string|null;gap:number}|null>(null);
-  // True between posting `refreshRecents` and the model coming back, so the control can show
-  // that something is happening. Any `syncModel` clears it - the host only ever answers with
-  // one, and a refresh that changed nothing still arrives as a sync.
+  // Refresh busy state starts on request and ends on any returned model sync.
   const [refreshing,setRefreshing] = useState(false);
-  // What the host observed on disk: GUIDs it could not stat, and the checked-out branch of
-  // each folder that is a repository. Webview-only - none of this is something the user set,
-  // and persisting it would let a stale verdict outlive the thing it describes.
   const [health,setHealth] = useState<{missing:string[];branches:Record<string,string>}>({missing:[],branches:{}});
 
   const filterInput = useRef<HTMLInputElement>(null);
-  // The hover detail card. One element for the whole page - only one bookmark can be under
-  // the pointer at a time, and a popover per card would be hundreds of top-layer elements.
   const [hover,setHover] = useState<{guid:string;left:number;top:number;bottom:number}|null>(null);
   const hovercard = useRef<HTMLDivElement>(null);
   const menuOpen = useRef(false);
@@ -60,6 +40,8 @@ function App() {
   // optimistically on click, so a clipboard failure cannot show a false confirmation.
   const [copied,setCopied] = useState<string|null>(null);
 
+  const [codeCliAvailable, setCodeCliAvailable] = useState(false);
+
   useEffect(() => {
     const receive = (event:MessageEvent) => {
       if (event.data?.command==='syncModel') {setModel(event.data.model); setRefreshing(false);}
@@ -67,22 +49,19 @@ function App() {
       if (event.data?.command==='setFocusToFilterInput') {filterInput.current?.focus(); filterInput.current?.select();}
       if (event.data?.command==='bookmarkHealth') {setHealth({missing:event.data.missing ?? [], branches:event.data.branches ?? {}});}
       if (event.data?.command==='pathCopied') {setCopied(event.data.guid);}
+      if (event.data?.command==='codeCliAvailable') {setCodeCliAvailable(event.data.available);}
     };
     window.addEventListener('message',receive);
     post('documentReady');
     return () => window.removeEventListener('message',receive);
   },[]);
 
-  // The tick is a transient acknowledgement, not a state, so it clears itself.
   useEffect(() => {
     if (!copied) {return;}
     const timer = window.setTimeout(() => setCopied(null), 1600);
     return () => window.clearTimeout(timer);
   },[copied]);
 
-  // Shows and places the hover card. The Popover API puts it in the top layer, so it escapes
-  // every `overflow` and stacking context on the page without z-index games - which is the
-  // whole reason for using it here rather than an absolutely positioned div.
   useEffect(() => {
     const card = hovercard.current;
     if (!card) {return;}
@@ -92,22 +71,32 @@ function App() {
     }
     if (!card.matches(':popover-open')) {card.showPopover();}
 
-    // Measured only once it is open; a closed popover has no box to measure.
     const box = card.getBoundingClientRect();
     const margin = 8;
-    // Below the bookmark by default, flipped above when it would run off the bottom.
     let top = hover.bottom + 6;
     let side = 'below';
     if (top + box.height > window.innerHeight - margin) {top = hover.top - box.height - 6; side = 'above';}
     const left = Math.max(margin, Math.min(hover.left, window.innerWidth - box.width - margin));
     card.style.left = `${left}px`;
     card.style.top = `${Math.max(margin, top)}px`;
-    // Which way it opened, so the stylesheet can grow it out of the edge nearest the bookmark
-    // rather than out of its own middle. Written here because this is the only place that knows
-    // the popover was flipped - nothing about the open card says which side of it the bookmark is
-    // on, and a scale that expands away from its trigger reads as arriving from nowhere.
     card.dataset.side = side;
   },[hover]);
+
+  // The Popover API positions the card against the viewport, so it does not move with the
+  // document and would float over unrelated content once the page scrolls. A pointer hover is
+  // dropped; a focused card keeps its card and has it re-measured, because focusing a card
+  // scrolls it into view and dismissing here would close the card before it ever painted.
+  useEffect(() => {
+    const onScroll = () => setHover(current => {
+      if (!current) {return null;}
+      const focused = (document.activeElement as Element|null)?.closest?.<HTMLElement>('.project');
+      if (!focused || focused.dataset.guid!==current.guid) {return null;}
+      const rect = focused.getBoundingClientRect();
+      return {guid:current.guid, left:rect.left, top:rect.top, bottom:rect.bottom};
+    });
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   // Keyboard driving. This listens on `window` rather than on the page element because focus
   // starts on `document.body`, which is outside the rendered tree - a handler on `<main>`
@@ -149,8 +138,6 @@ function App() {
       if (!card) {return;}
 
       if (event.key==='Enter' || event.key===' ') {
-        // `data-kind` carries the bookmark type, so the same rule as Ctrl/Cmd+click applies
-        // without having to look the project up in the model.
         const canWindow = card.dataset.kind==='folder' || card.dataset.kind==='workspace';
         post('open',{guid:card.dataset.guid, newWindow:(event.ctrlKey||event.metaKey) && canWindow});
         event.preventDefault();
@@ -164,7 +151,6 @@ function App() {
       }
       if (event.key.startsWith('Arrow')) {
         const target = neighbour(card, event.key);
-        // ArrowUp off the top card lands in the filter, which is where the eye goes anyway.
         if (target) {target.focus();}
         else if (event.key==='ArrowUp') {filterInput.current?.focus();}
         event.preventDefault();
@@ -200,8 +186,7 @@ function App() {
    */
   const [announcement,setAnnouncement] = useState('');
   useEffect(()=>{if (copied) {setAnnouncement('Path copied');}},[copied]);
-  // Only the falling edge is worth saying, and only after a refresh actually ran - otherwise
-  // the first render would announce a refresh that never happened.
+  // Announce refresh completion only on the busy-to-idle transition after a real refresh.
   const refreshWasRunning = useRef(false);
   useEffect(()=>{
     if (refreshing) {refreshWasRunning.current=true; return;}
@@ -213,39 +198,7 @@ function App() {
     setAnnouncement(hits===1 ? '1 bookmark matches the filter' : `${hits} bookmarks match the filter`);
   },[needles,model]);
 
-  /*
-   * Cards glide to wherever they end up, instead of appearing there. This is FLIP: remember
-   * every card's box, let the render happen, then start each card from the offset back to
-   * where it used to be and animate that offset away. The layout is never touched - only a
-   * transform - so nothing reflows while it plays.
-   *
-   * One effect covers every way a card can change position, which is the point of doing it
-   * this way rather than animating each feature separately: switching a group between list,
-   * grid and compact; filtering the board down and back; a bookmark moved to another group;
-   * a group reordered or folded above it. All of them are 'the boxes are somewhere else now'.
-   *
-   * It deliberately does nothing mid-drag. The gap that opens under the pointer is itself a
-   * transform, so measuring then would record the shifted positions and the drop would animate
-   * from the wrong place. Skipping also leaves `boxes` holding the pre-drag layout, which is
-   * exactly the right origin for the card's flight once it lands.
-   *
-   * Interrupting a flight is the case that has to be handled explicitly, and it is the common
-   * one: every keystroke in the filter re-renders and moves cards, far faster than the 220ms a
-   * flight takes. `getBoundingClientRect()` includes an in-progress transform, so a card
-   * measured mid-flight reports where it currently *appears*, not the layout box it is heading
-   * for - the same pollution the mid-drag guard above exists to avoid, arriving from this
-   * effect's own animations instead of the drag's.
-   *
-   * Left alone that inverts the offset: the card sits at `layout + offset`, so `was - now` comes
-   * out as `(previousLayout - layout) - offset` when the correct origin is `... + offset`, and
-   * the error is always exactly twice the offset.
-   *
-   * So each card is measured twice - once as it appears, then again after its previous flight is
-   * cancelled, which is the only way to get the real layout box back. The difference is the
-   * offset, and it is **added, not subtracted**. Cancelling also keeps `boxes` clean, so the next
-   * render compares against a layout position rather than a half-finished animation.
-   * `e2e/flip.spec.ts` asserts this direction; see "an interrupted flight keeps its direction".
-   */
+  /* FLIP compares stable layout boxes and does nothing mid-drag. When interrupting a flight, cancel it, recover the real layout box, and add the prior visual offset to preserve direction. */
   const boxes = useRef(new Map<string,{left:number; top:number}>());
   const flights = useRef(new Map<string,Animation>());
   const settle = useRef(0);
@@ -315,7 +268,6 @@ function App() {
       // - that would take the CSS transitions and the `card-in` entrance with them.
       const flight = flights.current.get(part.key);
       if (flight) {flight.cancel(); flights.current.delete(part.key);}
-      // With the flight gone, this is the element's true layout box.
       const now = part.element.getBoundingClientRect();
       // Document-relative, so the next render compares like with like however far the page has
       // been scrolled since.
@@ -359,7 +311,6 @@ function App() {
       }
     }
 
-    // Anything that has left the board takes its flight with it.
     for (const key of [...flights.current.keys()]) {if (!next.has(key)) {flights.current.delete(key);}}
     boxes.current = next;
 
@@ -429,8 +380,7 @@ function App() {
     }
     return null; //hovered card was removed from the model while pointed at
   },[hover,model]);
-  // A group survives if its own label matches or any of its bookmarks do. Note this is
-  // 'filtered to nothing', not 'empty' - an untouched board still shows its empty groups.
+  // Distinguish a group filtered to no matches from an actually empty group.
   const visibleGroups=model.groups.filter(group => groupMatches(group,needles) || group.projects.some(project => matches(project,needles)));
   const userGroups=model.groups.filter(group => group.guid!=='@vsc-mru');
 
@@ -478,16 +428,14 @@ function App() {
   function pointerInto(event:MouseEvent|FocusEvent) {
     const card = (event.target as Element|null)?.closest?.<HTMLElement>('.project');
     const from = (event as MouseEvent).relatedTarget as Element|null;
-    // Moving between children of the same card is not a new hover.
     if (!card || (from && card.contains(from))) {return;}
     window.clearTimeout(hoverTimer.current);
     if (menuOpen.current) {return;} //a context menu owns the interaction until it closes
-    if (!isClipped(card)) {setHover(null); return;} //nothing hidden, nothing to reveal
+    if (!isClipped(card)) {setHover(null); return;}
     const show = () => {
       const rect = card.getBoundingClientRect();
       setHover({guid:card.dataset.guid ?? '', left:rect.left, top:rect.top, bottom:rect.bottom});
     };
-    // A delay on pointer only. Keyboard focus is deliberate, so it shows at once.
     if (event.type==='focusin') {show();}
     else {hoverTimer.current = window.setTimeout(show, 350);}
   }
@@ -496,8 +444,6 @@ function App() {
     const to = (event as MouseEvent).relatedTarget as Element|null;
     if (!card || (to && card.contains(to))) {return;}
     window.clearTimeout(hoverTimer.current);
-    // Closed at once. The card holds nothing to click any more - copy lives on the bookmark
-    // itself - so it is `pointer-events: none` and there is no gap for the pointer to cross.
     setHover(null);
   }
 
@@ -533,8 +479,7 @@ function App() {
     return ()=>{for (const type of proof) {window.removeEventListener(type,abandoned,true);}};
   },[!!carry,!!drag]);
 
-  // Drag reorder. `index` is the position among user-created groups; the sealed Recent group
-  // reports -1 and is neither draggable nor a drop target.
+  // Group drag indexes exclude Recent; Recent reports `-1` and is neither draggable nor a destination.
   function dragOver(event:DragEvent, index:number, group:LandingPageGroup) {
     if (drag) {
       if (index<0) {return;}
@@ -544,9 +489,6 @@ function App() {
       if (drag.over!==over) {setDrag({...drag,over});}
       return;
     }
-    // A bookmark. Recent is generated and rebuilt from VS Code's history on every sync, so it
-    // takes no drop: anything landed there would be gone by the next message. Leaving it
-    // undecorated says so before the pointer is released.
     if (!carry || index<0) {return;}
     event.preventDefault();
     if (event.dataTransfer) {event.dataTransfer.dropEffect = carry.from==='@vsc-mru' ? 'copy' : 'move';}
@@ -572,11 +514,6 @@ function App() {
 
   return <main class="page" onPointerDown={event => {if (!(event.target as Element).closest('#ctxmenu,.modal,.menu-anchor')) {closeMenu(); setPopover(null);}}}>
     <header class="page-header">
-      {/* No standing subtitle. It read "Click to open, Ctrl/Cmd+click for a new window. Drag to
-          rearrange, right-click to customise." - a manual for gestures the page already teaches
-          through tooltips, cursors and its context menus, printed above every board forever for
-          the sake of the first two minutes. The one hint worth keeping now lives in the empty
-          state, which is the only place a reader is actually looking for instructions. */}
       <div class="titlerow"><div class="titletext"><h1>Landing Page</h1></div><div class="header-actions">
         <button class="btn-secondary" title="Open a folder in this window" onClick={()=>{setPopover(null); post('openFolder');}}><Svg name="folder"/><span>Open</span></button>
         <div class="menu-anchor">
@@ -596,9 +533,6 @@ function App() {
         <button class="btn-ghost btn-small" title="Settings" onClick={()=>post('openSettings')}><Svg name="settings"/></button>
       </div></div>
     </header>
-    {/* Hidden on an empty board. A filter over nothing is a control that cannot do anything,
-        and on the one screen where the reader is looking for the way in it is the widest thing
-        on the page. It returns with the first group. */}
     {model.groups.length>0 && <div class="commandbar">
       <div class="field field-filter"><span class="field-icon"><Svg name="search"/></span><input ref={filterInput} aria-label="Filter bookmarks" value={filter} onInput={event=>setFilter((event.target as HTMLInputElement).value)} placeholder="Filter bookmarks...  / or Ctrl/Cmd+F"/>{filter && <button class="btn-ghost" title="Clear filter" onClick={()=>setFilter('')}><Svg name="clear"/></button>}</div>
     </div>}
@@ -607,8 +541,6 @@ function App() {
       onDragLeave={event=>{const to=event.relatedTarget as Node|null; if (carry && (!to || !(event.currentTarget as HTMLElement).contains(to))) {setCarry({...carry,into:null,before:null});}}}
       onDrop={dropGroup}>{visibleGroups.map(group=>{
       const index=userGroups.indexOf(group);
-      // Only one indicator is ever drawn: 'before' the group at the insertion point, or
-      // 'after' the last one when dropping at the very end.
       const drop = !drag || drag.over===null || index<0 ? null
         : drag.over===index ? 'before'
         : (drag.over===userGroups.length && index===userGroups.length-1) ? 'after' : null;
@@ -620,22 +552,16 @@ function App() {
     })}</div>
     {model.groups.length===0 && <EmptyState/>}
     {needles.length>0 && visibleGroups.length===0 && <div class="placeholder" data-transient><h2>No bookmarks match your filter</h2><button class="btn-secondary" onClick={()=>setFilter('')}>Clear filter</button></div>}
-    {/* Only while a bookmark is actually being carried. A permanently visible delete target is
-        a permanent invitation to destroy something, and it would occupy page width that the
-        board itself does not use. */}
     {carry && <DeleteZone from={carry.from} onRelease={armed=>{
       const {guid,from} = carry;
       setCarry(null); setDrag(null); setHover(null);
       if (!armed) {return;}
-      // Recent is generated and cannot be edited, so its entries are hidden rather than
-      // removed - exactly as the action menu does for the same two cases.
       post(from==='@vsc-mru' ? 'hideRecent' : 'remove', {guid});
     }}/>}
     <div class="sr-only" role="status" aria-live="polite">{announcement}</div>
     <HoverCard reference={hovercard} project={hovered} branch={hovered ? health.branches[hovered.guid] : undefined} missing={!!hovered && health.missing.includes(hovered.guid)}/>
-    {menu && target && <ActionMenu menu={menu} target={target} rename={rename} setRename={setRename} confirm={confirm} setConfirm={setConfirm} picker={picker} setPicker={setPicker} close={closeMenu} renameTarget={renameTarget} chooseShade={chooseShade} chooseGlyph={chooseGlyph} groupIndex={userGroups.indexOf(target.group)} groupCount={userGroups.length}/>}
+    {menu && target && <ActionMenu menu={menu} target={target} rename={rename} setRename={setRename} confirm={confirm} setConfirm={setConfirm} picker={picker} setPicker={setPicker} close={closeMenu} renameTarget={renameTarget} chooseShade={chooseShade} chooseGlyph={chooseGlyph} groupIndex={userGroups.indexOf(target.group)} groupCount={userGroups.length} codeCliAvailable={codeCliAvailable}/>}
   </main>;
 }
 
-// Mount. The template gives the webview a single `#root`; everything else is Preact's.
 render(<App/>,document.getElementById('root')!);

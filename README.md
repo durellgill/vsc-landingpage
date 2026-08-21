@@ -94,6 +94,11 @@ Add bookmarks two ways, and they differ by where the bookmark lands:
 
 You can also right-click any file or folder in the **Explorer** and choose *Add to Landing Page Group* - that works even if the landing page has never been opened in the window.
 
+The same menu carries *Open in New Workspace*, which opens the clicked folder as a second workspace without disturbing the one you are in.
+Right-click a file instead and it reads *Open Parent Folder in New Workspace*, because a workspace is a folder and that is the folder you get.
+On macOS with `window.nativeTabs` enabled it arrives as a tab in the current window rather than a separate one.
+Both items are on the editor tab's right-click menu too.
+
 **Drag a bookmark** to move it - onto another group, or to a new position inside its own.
 The destination group is outlined while you drag, and a line shows exactly where the card will land.
 Dragging one **out of Recent copies it**, since Recent is rebuilt from VS Code's history and cannot be edited; and nothing can be dropped *into* Recent, so it is never outlined.
@@ -195,6 +200,8 @@ The only fixed colours are the accent palette you pick bookmark shades from.
 | Show Landing Page | Opens or focuses the page |
 | Landing Page: Refresh Recent | Rereads VS Code's recently-opened list |
 | Landing Page: Clone Repository | Same as the clone button |
-| Add to Landing Page Group... | Explorer and editor-tab context menus |
+| Add to Landing Page Group | Explorer and editor-tab context menus |
+| Open in New Workspace | Explorer context menu, on a folder |
+| Open Parent Folder in New Workspace | Explorer context menu on a file, and the editor-tab menu |
 | Reload Landing Page | Re-syncs the page from the stored model |
 | Reset/Delete Landing Page Contents | Removes all groups and bookmarks. Not undoable. |

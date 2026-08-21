@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { execFile } from 'child_process';
 import { findItemByGuid, LandingPageGroup, LandingPageModel, LandingPageProject } from './LandingPageModel';
 import { parseUriNameParts } from './uri-name-parts';
 import { MessageFromWebview, syncModelInWebview } from './webview-messages';
@@ -13,26 +14,23 @@ import { createDirectory } from './bookmark-creation';
 import { copyPath } from './clipboard-path';
 import { cloneRepository } from './clone-repository';
 
-// The extension host's message bridge. Everything the page can ask for arrives at
-// `handleMessageFromWebview` below and is dispatched into one of the modules imported above;
-// this file deliberately owns the dispatch and little else, so each case reads as one hop to
-// the real implementation.
 export { registerExtensionContext } from './model-storage';
+
+let codeCliCache:Promise<boolean>|undefined;
+/**
+ * Probes `code` asynchronously once per session. Without a shell, `code.cmd` is unavailable on Windows and the menu item is withheld.
+ */
+function codeCliAvailable():Promise<boolean>
+{
+	codeCliCache ??= new Promise<boolean>(resolve =>
+	{
+		execFile('code', ['--version'], {timeout: 5000}, error => resolve(!error));
+	});
+	return codeCliCache;
+}
 export { bookmarkUris } from './bookmark-creation';
 export { cloneRepository } from './clone-repository';
 
-/**
- * Rereads VS Code's recently-opened list and pushes the result to the page.
- *
- * The `Recent` group is a mirror of state the page has no way to observe. Opening a project
- * in another window, or removing one from VS Code's own history, leaves this page showing a
- * list that was correct when the panel was created and has been wrong ever since. There are
- * three ways in: the refresh control on the Recent group, the panel regaining visibility, and
- * the *Landing Page: Refresh Recent* palette command.
- *
- * @param webviewPanel Panel to update.
- * @param sharedModel Model whose `@vsc-mru` group is rebuilt in place.
- */
 export async function refreshRecents(webviewPanel:vscode.WebviewPanel, sharedModel:LandingPageModel):Promise<void>
 {
   await populateVscMru(sharedModel);
@@ -43,11 +41,7 @@ export async function refreshRecents(webviewPanel:vscode.WebviewPanel, sharedMod
 }
 
 /**
- * Removes content from given model instance, saves changes and shows a reload request message.
- *
- * Clears the Recent overlays too, which would otherwise be left behind keyed to entries the
- * board no longer has.
- * @param sharedModel Model to reset.
+ * Resetting the board also clears Recent overlays so orphaned customizations do not remain.
  */
 export async function resetModel(sharedModel:LandingPageModel):Promise<void>
 {
@@ -60,16 +54,11 @@ export async function resetModel(sharedModel:LandingPageModel):Promise<void>
 }
 
 /**
- * Called when the webview page sends a command or request to the extension.
- * @param message Info package received from the page.
- * @param webviewPanel Renderer instance.
- * @param sharedModel Model from webview, which contains current state of the landingpage configuration. Note that this model is not received from the webview, but from `extension.ts`.
+ * `sharedModel` is host-owned state supplied by `extension.ts`, not model data accepted from the webview.
  */
 export async function handleMessageFromWebview(message:MessageFromWebview,webviewPanel:vscode.WebviewPanel, sharedModel:LandingPageModel):Promise<void>
 {
-  // Refreshing the MRU list runs a VS Code command and rewrites the `Recent` group, so only
-  // do it for messages that actually resolve or render model items. Previously this ran for
-  // every message, including commands that do not read or render model items.
+  // Refresh MRU only for commands that resolve or render model items.
   const needsMru = message.command!=='openSettings'
                 && message.command!=='cloneRepository'
                 && message.command!=='openFolder';
@@ -79,9 +68,18 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
   {
     case 'documentReady':
       syncModelInWebview(webviewPanel, sharedModel);
+      // Sent from here, not at panel creation: the page has no `message` listener until its
+      // bundle has run, and the webview reloads whenever the tab is hidden, so anything posted
+      // before this point is dropped.
+      // Not awaited: the board should paint from the fresh model immediately, and the menu item
+      // this gates appears a moment later. Caught because the panel can be disposed while the
+      // probe is still running.
+      void codeCliAvailable()
+        .then(available => webviewPanel.webview.postMessage({command:'codeCliAvailable', available}))
+        .catch(() => {});
       void reportBookmarkHealth(webviewPanel, sharedModel);
       break;
-    case 'rename': // guid: ID of model element to rename
+    case 'rename':
       let foundGoP = findItemByGuid(message.guid,sharedModel);
       if (!foundGoP) {vscode.window.showWarningMessage(`rename: no group or bookmark with guid ${message.guid}`);return;}
       const label = message.value?.trim();
@@ -90,8 +88,7 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       await saveLandingPageModel(sharedModel);
       syncModelInWebview(webviewPanel, sharedModel);
       break;
-    case 'createBookmark':  //{guid: groupGUID to add bookmark into, pickFolder:bool show folder or file picker?}
-      // No guid means the page-level create menu was used, which names no destination group.
+    case 'createBookmark':
       const addTo = message.guid
         ? findItemByGuid(message.guid, sharedModel)?.target as LandingPageGroup|undefined
         : await pickDestinationGroup(sharedModel, 'Add the bookmark to group');
@@ -106,8 +103,6 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
           const p:LandingPageProject =     {guid:crypto.randomUUID(), label:nameParts.basename, path:uri.toString()};
           if (!nameParts.ext)              {p.icon = 'folder';}
           else if (nameParts.ext==='code-workspace') {p.icon = 'workspace';}
-          //else: unknown file type
-
           addTo.projects.push(p);
         }
         await saveLandingPageModel(sharedModel);
@@ -119,17 +114,17 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       await saveLandingPageModel(sharedModel);
       syncModelInWebview(webviewPanel, sharedModel);
       break;
-    case 'remove':  //{guid: item to remove}
+    case 'remove':
       let foundGoP2 = findItemByGuid(message.guid, sharedModel);
 
       if(foundGoP2!==null)
       {
-        if(foundGoP2.ownerGroup) //project in group
+        if(foundGoP2.ownerGroup)
         {
           let index = foundGoP2.ownerGroup.projects.indexOf(foundGoP2.target);
           if (index>=0) {foundGoP2.ownerGroup.projects.splice(index,1);}
         }
-        else //group in model
+        else
         {
           foundGoP2.model.groups.splice(foundGoP2.model.groups.indexOf(foundGoP2.target as LandingPageGroup),1);
         }
@@ -138,7 +133,7 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       }
       else {console.warn(`remove: item with guid "${message.guid}" not found.`,sharedModel);}
       break;
-    case 'open': // {guid: item with path to open}
+    case 'open':
       let projectFound = findItemByGuid(message.guid, sharedModel);
       if(projectFound!==null)
       {
@@ -146,16 +141,19 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
         let path = project.path;
         if(path)
         {
-          // Folders and .code-workspace files are opened as a workspace; anything else is a
-          // plain file and must use `vscode.open` - `vscode.openFolder` on a file does not
-          // open the file, it tries to treat it as a workspace root.
           const asWorkspace = project.icon==='folder' || project.icon==='workspace';
-          // `forceNewWindow` only exists on `vscode.openFolder`. A plain file has no new-window
-          // form - `vscode.open` opens an editor in the current window - so the flag is simply
-          // not offered for files, rather than silently ignored.
           if (asWorkspace)
           {
-            vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.parse(path), {forceNewWindow:message.newWindow===true}); //https://code.visualstudio.com/api/references/commands
+            vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.parse(path), {forceNewWindow:message.newWindow===true});
+          }
+          else if (message.newWindow===true && await codeCliAvailable())
+          {
+            // `code -n <file>` opens a new window on that file. Arguments, not a shell command:
+            // the path is model data, and a double-quoted shell string still interpolates
+            // `$(...)` and backticks. The CLI wants a filesystem path, not the stored URI.
+            execFile('code', ['-n', vscode.Uri.parse(path).fsPath], error => {
+              if (error) {vscode.window.showWarningMessage(`Could not open a new window: ${error.message}`);}
+            });
           }
           else
           {
@@ -163,27 +161,33 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
           }
           return;
         }
-        else //group in model > cannot open group
+        else
         {
           console.warn(`open: guid "${message.guid}" points to element without path!`,sharedModel);
         }
       }
       else {console.warn(`open: item with guid "${message.guid}" not found.`,sharedModel);}
       break;
-    case 'patch': // {guid: item to patch, field: field to patch('shade' or 'layout'), value: new value}
+    case 'patch':
       let found = findItemByGuid(message.guid,sharedModel);
       if (!found) {vscode.window.showWarningMessage(`patch: no group or bookmark with guid ${message.guid}`);return;}
       if (message.field==='shade')
       {
-        // Both bookmarks and user-created groups support an accent colour. Groups use it
-        // only in their heading treatment; bookmarks use it in their spine and icon.
-        // The `Recent` group itself is an ordinary model object and keeps its shade
-        // directly; its generated entries need the overlay.
-        if (!await customiseMru(message.guid,'shade',message.value,sharedModel)) {found.target.shade=message.value;}
+        // Validate shade tokens and treat the empty string as clearing the shade. Store the Recent group's shade directly and use the overlay only for generated Recent entries.
+        const validShades:Array<LandingPageProject['shade']|''> = ['red','orange','yellow','green','teal','pink','purple','blue','cyan','gray','silver','brown','white','black',''];
+        if (typeof message.value === 'string' && validShades.includes(message.value as LandingPageProject['shade']))
+        {
+          const shadeValue = message.value as LandingPageProject['shade'];
+          if (!await customiseMru(message.guid,'shade',shadeValue,sharedModel)) {(found.target as {shade?:LandingPageProject['shade']}).shade=shadeValue;}
+        }
       }
       else if (message.field==='layout')
       {
-        (found.target as LandingPageGroup).layout=message.value;
+        const validLayouts:Array<LandingPageGroup['layout']> = ['list','grid','compact'];
+        if (typeof message.value === 'string' && validLayouts.includes(message.value as LandingPageGroup['layout']))
+        {
+          (found.target as LandingPageGroup).layout=message.value as LandingPageGroup['layout'];
+        }
       }
       else if (message.field==='pinned')
       {
@@ -202,7 +206,6 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       }
       else if (message.field==='glyph')
       {
-        // Empty value clears the custom icon and falls back to the item's type/default icon.
         if (!await customiseMru(message.guid,'glyph',message.value,sharedModel)) {found.target.glyph=message.value || undefined;}
       }
       else
@@ -210,8 +213,6 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
         console.warn(`patch: field not supported for key ${message.field}.`);
         break;
       }
-      // The page renders from the model rather than mutating individual DOM nodes. Every saved
-      // patch must therefore return the updated model to the webview.
       await saveLandingPageModel(sharedModel);
       syncModelInWebview(webviewPanel, sharedModel);
       break;
@@ -222,8 +223,6 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       syncModelInWebview(webviewPanel, sharedModel);
       break;
     case 'refreshRecents':
-      // populateVscMru() already ran above for this command, so the model is current; all
-      // that is left is to hand it back with the rebuild flag set.
       syncModelInWebview(webviewPanel, sharedModel);
       break;
     case 'restoreHiddenRecents':
@@ -239,29 +238,29 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
         syncModelInWebview(webviewPanel, sharedModel);
       }
       break;
-    case 'moveBookmark': // {guid: bookmark dragged, toGroup: destination, beforeGuid: bookmark it lands in front of}
+    case 'moveBookmark':
       if (moveBookmark(message.guid, message.toGroup, message.beforeGuid, sharedModel))
       {
         await saveLandingPageModel(sharedModel);
         syncModelInWebview(webviewPanel, sharedModel);
       }
       break;
-    case 'copyPath': // {guid: bookmark whose target path should go to the clipboard}
+    case 'copyPath':
       await copyPath(message.guid, sharedModel, webviewPanel);
       break;
     case 'openSettings':
       vscode.commands.executeCommand('workbench.action.openSettings', 'vsc-landingpage');
       break;
-    case 'cloneRepository': // {url?: repository url typed in the webview}
+    case 'cloneRepository':
       await cloneRepository(message.url);
       break;
     case 'openFolder':
       vscode.commands.executeCommand('workbench.action.files.openFolder');
       break;
-    case 'createDirectory': // {guid: groupGUID to add the new folder into}
+    case 'createDirectory':
       await createDirectory(message.guid, sharedModel, webviewPanel);
       break;
-    case 'moveToGroup': // {guid: bookmark to move}
+    case 'moveToGroup':
       await moveToGroup(message.guid, sharedModel, webviewPanel);
       break;
     default:

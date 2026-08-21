@@ -1,9 +1,3 @@
-/**
- * Turning model values into the things drawn for them: icons, glyphs and shade keys.
- *
- * The shade lists are user data - see the palette note in `landingpage.scss`, and D012a for why
- * a bookmark's shade is drawn only on its spine.
- */
 import type { LandingPageGroup, LandingPageProject } from '../LandingPageModel';
 import { icons } from '../iconography';
 
@@ -30,7 +24,6 @@ export function shadeForGroup(group:LandingPageGroup) {
 export function iconFor(item:LandingPageProject|LandingPageGroup) {
   if (item.glyph && iconMap[`glyph-${item.glyph}`]) {return `glyph-${item.glyph}`;}
   if ('projects' in item) {return 'glyph-folder';}
-  // A plain file, not `fileQuestion`. Bookmarking a file is an ordinary, supported thing, and
-  // a question mark on the glyph told every one of them it was unrecognised.
+  // Plain files use the ordinary file glyph, not the unknown-file glyph.
   return item.icon==='folder' ? 'glyph-folder' : item.icon==='workspace' ? 'fileSliders' : 'file';
 }

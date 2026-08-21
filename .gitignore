@@ -51,6 +51,9 @@ Thumbs.db
 *.vsix
 *.vscode-test
 
+# Screenshots directory
+screenshots/
+
 # Lock files from unsupported package managers
 yarn.lock
 

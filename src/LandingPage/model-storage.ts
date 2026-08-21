@@ -1,9 +1,6 @@
 import * as vscode from 'vscode';
 import { LandingPageModel } from './LandingPageModel';
 
-/**
- * Pointer to the extension context, required to {@link saveLandingPageModel}.
- */
 let landingPageExtContext: vscode.ExtensionContext;
 
 /**
@@ -19,21 +16,11 @@ export function registerExtensionContext(ctx: vscode.ExtensionContext):void
   landingPageExtContext = ctx;
 }
 
-/**
- * The extension's global state, which is where the model and every Recent customisation live.
- *
- * Global rather than workspace state on purpose: a bookmark board is the user's, not one
- * checkout's, and it has to be the same board in every window.
- */
 export function extensionGlobalState():vscode.Memento
 {
   return landingPageExtContext.globalState;
 }
 
-/**
- * Permanently store the landingpage model in extension's storage.
- * @param model Current model status.
- */
 export async function saveLandingPageModel(model:LandingPageModel):Promise<void>
 {
   await landingPageExtContext.globalState.update('landingPageModel',model);

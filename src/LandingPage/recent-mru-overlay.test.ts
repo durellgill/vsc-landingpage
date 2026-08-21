@@ -5,10 +5,7 @@ import { LandingPageProject } from './LandingPageModel';
 import { takeExisting } from './recent-mru-overlay';
 
 /**
- * Builds candidates backed by real files, since `takeExisting` decides by stat-ing them.
- *
- * @param pattern One character per candidate: `y` exists on disk, `n` does not.
- * @returns Bookmarks in the given order, labelled by their index.
+ * Creates real files because `takeExisting` decides through filesystem stats.
  */
 async function candidates(pattern:string):Promise<LandingPageProject[]>
 {

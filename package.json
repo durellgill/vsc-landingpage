@@ -58,7 +58,15 @@
       },
       {
         "command": "vsc-landingpage.addToGroup",
-        "title": "\u2795 Add to Landing Page Group..."
+        "title": "Add to Landing Page Group \ud83d\udccc"
+      },
+      {
+        "command": "vsc-landingpage.openInNewWorkspace",
+        "title": "Open in New Workspace \ud83d\udcc2"
+      },
+      {
+        "command": "vsc-landingpage.openParentInNewWorkspace",
+        "title": "Open Parent Folder in New Workspace \ud83d\udcc2"
       }
     ],
     "keybindings": [
@@ -70,6 +78,24 @@
       }
     ],
     "menus": {
+      "commandPalette": [
+        {
+          "command": "vsc-landingpage.showWelcomePage",
+          "when": "true"
+        },
+        {
+          "command": "vsc-landingpage.addToGroup",
+          "when": "false"
+        },
+        {
+          "command": "vsc-landingpage.openInNewWorkspace",
+          "when": "false"
+        },
+        {
+          "command": "vsc-landingpage.openParentInNewWorkspace",
+          "when": "false"
+        }
+      ],
       "editor/title": [
         {
           "command": "vsc-landingpage.reset",
@@ -84,21 +110,29 @@
         {
           "command": "vsc-landingpage.addToGroup",
           "group": "navigation@100"
+        },
+        {
+          "command": "vsc-landingpage.openInNewWorkspace",
+          "when": "explorerResourceIsFolder",
+          "group": "navigation@99"
+        },
+        {
+          "command": "vsc-landingpage.openParentInNewWorkspace",
+          "when": "!explorerResourceIsFolder",
+          "group": "navigation@99"
         }
       ],
       "editor/title/context": [
         {
           "command": "vsc-landingpage.addToGroup",
           "group": "1_landingpage"
+        },
+        {
+          "command": "vsc-landingpage.openParentInNewWorkspace",
+          "group": "1_landingpage"
         }
       ]
     },
-    "commandPalette": [
-      {
-        "command": "vsc-landingpage.showWelcomePage",
-        "when": "true"
-      }
-    ],
     "configuration": {
       "title": "Landing Page",
       "properties": {
