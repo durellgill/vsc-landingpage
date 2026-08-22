@@ -6,6 +6,32 @@ on:
   pull_request:
 
 jobs:
+  # Does the committed lockfile install, on every platform anyone develops or builds on?
+  #
+  # This job exists because the answer has twice been no. `npm install` drops the transitive
+  # dependencies of optional packages that the generating machine cannot use, so a lockfile
+  # written on an Apple Silicon laptop installs perfectly there and fails on a Linux runner over
+  # packages the laptop was never going to see. Nothing on that laptop can detect it, which is
+  # what makes it worth a job rather than a rule in a document.
+  #
+  # `npm ci` alone, no build: the other jobs prove the code works, this one proves the lockfile
+  # a fresh clone would resolve is complete.
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
   check:
     runs-on: ubuntu-latest
     steps:
