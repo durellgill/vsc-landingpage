@@ -1,6 +1,6 @@
 import { render } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
-import type { LandingPageGroup, LandingPageModel, LandingPageProject } from '../LandingPageModel';
+import type { LandingPageGroup, LandingPageModel } from '../LandingPageModel';
 import { post } from './bridge';
 import { ActionMenu, DeleteZone, EmptyState, GroupShelf, HoverCard } from './components';
 import { groupMatches, matches, terms } from './bookmark-filter';
@@ -159,6 +159,26 @@ function App() {
     window.addEventListener('keydown',onKey);
     return () => window.removeEventListener('keydown',onKey);
   });
+
+  // Scrolling cancels the action menu and the New and Clone popovers alike. All three are
+  // anchored to a point in the page that scrolling moves out from under them, so leaving one
+  // open would leave it pointing at whatever is now in that spot.
+  useEffect(() => {
+    if (!menu && !popover) {return;}
+    const onScroll = () => {
+      // `closeMenu` hands the action menu's trigger its focus back, but a popover has no such
+      // record - so a scroll while the clone field was focused closed the form and left focus on
+      // `body`, sending the next Tab back to the top of the page. The trigger is the only
+      // `aria-haspopup` button in the anchor the focused element sits in.
+      const active = document.activeElement as HTMLElement|null;
+      const trigger = active?.closest('.popover') ? active.closest('.menu-anchor')?.querySelector<HTMLElement>('button[aria-haspopup]') : null;
+      closeMenu();
+      setPopover(null);
+      trigger?.focus({preventScroll: true});
+    };
+    window.addEventListener('scroll', onScroll, {passive: true});
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [menu, popover]);
 
   const target = useMemo(() => {
     if (!menu) {return null;}
@@ -409,7 +429,7 @@ function App() {
     // arrow keys stopped working until a card was clicked.
     const trigger = menuTrigger.current;
     menuTrigger.current = null;
-    if (trigger?.isConnected) {trigger.focus();}
+    if (trigger?.isConnected) {trigger.focus({preventScroll: true});}
   }
   menuOpen.current = menu!==null;
   function renameTarget() {

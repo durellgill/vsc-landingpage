@@ -99,3 +99,68 @@ test('the scrim dims by colour, never by opacity', async ({ page }) => {
   expect(dimming.palette, 'the palette inherited the scrim\'s dimming').toBe('1');
   expect(animatesOpacity, 'the scrim fades in via `opacity`, which dims the palette for the length of the fade').toBe(false);
 });
+
+/**
+ * Keyboard containment, for the two shapes the menu takes that a focus trap built on a list
+ * captured at open time gets wrong: a surface whose controls are replaced while it is up, and a
+ * surface that has no controls at all.
+ *
+ * Both were observed failing before the trap was rewritten to read the control list per keypress.
+ */
+test.describe('focus containment', () => {
+  /** What has focus, in the terms these checks care about. */
+  const focused = (page: import('@playwright/test').Page) => page.evaluate(() => ({
+    text: document.activeElement?.textContent?.trim() ?? '',
+    inHidden: !!document.activeElement?.closest('.hiddenrecents')
+  }));
+
+  test('Tab wraps onto the confirmation row that replaced the danger button', async ({ page }) => {
+    // Arming `Remove` swaps one button for two, so the last control in the menu is no longer the
+    // element it was when the menu opened. A trap holding the old one wraps to a detached node,
+    // which focuses nothing and silently drops the keystroke.
+    await openBoard(page);
+    await openCardMenu(page);
+    await menuItem(page, 'Remove').click();
+    await expect(page.locator('.ctxmenu button[data-confirm]')).toBeVisible();
+
+    await page.locator('.ctxmenu button').first().focus();
+    await page.keyboard.press('Shift+Tab');
+    expect((await focused(page)).text, 'Shift+Tab from the first item lands on Cancel, the control that is now last').toBe('Cancel');
+  });
+
+  test('a hidden-recents surface with nothing in it still holds focus', async ({ page }) => {
+    // The default board's Recent group carries no `hidden` key at all, so this surface renders one
+    // line of text and no controls. It is still a dialog, and Tab must not walk out of it onto the
+    // page behind - from where Escape closes the whole action menu instead of just this surface.
+    await openBoard(page);
+    await page.locator('.group[data-guid="@vsc-mru"] .tools button[aria-label^="Settings for"]').click();
+    await page.locator('.ctxmenu').waitFor();
+    await page.locator('.ctxmenu button.ctxsubmenu').click();
+    await page.locator('.hiddenrecents').waitFor();
+
+    expect((await focused(page)).inHidden, 'opening the surface moves focus into it').toBe(true);
+    await page.keyboard.press('Tab');
+    expect((await focused(page)).inHidden, 'Tab has nowhere to go inside the surface, so it stays put').toBe(true);
+
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.hiddenrecents')).toHaveCount(0);
+    await expect(page.locator('.ctxmenu'), 'Escape closes only the surface, leaving the menu that opened it').toBeVisible();
+    expect((await focused(page)).text, 'focus returns to the trigger').toContain('Hidden recents');
+  });
+});
+
+/**
+ * Scrolling dismisses the anchored surfaces, which have no way to follow the point they were
+ * opened against. Dismissing one must not strand the keyboard: focus goes back to whatever opened
+ * it, exactly as closing it any other way would.
+ */
+test('scrolling closes the clone popover and returns focus to its trigger', async ({ page }) => {
+  await openBoard(page);
+  await page.getByRole('button', { name: 'Clone a repository' }).click();
+  await page.locator('.popover-clone input').focus();
+
+  await page.evaluate(() => { document.scrollingElement!.scrollTop = 100; });
+  await expect(page.locator('.popover-clone')).toHaveCount(0);
+  const label = await page.evaluate(() => document.activeElement?.getAttribute('aria-label'));
+  expect(label, 'focus is on the trigger, not lost to `body`').toBe('Clone a repository');
+});

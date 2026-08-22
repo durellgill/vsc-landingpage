@@ -6,6 +6,42 @@ import { motion, stillness, useAnchored } from './motion';
 import { Svg, glyphs, iconFor, shadeForGroup, shades, typeShades } from './presentation';
 import type { Layout } from './types';
 
+/**
+ * Focuses the first control when a surface opens, or the surface itself when it holds none, and
+ * wraps Tab at either edge so focus cannot leave. Returning focus to the trigger belongs to
+ * whoever closes the surface, because only it still holds a reference to that trigger.
+ *
+ * The control list is read at every keypress rather than captured on open: the menu's danger row
+ * swaps one button for two when it asks for confirmation, so a list captured on open would wrap
+ * to a detached node.
+ */
+function useFocusTrap(containerRef: {current: HTMLElement | null}, isOpen: boolean) {
+  useLayoutEffect(() => {
+    const container = isOpen ? containerRef.current : null;
+    if (!container) {return;}
+    const controls = () => Array.from(container.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+    (controls()[0] ?? container).focus({preventScroll: true});
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') {return;}
+      const items = controls();
+      // An empty surface still has to hold focus. `Hidden recents` on a board with nothing hidden
+      // renders one line of text and no controls at all, and letting Tab out of it puts focus on
+      // the page behind a dialog that is still open - where Escape then closes the whole menu
+      // rather than just this surface.
+      if (!items.length) {event.preventDefault(); container.focus({preventScroll: true}); return;}
+      const [first] = items;
+      const last = items[items.length-1];
+      if (document.activeElement !== (event.shiftKey ? first : last)) {return;}
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus({preventScroll: true});
+    };
+
+    window.addEventListener('keydown', onKeyDown, {capture: true});
+    return () => window.removeEventListener('keydown', onKeyDown, {capture: true});
+  }, [isOpen]);
+}
+
 
 export function GroupShelf({group,index,needles,composer,setComposer,openMenu,refreshing,refresh,showMore,health,dragging,drop,onDragStart,onDragOver,onDrop,carried,landing,gap,onCarry,onDropBookmark,copiedGuid}:{group:LandingPageGroup;index:number;total:number;needles:string[];composer:boolean;setComposer:(id:string|null)=>void;openMenu:(event:MouseEvent,guid:string)=>void;refreshing:boolean;refresh:()=>void;showMore:()=>void;health:{missing:string[];branches:Record<string,string>};dragging:boolean;drop:'before'|'after'|null;onDragStart:()=>void;onDragOver:(event:DragEvent,index:number,group:LandingPageGroup)=>void;onDrop:()=>void;carried:string|undefined;landing:string|null|undefined;gap:number;onCarry:(guid:string,card:HTMLElement)=>void;onDropBookmark:(event:DragEvent,group:LandingPageGroup,section:HTMLElement)=>void;copiedGuid:string|null}) {
   const sealed=group.guid==='@vsc-mru';
@@ -106,8 +142,7 @@ export function BookmarkCard({project,missing,branch,openMenu,carried,onCarry,dr
 
 export function HiddenRecents({hidden,close,anchorX,anchorY}:{hidden:LandingPageProject[]|undefined;close:()=>void;anchorX:number;anchorY:number}) {
   const anchor = useAnchored(anchorX, anchorY);
-  // Focus the first action on mount, or the dialog itself when the empty state has no controls.
-  useEffect(()=>{(anchor.current?.querySelector<HTMLElement>('button') ?? anchor.current)?.focus();},[]);
+  useFocusTrap(anchor, true);
 
   /* Escape is handled here, on the surface, rather than on `window`.
    *
@@ -140,10 +175,11 @@ export function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,pick
   // Positioning is owned by `useAnchored`, which measures and clamps after render - so no
   // inline left/top here, or a re-render would put the surface back at the raw click point.
   const anchor = useAnchored(menu.x, menu.y);
-  // Focus the first applicable control only when the menu mounts; later rename and confirmation states manage their own focus.
-  useEffect(()=>{anchor.current?.querySelector('button')?.focus();},[]);
+  // Keyed off the picker, not off the menu: a picker replaces this surface with a `Palette` by
+  // the early return below, and a trap keyed off something always true would keep listening for
+  // a menu that is no longer rendered, alongside the palette's own.
+  useFocusTrap(anchor, picker===null);
 
-  // State for the HiddenRecents dialog
   const [showHiddenRecents, setShowHiddenRecents] = useState(false);
   const hiddenRecentsButton = useRef<HTMLButtonElement>(null);
 
@@ -181,9 +217,7 @@ export function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,pick
     </div>
 {showHiddenRecents && sealed && <HiddenRecents
   hidden={group.hidden}
-  close={() => {
-    setShowHiddenRecents(false);
-  }}
+  close={() => {setShowHiddenRecents(false); hiddenRecentsButton.current?.focus({preventScroll: true});}}
   anchorX={menu.x}
   anchorY={menu.y}
 />}
@@ -220,18 +254,17 @@ export function HoverCard({reference,project,branch,missing}:{reference:any;proj
  * the keyboard replaced the menu with a surface holding nothing focusable, and the only way out
  * was Escape.
  *
- * Focus is moved to the first swatch on open and returned to whatever opened the menu on close,
- * which `App` owns because it is the only thing that still has a reference to the trigger.
+ * Focus is moved to the first swatch on open and returned to the menu trigger on close
+ * via the `close` prop which calls `closeMenu` in main.tsx.
  */
 export function Palette({type,x,y,choose,close}:any) {
   const anchor=useAnchored(x,y);
-  const first=useRef<HTMLButtonElement>(null);
-  useEffect(()=>{first.current?.focus();},[]);
+  useFocusTrap(anchor, true);
   return <div class="modal" role="dialog" aria-modal="true" aria-label={type==='shade'?'Choose an accent colour':'Choose a custom icon'} onPointerUp={close}>
     <div class={type==='shade'?'palette':'glyphpalette'} ref={anchor} onPointerUp={(event:any)=>event.stopPropagation()}>
       {type==='shade'
-        ? shades.map((shade,index)=><button key={shade||'none'} ref={index===0?first:undefined} type="button" data-shade={shade} aria-label={shade?shade[0].toUpperCase()+shade.slice(1):'No accent colour'} onClick={()=>choose(shade)}/>)
-        : <>{glyphs.map(([key],index)=><button key={key} ref={index===0?first:undefined} type="button" title={key.slice(6)} aria-label={key.slice(6)} onClick={()=>choose(key.slice(6))}><Svg name={key}/></button>)}<button class="glyph-clear" type="button" title="No icon" aria-label="No custom icon" onClick={()=>choose('')}><Svg name="circleX"/></button></>}
+        ? shades.map(shade=><button key={shade||'none'} type="button" data-shade={shade} aria-label={shade?shade[0].toUpperCase()+shade.slice(1):'No accent colour'} onClick={()=>choose(shade)}/>)
+        : <>{glyphs.map(([key])=><button key={key} type="button" title={key.slice(6)} aria-label={key.slice(6)} onClick={()=>choose(key.slice(6))}><Svg name={key}/></button>)}<button class="glyph-clear" type="button" title="No icon" aria-label="No custom icon" onClick={()=>choose('')}><Svg name="circleX"/></button></>}
     </div>
   </div>;
 }
