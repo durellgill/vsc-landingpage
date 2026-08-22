@@ -7,7 +7,7 @@ import { Svg, glyphs, iconFor, shadeForGroup, shades, typeShades } from './prese
 import type { Layout } from './types';
 
 
-export function GroupShelf({group,index,needles,composer,setComposer,openMenu,refreshing,refresh,health,dragging,drop,onDragStart,onDragOver,onDrop,carried,landing,gap,onCarry,onDropBookmark,copiedGuid}:{group:LandingPageGroup;index:number;total:number;needles:string[];composer:boolean;setComposer:(id:string|null)=>void;openMenu:(event:MouseEvent,guid:string)=>void;refreshing:boolean;refresh:()=>void;health:{missing:string[];branches:Record<string,string>};dragging:boolean;drop:'before'|'after'|null;onDragStart:()=>void;onDragOver:(event:DragEvent,index:number,group:LandingPageGroup)=>void;onDrop:()=>void;carried:string|undefined;landing:string|null|undefined;gap:number;onCarry:(guid:string,card:HTMLElement)=>void;onDropBookmark:(event:DragEvent,group:LandingPageGroup,section:HTMLElement)=>void;copiedGuid:string|null}) {
+export function GroupShelf({group,index,needles,composer,setComposer,openMenu,refreshing,refresh,showMore,health,dragging,drop,onDragStart,onDragOver,onDrop,carried,landing,gap,onCarry,onDropBookmark,copiedGuid}:{group:LandingPageGroup;index:number;total:number;needles:string[];composer:boolean;setComposer:(id:string|null)=>void;openMenu:(event:MouseEvent,guid:string)=>void;refreshing:boolean;refresh:()=>void;showMore:()=>void;health:{missing:string[];branches:Record<string,string>};dragging:boolean;drop:'before'|'after'|null;onDragStart:()=>void;onDragOver:(event:DragEvent,index:number,group:LandingPageGroup)=>void;onDrop:()=>void;carried:string|undefined;landing:string|null|undefined;gap:number;onCarry:(guid:string,card:HTMLElement)=>void;onDropBookmark:(event:DragEvent,group:LandingPageGroup,section:HTMLElement)=>void;copiedGuid:string|null}) {
   const sealed=group.guid==='@vsc-mru';
   // A matching group label reveals all its bookmarks. The host filters missing Recent entries before the visible cap so the header count and rendered rows agree.
   const projects=pinnedFirst(groupMatches(group,needles) ? group.projects : group.projects.filter(project=>matches(project,needles)));
@@ -77,6 +77,11 @@ export function GroupShelf({group,index,needles,composer,setComposer,openMenu,re
       carried={carried===project.guid} onCarry={onCarry} copied={copiedGuid===project.guid}
       shift={opening>=0 && position>=opening && project.guid!==carried ? gap : 0}
       dropEdge={!receiving || opening>=0 ? undefined : landing===project.guid ? 'before' : (landing===null && position===tail) ? 'after' : undefined}/>)}</div>}</div>
+    {/* Only the generated Recent group pages: a user group holds exactly what was put in it, so
+        there is nothing behind it to reveal. Hidden while filtering, where the visible list is
+        answering the filter rather than the cap, and hidden when collapsed along with the cards. */}
+    {sealed && group.hasMore && !collapsed && needles.length===0 &&
+      <button class="btn-secondary showmore" data-role="show-more" onClick={showMore}>Show more</button>}
   </section>;
 }
 
@@ -99,6 +104,37 @@ export function BookmarkCard({project,missing,branch,openMenu,carried,onCarry,dr
 }
 
 
+export function HiddenRecents({hidden,close,anchorX,anchorY}:{hidden:LandingPageProject[]|undefined;close:()=>void;anchorX:number;anchorY:number}) {
+  const anchor = useAnchored(anchorX, anchorY);
+  // Focus the first action on mount, or the dialog itself when the empty state has no controls.
+  useEffect(()=>{(anchor.current?.querySelector<HTMLElement>('button') ?? anchor.current)?.focus();},[]);
+
+  /* Escape is handled here, on the surface, rather than on `window`.
+   *
+   * `main.tsx` already listens for Escape on the window and answers it with `closeMenu()`, which
+   * unmounts the whole `ActionMenu` - and with it the `Hidden recents` button this surface has to
+   * hand focus back to. Listening on the window too cannot prevent that: `stopPropagation` does
+   * nothing between two listeners on the same target, and the page's was registered first.
+   *
+   * Keeping it on the element works because focus is inside the surface, so the keydown starts
+   * there and bubbles. Stopping it here means it never reaches the window at all, the action menu
+   * stays open, and the trigger is still mounted to receive focus. */
+  return <div class="hiddenrecents" role="dialog" aria-label="Hidden recents" tabIndex={-1} ref={anchor}
+    onKeyDown={(event:any)=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close();}}}>
+    {hidden && hidden.length > 0 ? (
+      <>
+        {hidden.map(entry => (
+          <div key={entry.guid} class="hiddenrecents-entry">
+            <span>{entry.label}</span>
+            <button onClick={()=>{post('unhideRecent',{guid:entry.guid});close();}}>Restore</button>
+          </div>
+        ))}
+        <button onClick={()=>{post('restoreHiddenRecents');close();}}>Restore all</button>
+      </>
+    ) : <div>Nothing is hidden</div>}
+  </div>;
+}
+
 export function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,picker,setPicker,close,renameTarget,chooseShade,chooseGlyph,groupIndex,groupCount,codeCliAvailable}:any) {
   const group=target.group as LandingPageGroup; const project=!('projects' in target.item); const sealed=group.guid==='@vsc-mru';
   // Positioning is owned by `useAnchored`, which measures and clamps after render - so no
@@ -106,32 +142,52 @@ export function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,pick
   const anchor = useAnchored(menu.x, menu.y);
   // Focus the first applicable control only when the menu mounts; later rename and confirmation states manage their own focus.
   useEffect(()=>{anchor.current?.querySelector('button')?.focus();},[]);
+
+  // State for the HiddenRecents dialog
+  const [showHiddenRecents, setShowHiddenRecents] = useState(false);
+  const hiddenRecentsButton = useRef<HTMLButtonElement>(null);
+
   if (picker==='shade') return <Palette type="shade" x={menu.x} y={menu.y} choose={chooseShade} close={close}/>;
   if (picker==='glyph') return <Palette type="glyph" x={menu.x} y={menu.y} choose={chooseGlyph} close={close}/>;
   // `role="dialog"` rather than `role="menu"`. A menu role obliges roving tabindex and arrow-key
   // navigation, and it takes only `menuitem` children - which the rename row, an input and two
   // buttons, is not. Declaring it without the rest would put screen readers into application
   // mode and take away the plain Tab navigation that actually works here.
-  return <div id="ctxmenu" class="ctxmenu" role="dialog" aria-label={`Actions for ${target.item.label}`} ref={anchor} data-renaming={rename!==null ? 'yes' : undefined}>
-    {project && <button onClick={()=>{post('open',{guid:target.item.guid});close();}}><Svg name="arrowRightIcon"/><span>Open</span></button>}
-    {project && offersNewWindow(target.item, codeCliAvailable) && <button onClick={()=>{post('open',{guid:target.item.guid,newWindow:true});close();}}><Svg name="appWindow"/><span>Open in new window</span></button>}
-    {project && <button onClick={()=>{post('copyPath',{guid:target.item.guid});close();}}><Svg name="copy"/><span>Copy path</span></button>}
-    {project && <button onClick={()=>{post('patch',{guid:target.item.guid,field:'pinned',value:!target.item.pinned});close();}}><Svg name={target.item.pinned?'pinOff':'pin'}/><span>{target.item.pinned?'Unpin':'Pin to top'}</span></button>}
-    {!sealed && <>{rename!==null ? <div class="ctxrename"><input autoFocus value={rename} onInput={(event:any)=>setRename(event.currentTarget.value)} onKeyDown={(event:any)=>{if(event.key==='Enter')renameTarget();if(event.key==='Escape')close();}}/><button onClick={renameTarget}>Save</button><button onClick={close}>Cancel</button></div> : <button onClick={()=>setRename(target.item.label)}><Svg name="textCursorInput"/><span>Rename</span></button>}</>}
-    <button onClick={()=>setPicker('shade')}><Svg name="paintbrush"/><span>Accent colour</span></button>
-    <button onClick={()=>setPicker('glyph')}><Svg name="image"/><span>Custom icon</span></button>
-    {project && !sealed && <button onClick={()=>{post('moveToGroup',{guid:target.item.guid});close();}}><Svg name="folderInput"/><span>Move to group</span></button>}
-    {/* The keyboard route to reordering groups. Dragging the title bar was the only way to do
-        it, which made the whole feature mouse-only - the bookmark equivalent has always been
-        "Move to group" above, but groups had nothing. The host's `moveGroup` already accepted
-        this one-step `direction` form; only the control for it was missing. Hidden rather than
-        disabled at the ends of the board, so the menu never offers a dead item. */}
-    {!project && !sealed && groupIndex>0 && <button onClick={()=>{post('moveGroup',{guid:target.item.guid,direction:'up'});close();}}><Svg name="chevronUp"/><span>Move group up</span></button>}
-    {!project && !sealed && groupIndex<groupCount-1 && <button onClick={()=>{post('moveGroup',{guid:target.item.guid,direction:'down'});close();}}><Svg name="chevronDown"/><span>Move group down</span></button>}
-    {!project && sealed && <button onClick={()=>{post('restoreHiddenRecents');close();}}>Restore hidden recents</button>}
-    <div class="ctxsep"/>
-    {sealed&&project ? (confirm==='hide'?<button class="danger" data-confirm onClick={()=>{post('hideRecent',{guid:target.item.guid});close();}}>Hide?</button>:<button class="danger" onClick={()=>setConfirm('hide')}><Svg name="trash2"/><span>Hide from Landing Page</span></button>) : !sealed && (confirm==='remove'?<><button class="danger" data-confirm onClick={()=>{post('remove',{guid:target.item.guid});close();}}>Remove?</button><button onClick={close}>Cancel</button></>:<button class="danger" onClick={()=>setConfirm('remove')}><Svg name="trash2"/><span>Remove</span></button>)}
-  </div>;
+  return <>
+    <div id="ctxmenu" class="ctxmenu" role="dialog" aria-label={`Actions for ${target.item.label}`} ref={anchor} data-renaming={rename!==null ? 'yes' : undefined}>
+      {project && <button onClick={()=>{post('open',{guid:target.item.guid});close();}}><Svg name="arrowRightIcon"/><span>Open</span></button>}
+      {project && offersNewWindow(target.item, codeCliAvailable) && <button onClick={()=>{post('open',{guid:target.item.guid,newWindow:true});close();}}><Svg name="appWindow"/><span>Open in new window</span></button>}
+      {project && <button onClick={()=>{post('copyPath',{guid:target.item.guid});close();}}><Svg name="copy"/><span>Copy path</span></button>}
+      {project && <button onClick={()=>{post('patch',{guid:target.item.guid,field:'pinned',value:!target.item.pinned});close();}}><Svg name={target.item.pinned?'pinOff':'pin'}/><span>{target.item.pinned?'Unpin':'Pin to top'}</span></button>}
+      {!sealed && <>{rename!==null ? <div class="ctxrename"><input autoFocus value={rename} onInput={(event:any)=>setRename(event.currentTarget.value)} onKeyDown={(event:any)=>{if(event.key==='Enter')renameTarget();if(event.key==='Escape')close();}}/><button onClick={renameTarget}>Save</button><button onClick={close}>Cancel</button></div> : <button onClick={()=>setRename(target.item.label)}><Svg name="textCursorInput"/><span>Rename</span></button>}</>}
+      <button onClick={()=>setPicker('shade')}><Svg name="paintbrush"/><span>Accent colour</span></button>
+      <button onClick={()=>setPicker('glyph')}><Svg name="image"/><span>Custom icon</span></button>
+      {project && !sealed && <button onClick={()=>{post('moveToGroup',{guid:target.item.guid});close();}}><Svg name="folderInput"/><span>Move to group</span></button>}
+      {/* The keyboard route to reordering groups. Dragging the title bar was the only way to do
+          it, which made the whole feature mouse-only - the bookmark equivalent has always been
+          "Move to group" above, but groups had nothing. The host's `moveGroup` already accepted
+          this one-step `direction` form; only the control for it was missing. Hidden rather than
+          disabled at the ends of the board, so the menu never offers a dead item. */}
+      {!project && !sealed && groupIndex>0 && <button onClick={()=>{post('moveGroup',{guid:target.item.guid,direction:'up'});close();}}><Svg name="chevronUp"/><span>Move group up</span></button>}
+      {!project && !sealed && groupIndex<groupCount-1 && <button onClick={()=>{post('moveGroup',{guid:target.item.guid,direction:'down'});close();}}><Svg name="chevronDown"/><span>Move group down</span></button>}
+      {/* The only row here that opens another surface rather than acting, so it is the only one
+          that has to say so: a trailing chevron for that, and `aria-haspopup` to tell a screen
+          reader what the chevron tells everyone else. The leading icon is not decoration either -
+          without it this was the one item in the menu with no icon, and its label hung out of
+          line with every other label in the list. */}
+      {!project && sealed && <button class="ctxsubmenu" ref={hiddenRecentsButton} aria-haspopup="dialog" aria-expanded={showHiddenRecents} onClick={()=>setShowHiddenRecents(true)}><Svg name="eyeClosed"/><span>Hidden recents</span><Svg name="chevronRight"/></button>}
+      <div class="ctxsep"/>
+      {sealed&&project ? (confirm==='hide'?<button class="danger" data-confirm onClick={()=>{post('hideRecent',{guid:target.item.guid});close();}}>Hide?</button>:<button class="danger" onClick={()=>setConfirm('hide')}><Svg name="trash2"/><span>Hide from Landing Page</span></button>) : !sealed && (confirm==='remove'?<><button class="danger" data-confirm onClick={()=>{post('remove',{guid:target.item.guid});close();}}>Remove?</button><button onClick={close}>Cancel</button></>:<button class="danger" onClick={()=>setConfirm('remove')}><Svg name="trash2"/><span>Remove</span></button>)}
+    </div>
+{showHiddenRecents && sealed && <HiddenRecents
+  hidden={group.hidden}
+  close={() => {
+    setShowHiddenRecents(false);
+  }}
+  anchorX={menu.x}
+  anchorY={menu.y}
+/>}
+  </>;
 }
 
 

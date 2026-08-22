@@ -6,8 +6,9 @@ import { MessageFromWebview, syncModelInWebview } from './webview-messages';
 import { saveLandingPageModel } from './model-storage';
 import { reportBookmarkHealth } from './bookmark-health';
 import {
-  RECENT_GROUP_GUID, clearMruCustomisations, customiseMru, hideMru, populateVscMru, restoreHiddenMru,
+  RECENT_GROUP_GUID, clearMruCustomisations, customiseMru, hideMru, hiddenMruEntries, populateVscMru, restoreHiddenMru, unhideMru,
 } from './recent-mru-overlay';
+import { recentLimit } from './history';
 import { pickDestinationGroup } from './group-destination';
 import { moveBookmark, moveGroup, moveToGroup } from './bookmark-moves';
 import { createDirectory } from './bookmark-creation';
@@ -31,9 +32,19 @@ function codeCliAvailable():Promise<boolean>
 export { bookmarkUris } from './bookmark-creation';
 export { cloneRepository } from './clone-repository';
 
+/**
+ * How many Recent entries the page is currently showing, when it has asked for more than the
+ * configured cap.
+ *
+ * Session-only and deliberately not persisted. `maxRecentItems` stays the setting that decides
+ * how long the list is; this is one visit reaching past it, and a reload returns to the setting
+ * rather than leaving a second, invisible one behind.
+ */
+let recentShown:number|undefined;
+
 export async function refreshRecents(webviewPanel:vscode.WebviewPanel, sharedModel:LandingPageModel):Promise<void>
 {
-  await populateVscMru(sharedModel);
+  await populateVscMru(sharedModel, recentShown);
   syncModelInWebview(webviewPanel, sharedModel);
   // Not awaited: the board should paint from the fresh model immediately, and the health
   // verdict decorates it a moment later.
@@ -48,7 +59,7 @@ export async function resetModel(sharedModel:LandingPageModel):Promise<void>
   sharedModel.groups=[];
   await restoreHiddenMru();
   await clearMruCustomisations();
-  await populateVscMru(sharedModel);
+  await populateVscMru(sharedModel, recentShown);
   await saveLandingPageModel(sharedModel);
   vscode.window.showInformationMessage('Model reset. Please close and reopen landingpage view.');
 }
@@ -62,7 +73,7 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
   const needsMru = message.command!=='openSettings'
                 && message.command!=='cloneRepository'
                 && message.command!=='openFolder';
-  if (needsMru) {await populateVscMru(sharedModel);}
+  if (needsMru) {await populateVscMru(sharedModel, recentShown);}
 
   switch(message.command)
   {
@@ -218,16 +229,26 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
       break;
     case 'hideRecent':
       await hideMru(message.guid);
-      await populateVscMru(sharedModel);
+      await populateVscMru(sharedModel, recentShown);
       await saveLandingPageModel(sharedModel);
       syncModelInWebview(webviewPanel, sharedModel);
       break;
     case 'refreshRecents':
+      // `more` asks for another page; a plain refresh rereads the list at whatever length is
+      // already on screen, so refreshing never silently collapses a list the user expanded.
+      if (message.more) {recentShown = (recentShown ?? recentLimit()) + recentLimit();}
+      await populateVscMru(sharedModel, recentShown);
       syncModelInWebview(webviewPanel, sharedModel);
       break;
     case 'restoreHiddenRecents':
       await restoreHiddenMru();
-      await populateVscMru(sharedModel);
+      await populateVscMru(sharedModel, recentShown);
+      await saveLandingPageModel(sharedModel);
+      syncModelInWebview(webviewPanel, sharedModel);
+      break;
+    case 'unhideRecent':
+      await unhideMru(message.guid);
+      await populateVscMru(sharedModel, recentShown);
       await saveLandingPageModel(sharedModel);
       syncModelInWebview(webviewPanel, sharedModel);
       break;

@@ -70,6 +70,20 @@ export async function restoreHiddenMru():Promise<void>
   await extensionGlobalState().update(HIDDEN_MRU_KEY, []);
 }
 
+export function hiddenMruEntries(all: LandingPageProject[]): LandingPageProject[]
+{
+  const hidden = hiddenMruGuids();
+  return all.filter(project => hidden.has(project.guid));
+}
+
+export async function unhideMru(guid: string|undefined): Promise<void>
+{
+  if (!guid?.startsWith('MRU:')) {return;}
+  const hidden = hiddenMruGuids();
+  hidden.delete(guid);
+  await extensionGlobalState().update(HIDDEN_MRU_KEY, [...hidden]);
+}
+
 /**
  * Drops every stored `Recent` customisation. Used when resetting the model, which otherwise
  * would leave orphaned overlay entries behind after clearing the board.
@@ -79,7 +93,37 @@ export async function clearMruCustomisations():Promise<void>
   await extensionGlobalState().update(MRU_CUSTOM_KEY, {});
 }
 
-export async function populateVscMru(sharedModel:LandingPageModel):Promise<void>
+export interface RecentPageResult {
+  projects: LandingPageProject[];
+  hasMore: boolean;
+}
+
+/**
+ * Trims a probed survivor list down to one page, and reports whether another page follows.
+ *
+ * `Show more` has to decide whether to offer itself before it can be drawn, and the only honest
+ * way to know is to have looked one entry further than it means to show. So the caller asks
+ * `takeExisting` for `limit + 1` survivors and hands the result here, and this drops the extra.
+ *
+ * The tempting shortcut - "did we fill the quota?" - is wrong. A history holding exactly `limit`
+ * survivors fills it and has nothing behind it, and the button would reveal nothing at all. Only
+ * the probe entry distinguishes those two cases.
+ *
+ * A limit of 0 is the documented way to ask for everything, so nothing is dropped and no further
+ * page is ever offered.
+ */
+export function recentPage(projects:LandingPageProject[], limit:number):RecentPageResult
+{
+  if (limit<=0) {return {projects, hasMore:false};}
+  return {projects: projects.slice(0, limit), hasMore: projects.length>limit};
+}
+
+/**
+ * @param shown How many entries to show, when the page has asked for more than the configured
+ * cap. Session-only: it is never persisted, so a reload returns to `maxRecentItems` rather than
+ * quietly competing with that setting.
+ */
+export async function populateVscMru(sharedModel:LandingPageModel, shown?:number):Promise<void>
 {
   let mruFound = findItemByGuid(RECENT_GROUP_GUID,sharedModel);
   let mruGroup:LandingPageGroup;
@@ -94,10 +138,16 @@ export async function populateVscMru(sharedModel:LandingPageModel):Promise<void>
   }
   const hidden = hiddenMruGuids();
   const custom = mruCustomisations();
-  const candidates = (await importVscRecentList()).filter(project => !hidden.has(project.guid));
-  const freshProjects = await takeExisting(candidates, recentLimit());
-  for(const project of freshProjects) {applyMruCustomisation(project, custom[project.guid]);}
-  mruGroup.projects=freshProjects;
+  const allHistory = await importVscRecentList();
+  const candidates = allHistory.filter(project => !hidden.has(project.guid));
+  // One past the limit, so `recentPage` can tell "exactly full" from "there is more behind this".
+  const limit = shown ?? recentLimit();
+  const probed = await takeExisting(candidates, limit>0 ? limit+1 : 0);
+  const page = recentPage(probed, limit);
+  for(const project of page.projects) {applyMruCustomisation(project, custom[project.guid]);}
+  mruGroup.projects=page.projects;
+  mruGroup.hasMore=page.hasMore;
+  mruGroup.hidden = hiddenMruEntries(allHistory);
 }
 
 /**

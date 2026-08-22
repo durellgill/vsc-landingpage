@@ -94,3 +94,8 @@ scripts/design-agent.sh
 playwright-report/
 blob-report/
 test-results/
+
+# Personal working notes: observations about agents, tooling, and infrastructure that are worth
+# keeping across sessions but are not project documentation. Durable project decisions belong in
+# DECISIONS.md, and in-flight work belongs in TODO.md - both of which are committed.
+NOTES.md

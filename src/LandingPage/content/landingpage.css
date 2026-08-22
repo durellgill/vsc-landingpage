@@ -48,12 +48,9 @@
   color: var(--vscode-foreground);
   background-color: var(--vscode-editor-background);
   /*
-   * Disable text selection during drag but keep paths selectable.
+   * Disable text selection so pointer movement starts a drag without highlighting card text.
    */
   user-select: none;
-}
-.landingpage .project-path, .landingpage .project-label {
-  user-select: text;
 }
 .landingpage h1, .landingpage h2, .landingpage p {
   margin: 0;
@@ -372,9 +369,9 @@
    */
   animation: scrim-in var(--dur-enter) var(--ease-out);
 }
-.landingpage .ctxmenu {
+.landingpage .ctxmenu,
+.landingpage .hiddenrecents {
   position: fixed;
-  z-index: 200;
   min-width: 184px;
   padding: 4px;
   display: flex;
@@ -391,7 +388,14 @@
   transform-origin: var(--origin-x, left) var(--origin-y, top);
   animation: menu-in var(--dur-enter) var(--ease-out);
 }
-.landingpage .ctxmenu button {
+.landingpage .ctxmenu {
+  z-index: 200;
+}
+.landingpage .hiddenrecents {
+  z-index: 201;
+}
+.landingpage .ctxmenu button,
+.landingpage .hiddenrecents button {
   justify-content: flex-start;
   gap: 10px;
   padding: 6px 10px;
@@ -399,7 +403,8 @@
   font-size: 0.9em;
   white-space: nowrap;
 }
-.landingpage .ctxmenu button:hover {
+.landingpage .ctxmenu button:hover,
+.landingpage .hiddenrecents button:hover {
   background-color: var(--vscode-menu-selectionBackground, var(--vscode-toolbar-hoverBackground));
   color: var(--vscode-menu-selectionForeground, inherit);
 }
@@ -437,6 +442,16 @@
 .landingpage .ctxmenu[data-renaming=yes] .ctxrename {
   display: flex;
   animation: card-in var(--dur-enter) var(--ease-out);
+}
+.landingpage .hiddenrecents-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+}
+.landingpage .hiddenrecents-entry button {
+  padding: 2px 8px;
+  font-size: 0.8em;
 }
 .landingpage .ctxmenu button[data-confirm] {
   animation: confirm-arm var(--dur-arm) var(--ease-out);
@@ -1826,4 +1841,27 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/* `Show more` sits under Recent's cards, inside the folding box so it collapses with them.
+ * Full width rather than floated: at compact and grid layouts the last row's right edge moves
+ * with the wrap, and a button anchored to it drifted around as the panel was resized. */
+.landingpage .content .group .showmore {
+  display: block;
+  width: 100%;
+  margin-top: var(--gapspace-s);
+}
+
+/* A menu row that opens another surface instead of acting. The trailing chevron is pushed to the
+ * far edge so it reads as "there is more this way" rather than as part of the label, and the row
+ * keeps room for it even when the menu is sized by a longer sibling. */
+.landingpage .ctxmenu button.ctxsubmenu {
+  padding-right: 6px;
+}
+.landingpage .ctxmenu button.ctxsubmenu .icon:last-child {
+  margin-left: auto;
+  opacity: 0.7;
+}
+.landingpage .ctxmenu button.ctxsubmenu:hover .icon:last-child {
+  opacity: 1;
 }

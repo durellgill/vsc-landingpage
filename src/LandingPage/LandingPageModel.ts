@@ -26,6 +26,17 @@ export interface LandingPageGroup extends LandingPageItem
    * Collapse state persists across reloads and windows. Filtering may temporarily reveal a collapsed group without changing that stored state.
    */
   collapsed?:boolean;
+
+  /**
+   * Hidden entries for Recent group only.
+   */
+  hidden?:LandingPageProject[];
+
+  /**
+   * Whether the recently-opened history holds more entries than this group is showing. Drives the
+   * `Show more` control, and is never persisted - it describes the current page, not the model.
+   */
+  hasMore?:boolean;
 }
 
 export interface LandingPageProject extends LandingPageItem

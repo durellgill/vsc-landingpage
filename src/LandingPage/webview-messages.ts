@@ -3,13 +3,15 @@ import { LandingPageModel } from './LandingPageModel';
 
 export interface MessageFromWebview
 {
-	command:'documentReady'|'rename'|'createBookmark'|'createGroup'|'remove'|'hideRecent'|'restoreHiddenRecents'|'refreshRecents'|'moveGroup'|'open'|'patch'|'openSettings'|'cloneRepository'|'openFolder'|'moveToGroup'|'createDirectory'|'copyPath'|'moveBookmark';
+	command:'documentReady'|'rename'|'createBookmark'|'createGroup'|'remove'|'hideRecent'|'restoreHiddenRecents'|'unhideRecent'|'refreshRecents'|'moveGroup'|'open'|'patch'|'openSettings'|'cloneRepository'|'openFolder'|'moveToGroup'|'createDirectory'|'copyPath'|'moveBookmark';
 
   url?:string;
 
 	guid?:string;
   pickFolder?:boolean;
   newWindow?:boolean;
+  /** For command 'refreshRecents': reveal another page beyond the configured cap. */
+  more?:boolean;
   direction?:'up'|'down';
   /** For command 'moveGroup': insertion index the group was dropped at, among user-created groups. */
   toIndex?:number;

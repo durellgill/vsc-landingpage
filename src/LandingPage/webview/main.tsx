@@ -512,7 +512,7 @@ function App() {
     post('moveBookmark',{guid:carry.guid, toGroup:group.guid, beforeGuid:before??undefined});
   }
 
-  return <main class="page" onPointerDown={event => {if (!(event.target as Element).closest('#ctxmenu,.modal,.menu-anchor')) {closeMenu(); setPopover(null);}}}>
+  return <main class="page" onPointerDown={event => {if (!(event.target as Element).closest('#ctxmenu,.modal,.menu-anchor,.hiddenrecents')) {closeMenu(); setPopover(null);}}}>
     <header class="page-header">
       <div class="titlerow"><div class="titletext"><h1>Landing Page</h1></div><div class="header-actions">
         <button class="btn-secondary" title="Open a folder in this window" onClick={()=>{setPopover(null); post('openFolder');}}><Svg name="folder"/><span>Open</span></button>
@@ -545,7 +545,7 @@ function App() {
         : drag.over===index ? 'before'
         : (drag.over===userGroups.length && index===userGroups.length-1) ? 'after' : null;
       return <GroupShelf key={group.guid} group={group} index={index} total={userGroups.length} needles={needles} composer={composer===group.guid} setComposer={setComposer} openMenu={openMenu}
-        refreshing={refreshing} refresh={()=>{setRefreshing(true); post('refreshRecents');}} health={health}
+        refreshing={refreshing} refresh={()=>{setRefreshing(true); post('refreshRecents');}} showMore={()=>post('refreshRecents',{more:true})} health={health}
         dragging={drag?.guid===group.guid} drop={drop} onDragStart={()=>setDrag({guid:group.guid,over:null})} onDragOver={dragOver} onDrop={dropGroup}
         carried={carry?.guid} landing={carry?.into===group.guid ? carry.before : undefined} gap={carry?.gap??0}
         onCarry={(guid,card)=>{setHover(null); closeMenu(); setCarry({guid,from:group.guid,into:null,before:null,gap:gapFor(card)});}} onDropBookmark={dropBookmark} copiedGuid={copied}/>;

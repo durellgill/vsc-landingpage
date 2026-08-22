@@ -27,6 +27,17 @@ test('a painted bookmark still grows its spine on hover', async ({ page }) => {
   expect(hovered.width, 'the hovered spine is not at its full width').toBe(4);
 });
 
+test('dragging a bookmark cannot select its label or path text', async ({ page }) => {
+  await openBoard(page);
+
+  const card = cards(page).first();
+  const selectableText = card.locator('.project-label, .project-path');
+  const userSelect = await selectableText.evaluateAll(nodes =>
+    nodes.map(node => getComputedStyle(node).userSelect));
+
+  expect(userSelect, 'bookmark text can be highlighted while starting a drag').toEqual(['none', 'none']);
+});
+
 test('the hover card survives the scroll that focusing a card causes', async ({ page }) => {
   // The hover card is positioned in the viewport by the Popover API and does not move with the
   // document, so it is dropped when the page scrolls. Focusing a card off-screen scrolls it into

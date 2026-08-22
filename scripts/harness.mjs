@@ -154,6 +154,13 @@ const stub = `<script>
   window.acquireVsCodeApi = () => ({
     postMessage(message) {
       window.__posted.push(message);
+      // Stands in for the host's paging: a refresh carrying "more" appends the next page and
+      // clears "hasMore" once the reserve is empty. A plain refresh must not do either, which is
+      // the distinction the "Show more" checks turn on.
+      // (No backticks in this block: it sits inside a template literal.)
+      if (message.command === 'refreshRecents' && message.more) { showMore(); }
+      if (message.command === 'unhideRecent') { unhide(message.guid); }
+      if (message.command === 'restoreHiddenRecents') { unhideAll(); }
       if (message.command === 'documentReady' || message.command === 'refreshRecents') { sync(); }
       // 'patch' is the host's persist-then-resync path. Applying it here means state that
       // lives in the model - layout, shade, collapsed - actually round-trips in the harness
@@ -220,6 +227,33 @@ const stub = `<script>
     const at = message.beforeGuid ? destination.projects.findIndex(p => p.guid === message.beforeGuid) : -1;
     destination.projects.splice(at < 0 ? destination.projects.length : at, 0, landed);
   }
+  function recent() { return model.groups.find(g => g.guid === '@vsc-mru'); }
+  function showMore() {
+    const group = recent();
+    if (!group) { return; }
+    group.projects = group.projects.concat(model.reserve || []);
+    model.reserve = [];
+    group.hasMore = false;
+  }
+  // Restoring returns the entry to the visible list, which is the half of the feature a message
+  // log cannot show: a page that posts the right guid and never sees the bookmark come back is
+  // still broken from where the user sits.
+  function unhide(guid) {
+    const group = recent();
+    if (!group || !group.hidden) { return; }
+    const at = group.hidden.findIndex(p => p.guid === guid);
+    if (at < 0) { return; }
+    const [entry] = group.hidden.splice(at, 1);
+    group.projects.push(entry);
+    sync();
+  }
+  function unhideAll() {
+    const group = recent();
+    if (!group || !group.hidden) { return; }
+    group.projects = group.projects.concat(group.hidden);
+    group.hidden = [];
+    sync();
+  }
   function sync() {
     // Mirrors communication.ts: the host replies on its own turn, never synchronously.
     //
@@ -233,9 +267,38 @@ const stub = `<script>
   window.addEventListener('error', event => { window.__error = String(event.error || event.message); });
 </script>`;
 
+/**
+ * The board `?recents` serves: a `Recent` group that is hiding entries and has another page
+ * behind it.
+ *
+ * Its own state rather than the default model, because both of those put a control on `Recent`
+ * that the default board must not show - and folding them into the shared model would rewrite
+ * every appearance baseline to add a button most boards do not have.
+ *
+ * `reserve` is the rest of the history: what the host would return on the second page. The stub
+ * hands it over when the page asks for more, which is what makes `Show more` actually lengthen
+ * the list here instead of only appearing in the message log.
+ */
+function recentsModel() {
+  const board = structuredClone(model);
+  const recent = board.groups.find(g => g.guid === '@vsc-mru');
+  recent.hasMore = true;
+  recent.hidden = [
+    {guid: 'MRU:hidden-1', label: 'buried-project', path: 'file:///Users/dev/Projects/buried-project', icon: 'folder'},
+    {guid: 'MRU:hidden-2', label: 'old-scratch', path: 'file:///Users/dev/old-scratch', icon: 'folder'}
+  ];
+  board.reserve = [
+    {guid: 'MRU:c', label: 'dotfiles', path: 'file:///Users/dev/dotfiles', icon: 'folder'},
+    {guid: 'MRU:d', label: 'talks', path: 'file:///Users/dev/talks', icon: 'folder'}
+  ];
+  return board;
+}
+
 const server = createServer(async (request, response) => {
   const url = new URL(request.url, 'http://localhost');
-  const payload = url.searchParams.has('empty') ? {groups: []} : model;
+  const payload = url.searchParams.has('empty') ? {groups: []}
+    : url.searchParams.has('recents') ? recentsModel()
+    : model;
   let html = (await renderer())("'self'", harnessCspNonce);
   // The stub must be installed before the bundle runs, so it goes ahead of the page script.
   // ?healthy suppresses the missing-target verdict, for checking the undecorated board.
@@ -254,7 +317,7 @@ const server = createServer(async (request, response) => {
 });
 
 server.listen(port, () => {
-  console.log(`Landing page harness: http://localhost:${port}/  (append ?empty for the empty state)`);
+  console.log(`Landing page harness: http://localhost:${port}/  (append ?empty for the empty state, ?recents for hidden entries and paging)`);
 });
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
