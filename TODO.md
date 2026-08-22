@@ -18,6 +18,12 @@ Delete an item when it is finished; move anything that becomes a durable rule in
   - Remove the `--grep-invert @visual` exclusion and confirm a deliberate visual regression fails CI.
   - Mask genuinely volatile pixels instead of raising the zero-pixel tolerance.
 
+- [ ] Fix the race in `e2e/flip.spec.ts` "an interrupted flight keeps its direction", which fails about one run in six.
+  - The check samples `cardTops` and only then clicks to interrupt, but the page's FLIP reads each card's position at the click. Measured gap between the two instants is around 29ms, and the first wave is still moving throughout it.
+  - A card whose net travel is small crosses its settled position inside that gap, so the sign of `mid - settled` stops agreeing with the sign the transform was built from. It is always the same card, always around 8px of travel against a 23px transform.
+  - Record each element's position inside the patched `animate` in `recordFlights`, and compare against that, so both halves of the comparison come from one instant. Do not widen the 1px filter: that hides the race rather than removing it.
+  - The product is not at fault here, so a fix must keep the check failing against the genuine inverted-direction bug it was written for.
+
 ## Behavior
 
 - [ ] Keep the rename editor open and explain the problem when a submitted label is empty.
