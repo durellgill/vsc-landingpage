@@ -59,7 +59,7 @@ test.describe('the D015 contract', () => {
     expect(labelled, 'a card with aria-label loses its path and missing state').toBe(0);
   });
 
-  test('a missing target is announced, not just coloured red', async ({ page }) => {
+  test('a missing target is announced, not just colored red', async ({ page }) => {
     await openBoard(page);
     const missing = cards(page).filter({ hasText: 'moved-away' });
 

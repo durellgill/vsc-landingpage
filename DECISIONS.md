@@ -94,13 +94,13 @@ Consequences: Add new durable Recent customization fields to the overlay. Remove
 
 Status: active
 
-Decision: Group-local creation uses that group. Page-level bookmark creation asks for a destination when needed. Page-level folder creation creates the folder and opens it in the current VS Code window without adding a bookmark or group; VS Code adds it to Open Recent naturally.
+Decision: Bookmark creation is group-local. Page-level folder creation creates the folder and opens it in the current VS Code window without adding a bookmark or group; VS Code adds it to Open Recent naturally.
 
 Reason: A failed irreversible operation must not leave model changes behind, and a control inside a group already communicates its destination.
 
 Considered instead: Creating the model entry first and reconciling if the filesystem operation failed. Rejected because the reconciliation path is the one that never gets tested, so the failure leaves a bookmark pointing at a directory that was never created. Also considered: always prompting for a destination, rejected because a control rendered inside a group has already answered that question.
 
-Consequences: Only the New folder action inside a group creates a bookmark for the new directory. Keep webview-initiated text input in the page. Explorer and editor context commands may use native quick picks and input boxes because they start outside the page.
+Consequences: The page header's New menu contains no bookmark picker. Use Add inside a group to create folder, file, or workspace bookmarks in that group. The page-level Folder on disk action remains separate and does not create a bookmark. Keep webview-initiated text input in the page. Explorer and editor context commands may use native quick picks and input boxes because they start outside the page.
 
 ## D007: Dragging uses identifiers and geometry
 
@@ -246,7 +246,7 @@ Status: active. Extends D012a from the bookmark to the whole board.
 
 Decision: A shade is drawn as a 4px wide, 20px tall capsule in the leading gutter, and nowhere else. A group header draws it for the group, a bookmark card draws it for the bookmark, and the two share the same gutter column and the same dimensions. The bookmark's mark grows to its full 4px under the pointer or on focus; nothing else about it changes. The group icon, the bookmark icon, and the group's bookmark count are neutral.
 
-Reason: The board previously spent the accent four ways in the space of two rows - a 5px full-height band down the leading edge of every card, an 18% shade plate behind the group's folder icon, the group label recoloured on hover, and a bordered count pill beside it. A full-height colour band is the most recognisable tic of a generated dashboard, and it made a run of same-shade bookmarks fuse into one continuous stripe instead of reading as separate things. In grid and compact, where the card draws its own hairline, the band sat on that hairline and read as a coloured border. A short mark in the leading margin is what VS Code itself uses for gutter decorations - dirty diff, breakpoints - so it is the vocabulary a bookmark board belongs to.
+Reason: The board previously spent the accent four ways in the space of two rows - a 5px full-height band down the leading edge of every card, an 18% shade plate behind the group's folder icon, the group label recolored on hover, and a bordered count pill beside it. A full-height color band is the most recognisable tic of a generated dashboard, and it made a run of same-shade bookmarks fuse into one continuous stripe instead of reading as separate things. In grid and compact, where the card draws its own hairline, the band sat on that hairline and read as a colored border. A short mark in the leading margin is what VS Code itself uses for gutter decorations - dirty diff, breakpoints - so it is the vocabulary a bookmark board belongs to.
 
 Considered instead: Keeping the full-height band and reducing its saturation. Rejected because the fusing problem is geometric, not chromatic - any full-height band on adjacent same-shade cards still reads as one stripe.
 

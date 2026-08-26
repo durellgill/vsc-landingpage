@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { cards, expectConfirmationArms, menuItem, openBoard, openCardMenu, stillness } from './board';
+import { cards, expectConfirmationArms, menuItem, openBoard, openCardMenu, postedCount, stillness } from './board';
 
 /**
  * The action menu: what it costs to press, where it lands, and what it dims.
@@ -27,6 +27,22 @@ test('the confirmation refuses a double-click and accepts a deliberate one', asy
   // dwell is the safeguard: the same pixel must do nothing at 90ms and remove at 450ms.
   await openBoard(page);
   await expectConfirmationArms(page);
+});
+
+test('the header opens the GitHub repository through the host', async ({ page }) => {
+  await openBoard(page);
+  await page.getByRole('button', { name: 'Open Landing Page on GitHub' }).click();
+  expect(await postedCount(page, 'openRepository')).toBe(1);
+});
+
+test('the New menu leaves bookmark selection to a group', async ({ page }) => {
+  await openBoard(page);
+  await page.getByRole('button', { name: 'New' }).click();
+  const menu = page.locator('.popover');
+  await expect(menu.getByRole('button', { name: 'Group' })).toBeVisible();
+  await expect(menu.getByRole('button', { name: 'Folder on disk' })).toBeVisible();
+  await expect(menu.getByRole('button', { name: 'Bookmark a folder' })).toHaveCount(0);
+  await expect(menu.getByRole('button', { name: 'Bookmark a file or workspace' })).toHaveCount(0);
 });
 
 test.describe('opened at the pointer in the corner', () => {
@@ -64,14 +80,14 @@ test.describe('opened at the pointer in the corner', () => {
   });
 });
 
-test('the scrim dims by colour, never by opacity', async ({ page }) => {
-  // The page's most-repeated trap: alpha belongs in the colour, never in `opacity`, because
+test('the scrim dims by color, never by opacity', async ({ page }) => {
+  // The page's most-repeated trap: alpha belongs in the color, never in `opacity`, because
   // `opacity` on a parent creates a stacking context its children cannot climb out of. That
   // applies to the *animation* too - fading the scrim in via `opacity` would dim the palette for
   // the length of the fade, and a child `opacity: 1` cannot undo it.
   await openBoard(page);
   await openCardMenu(page);
-  await menuItem(page, 'Accent colour').click();
+  await menuItem(page, 'Accent color').click();
   await page.locator('.palette').waitFor();
 
   // Read the entrance *while it is still running*. `getAnimations()` does not return a finished

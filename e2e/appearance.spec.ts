@@ -4,7 +4,7 @@ import { openBoard } from './board';
 /**
  * Does the board still look the same?
  *
- * This is the only layer that catches a colour token drifting, spacing changing, or type
+ * This is the only layer that catches a color token drifting, spacing changing, or type
  * shifting - none of which an aria snapshot or a geometry assertion can see. It is also the
  * layer that is easiest to make meaningless, in two ways worth stating:
  *

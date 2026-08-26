@@ -9,6 +9,8 @@
     - img
   - button "Clone a repository":
     - img
+  - button "Open Landing Page on GitHub":
+    - img
   - button "Settings":
     - img
   - heading "Nothing bookmarked yet" [level=2]

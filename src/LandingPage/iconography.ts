@@ -74,6 +74,7 @@ import svgPin from 'lucide-static/icons/pin.svg?raw';
 import svgPinOff from 'lucide-static/icons/pin-off.svg?raw';
 import svgSearch from 'lucide-static/icons/search.svg?raw';
 import svgFolderOpen from 'lucide-static/icons/folder-open.svg?raw';
+import svgGithub from 'lucide-static/icons/github.svg?raw';
 
 /**
  * Strips the fixed 24x24 sizing off a raw Lucide SVG so the CSS controls icon size.
@@ -84,7 +85,7 @@ import svgFolderOpen from 'lucide-static/icons/folder-open.svg?raw';
  * Only the opening `<svg>` tag is touched. Doing this over the whole file also strips the
  * `width`/`height` of child `<rect>` elements, which are geometry rather than sizing - that
  * collapsed them to nothing and silently blanked every icon drawn from rects, including both
- * layout buttons. Eleven of the seventy-four icons here contain such a child.
+ * layout buttons. Eleven of the seventy-five icons here contain such a child.
  *
  * @param source Raw SVG file contents.
  * @returns SVG markup sized by CSS rather than by its own attributes.
@@ -180,6 +181,7 @@ export const icons=
   'glyph-shop' : icon(svgShoppingBag),
   search : icon(svgSearch),
   folderOpen : icon(svgFolderOpen),
-  folderGit : icon(svgFolderGit2)
+  folderGit : icon(svgFolderGit2),
+  github : icon(svgGithub)
 
 };

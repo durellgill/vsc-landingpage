@@ -49,7 +49,7 @@ test('no entrance carries a transform, and the busy spinner still turns', async 
   await page.waitForTimeout(30);
   await sweep();
 
-  await menuItem(page, 'Accent colour').click();
+  await menuItem(page, 'Accent color').click();
   await page.locator('.palette').waitFor();
   await page.waitForTimeout(30);
   await sweep();

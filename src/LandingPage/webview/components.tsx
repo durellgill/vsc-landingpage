@@ -129,7 +129,7 @@ export function BookmarkCard({project,missing,branch,openMenu,carried,onCarry,dr
   // than from an `aria-label` carrying the label alone. `aria-label` *replaces* the name computed
   // from the content, so everything else on the card was silently unannounced - the path, the
   // branch, and the `Missing` badge, which is rendered as the literal word precisely so that the
-  // state is not carried by colour alone. Pointing at the elements also keeps the two in step:
+  // state is not carried by color alone. Pointing at the elements also keeps the two in step:
   // there is no second copy of the text to fall out of date.
   const labelId=`bm-${project.guid}-label`; const descId=`bm-${project.guid}-desc`;
   return <article class={`project interactable${carried?' dragging':''}`} tabIndex={0} role="button" aria-labelledby={labelId} aria-describedby={descId} data-guid={project.guid} data-shade={shade} data-kind={type} data-missing={missing?'yes':undefined} data-pinned={project.pinned?'yes':undefined} data-drop={dropEdge}
@@ -205,7 +205,7 @@ export function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,pick
       {project && <button onClick={()=>{post('copyPath',{guid:target.item.guid});close();}}><Svg name="copy"/><span>Copy path</span></button>}
       {project && <button onClick={()=>{post('patch',{guid:target.item.guid,field:'pinned',value:!target.item.pinned});close();}}><Svg name={target.item.pinned?'pinOff':'pin'}/><span>{target.item.pinned?'Unpin':'Pin to top'}</span></button>}
       {!sealed && <>{rename!==null ? <div class="ctxrename"><input ref={renameInput} value={rename} onInput={(event:any)=>setRename(event.currentTarget.value)} onKeyDown={(event:any)=>{if(event.key==='Enter')renameTarget();if(event.key==='Escape')close();}}/><button onClick={renameTarget}>Save</button><button onClick={close}>Cancel</button></div> : <button onClick={()=>setRename(target.item.label)}><Svg name="textCursorInput"/><span>Rename</span></button>}</>}
-      <button onClick={()=>setPicker('shade')}><Svg name="paintbrush"/><span>Accent colour</span></button>
+      <button onClick={()=>setPicker('shade')}><Svg name="paintbrush"/><span>Accent color</span></button>
       <button onClick={()=>setPicker('glyph')}><Svg name="image"/><span>Custom icon</span></button>
       {project && !sealed && <button onClick={()=>{post('moveToGroup',{guid:target.item.guid});close();}}><Svg name="folderInput"/><span>Move to group</span></button>}
       {/* The keyboard route to reordering groups. Dragging the title bar was the only way to do
@@ -254,12 +254,12 @@ export function HoverCard({reference,project,branch,missing}:{reference:any;proj
 
 
 /**
- * The accent-colour and custom-icon pickers.
+ * The accent-color and custom-icon pickers.
  *
- * Both are real dialogs rather than decorated `div`s. The colour swatches in particular used to
+ * Both are real dialogs rather than decorated `div`s. The color swatches in particular used to
  * be bare `<div>`s carrying only a click handler, which made the whole feature mouse-only: no
  * tab stop, no name, no focus ring. It was worse than an ordinary unreachable control, because
- * `ActionMenu` renders the palette *in place of* the menu - so choosing "Accent colour" from
+ * `ActionMenu` renders the palette *in place of* the menu - so choosing "Accent color" from
  * the keyboard replaced the menu with a surface holding nothing focusable, and the only way out
  * was Escape.
  *
@@ -269,10 +269,10 @@ export function HoverCard({reference,project,branch,missing}:{reference:any;proj
 export function Palette({type,x,y,choose,close}:any) {
   const anchor=useAnchored(x,y);
   useFocusTrap(anchor, true);
-  return <div class="modal" role="dialog" aria-modal="true" aria-label={type==='shade'?'Choose an accent colour':'Choose a custom icon'} onPointerUp={close}>
+  return <div class="modal" role="dialog" aria-modal="true" aria-label={type==='shade'?'Choose an accent color':'Choose a custom icon'} onPointerUp={close}>
     <div class={type==='shade'?'palette':'glyphpalette'} ref={anchor} onPointerUp={(event:any)=>event.stopPropagation()}>
       {type==='shade'
-        ? shades.map(shade=><button key={shade||'none'} type="button" data-shade={shade} aria-label={shade?shade[0].toUpperCase()+shade.slice(1):'No accent colour'} onClick={()=>choose(shade)}/>)
+        ? shades.map(shade=><button key={shade||'none'} type="button" data-shade={shade} aria-label={shade?shade[0].toUpperCase()+shade.slice(1):'No accent color'} onClick={()=>choose(shade)}/>)
         : <>{glyphs.map(([key])=><button key={key} type="button" title={key.slice(6)} aria-label={key.slice(6)} onClick={()=>choose(key.slice(6))}><Svg name={key}/></button>)}<button class="glyph-clear" type="button" title="No icon" aria-label="No custom icon" onClick={()=>choose('')}><Svg name="circleX"/></button></>}
     </div>
   </div>;

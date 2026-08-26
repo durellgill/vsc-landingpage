@@ -1,6 +1,6 @@
 /*
  *--- tokens and base --------------------------------------------------------
- * Everything the rest of the file resolves against, plus the page's own type and colour.
+ * Everything the rest of the file resolves against, plus the page's own type and color.
  * Kept as one rule: `.landingpage` is the scope every other selector is written under, and
  * splitting it would put the same selector in two places, which is the thing this file was
  * cleaned up to stop doing.
@@ -26,7 +26,7 @@
   --ease-move: cubic-bezier(.2, .7, .3, 1);
   --ease-hover: ease;
   --dur-press: .1s; /* press and release feedback, the fastest thing on the page */
-  --dur-hover: .15s; /* anything tracking the pointer: hover colour, the spine, drag feedback */
+  --dur-hover: .15s; /* anything tracking the pointer: hover color, the spine, drag feedback */
   --dur-enter: .18s; /* something appearing: a card, a menu, a tick, the hover popover */
   --dur-move: .22s; /* something travelling: FLIP, group height, the fold chevron */
   /*
@@ -264,7 +264,7 @@
  *
  * Buttons, not divs. These were bare `<div>`s with a click handler: unreachable by keyboard,
  * nameless to a screen reader, and with no focus style anywhere - and because `ActionMenu`
- * returns the palette *instead of* the menu, activating "Accent colour" without a mouse
+ * returns the palette *instead of* the menu, activating "Accent color" without a mouse
  * landed in a modal containing nothing focusable at all. The tag is also what scopes this
  * rule safely: `data-shade` is model state carried on groups and bookmark cards, so a
  * selector loose enough to reach those would turn a whole group into a patterned circle.
@@ -350,7 +350,7 @@
    * Scrim derived from the editor background, so it dims in dark themes instead of
    * washing the page white the way a hardcoded rgba(255,255,255,.5) did.
    *
-   * The alpha MUST live in the colour, not in `opacity`. `opacity` on a parent creates a
+   * The alpha MUST live in the color, not in `opacity`. `opacity` on a parent creates a
    * stacking context that children cannot exceed, so an opacity scrim silently rendered
    * the picker itself at 60% too - a child `opacity: 1` cannot undo it.
    */
@@ -1216,7 +1216,7 @@
   min-width: 0;
   display: flex;
   flex-direction: row;
-  align-items: baseline;
+  align-items: end;
   gap: var(--gapspace);
 }
 .landingpage .content .projects.list .project .textblock .project-label {
@@ -1255,7 +1255,7 @@
   min-width: 0;
   display: flex;
   flex-direction: row;
-  align-items: baseline;
+  align-items: end;
   gap: var(--gapspace-s);
 }
 .landingpage .content .projects.compact .project .textblock .project-label {
@@ -1320,7 +1320,7 @@
   display: flex;
   /*
    * `--shade-readable`, not the raw literal - this draws a glyph, not a fill. The .75
-   * opacity that used to quieten a fully saturated accent goes with it: the mixed colour
+   * opacity that used to quieten a fully saturated accent goes with it: the mixed color
    * is already calm, and stacking the two put the icon back under the 3:1 floor.
    */
   color: var(--shade-readable, var(--vscode-descriptionForeground));
@@ -1568,9 +1568,9 @@
  * target is - but still dashed, still a wash rather than a fill, and the label still says
  * to hold, because a release at this moment does nothing.
  *
- * The glyph and the label take the error colour *mixed into the foreground*, never the raw
+ * The glyph and the label take the error color *mixed into the foreground*, never the raw
  * one, which is the same rule the `data-shade` palette follows and for the same reason: the
- * fill underneath is made of that colour, so writing on it in the colour itself is writing
+ * fill underneath is made of that color, so writing on it in the color itself is writing
  * red on pink. Measured raw against the armed fill at 2.43:1 on light and 3.64:1 on dark,
  * where small text needs 4.5:1, while passing on high contrast at 5.24:1 - the usual way
  * this defect hides. 45% into the foreground clears it in all three, worst case 4.89:1 on
@@ -1697,7 +1697,7 @@
      * The duration list has to be replaced too, not just the property list. Durations are
      * matched to properties by position and repeat cyclically, so a declaration that said
      * `background-color .15s, transform .1s` would hand its second duration to whichever
-     * property now sits second - the press duration would end up driving a colour. One value
+     * property now sits second - the press duration would end up driving a color. One value
      * applies to all six.
      */
     transition-duration: var(--dur-hover) !important;
@@ -1711,7 +1711,7 @@
    * The focus ring is exempt from the duration above, for the same reason it is exempt from
    * the normal one - see `.project:focus`. Arrow-key navigation is the most repeated action
    * on this page and the ring is the only thing saying what Enter will open, so it has to be
-   * at its final colour before the next keypress rather than easing over 150ms behind it.
+   * at its final color before the next keypress rather than easing over 150ms behind it.
    * The blanket `transition-duration` in this block was silently handing the defect that rule
    * exists to prevent straight back to reduced-motion users, who are the least likely to want
    * it. `scale` and `translate` need no protection here: the property list above has already

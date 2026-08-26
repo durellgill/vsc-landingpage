@@ -88,7 +88,7 @@ For a faster interactive loop, install the workspace recommendations, run the `t
 
 F5 is not the quickest way to see a UI change. `npm run harness` builds everything and serves the *real* page at `http://localhost:5599` against a stubbed extension host, which gives you an ordinary browser console, an ordinary DOM inspector, and every message the page posts recorded on `window.__posted`.
 
-Stop the server when finished. Query strings select a state: `?empty` for the first-run state, `?theme=light` for a light editor theme, `?theme=hc` for Dark High Contrast, and `?healthy` to suppress the missing-target markers. The harness supplies the `--vscode-*` theme variables itself, so colours are real rather than missing.
+Stop the server when finished. Query strings select a state: `?empty` for the first-run state, `?theme=light` for a light editor theme, `?theme=hc` for Dark High Contrast, and `?healthy` to suppress the missing-target markers. The harness supplies the `--vscode-*` theme variables itself, so colors are real rather than missing.
 
 The harness renders the same HTML, CSS, and Preact bundle as the extension. It records outgoing messages on `window.__posted`. Assert messages and state for behavior; use screenshots only for appearance.
 

@@ -79,10 +79,10 @@ const model = {
 
 /**
  * The `--vscode-*` variables the CSS resolves against, taken from Dark Modern, Light Modern
- * and Dark High Contrast. Without these every colour in the page falls back to nothing and a
+ * and Dark High Contrast. Without these every color in the page falls back to nothing and a
  * visual check is worthless. `?theme=light` and `?theme=hc` render the other two sets.
  *
- * High contrast is not decoration here: the repo's own convention is that every colour must
+ * High contrast is not decoration here: the repo's own convention is that every color must
  * resolve to a `--vscode-*` variable and be checked in all three themes, and that theme is the
  * one that punishes anything relying on a subtle fill or a low-contrast border. It is also the
  * theme where a hover effect built from opacity alone stops being visible at all.
@@ -122,7 +122,7 @@ const themes = {
     'menu-selectionBackground': '#005fb8', 'menu-selectionForeground': '#ffffff', 'menu-separatorBackground': '#d4d4d4',
     'panel-border': '#e5e5e5', 'toolbar-hoverBackground': '#b8b8b850', 'terminal-ansiGreen': '#0dbc79'
   },
-  // Dark High Contrast. Pure black ground, white text, and a bright focus colour - the theme
+  // Dark High Contrast. Pure black ground, white text, and a bright focus color - the theme
   // that shows up anything depending on a faint outline or a translucent fill.
   hc: {
     'editor-background': '#000000', foreground: '#ffffff', 'descriptionForeground': '#ffffff',
@@ -170,6 +170,11 @@ const stub = `<script>
       // drives the tick. The webview never assumes success.
       if (message.command === 'copyPath') {
         setTimeout(() => window.dispatchEvent(new MessageEvent('message', {data: {command: 'pathCopied', guid: message.guid}})), 0);
+      }
+      // The VS Code host opens this in the system browser. The hosted harness has no host, so
+      // let its HTTPS deployment provide the equivalent new-tab link without affecting local tests.
+      if (message.command === 'openRepository' && location.protocol === 'https:') {
+        window.open('https://github.com/Durellg/vsc-landingpage', '_blank', 'noopener');
       }
       // Stands in for moveBookmark(): a card dragged to another group, or to a new position in
       // its own. Applying it here means a drop that lands in the wrong place is visible on the
