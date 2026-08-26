@@ -7,7 +7,7 @@ Project instructions for coding agents working on Landing Page.
 - [DEVELOP.md](DEVELOP.md) explains the build, test, browser harness, and packaging workflow.
 - [DECISIONS.md](DECISIONS.md) records product and architecture decisions. Change that file when a durable decision changes. Do not turn this file into a change log.
 - [README.md](README.md) describes the extension from a user's point of view.
-- [TODO.md](TODO.md) holds ordered, in-flight work with a definition of done. Durable rules belong in DECISIONS.md, not there.
+- Keep ordered, in-flight work with a definition of done in a local `TODO.md` when needed. Durable rules belong in DECISIONS.md, not there.
 
 ## Architecture
 
