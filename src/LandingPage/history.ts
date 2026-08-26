@@ -52,7 +52,8 @@ function mruGuid(uri:Uri):string
 
 export async function importVscRecentList():Promise<LandingPageProject[]>
 {
-  const recentWorkspaces: RecentlyOpenedItems = await commands.executeCommand("_workbench.getRecentlyOpened");
+  const recentWorkspaces = await commands.executeCommand<RecentlyOpenedItems|undefined>("_workbench.getRecentlyOpened");
+  if (!recentWorkspaces) {return [];}
 
   let result:LandingPageProject[]=[];
   for(let recentWorkspace of recentWorkspaces.workspaces)
@@ -84,7 +85,7 @@ export async function importVscRecentList():Promise<LandingPageProject[]>
     result.push({
       guid:mruGuid(recentFile.fileUri),
       path:recentFile.fileUri.toString(),
-      label:recentFile.label||nameParts.basename+'.'+nameParts.ext,
+      label:recentFile.label||(nameParts.ext ? nameParts.basename+'.'+nameParts.ext : nameParts.basename),
     });
   }
 

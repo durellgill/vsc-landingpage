@@ -37,10 +37,12 @@ export async function copyPath(guid:string|undefined, sharedModel:LandingPageMod
 /**
  * Quotes only text containing shell metacharacters. POSIX uses single quotes with embedded-quote reopening, while Windows uses double quotes.
  */
-export function shellQuote(text:string):string
+export function shellQuote(text:string, platform:string=process.platform):string
 {
-  if (!/[\s'"\\$`&|;<>()*?\[\]{}!#~]/.test(text)) {return text;}
+  // Backslash is a Windows path separator, not a character that needs quoting there.
+  const unsafe = platform==='win32' ? /[\s'"$`&|;<>()*?\[\]{}!#~]/ : /[\s'"\\$`&|;<>()*?\[\]{}!#~]/;
+  if (!unsafe.test(text)) {return text;}
 
-  if (process.platform==='win32') {return `"${text}"`;}
+  if (platform==='win32') {return `"${text}"`;}
   return `'${text.replace(/'/g, `'\\''`)}'`;
 }

@@ -50,7 +50,7 @@ Errors surface in two separate places, because the page is a sandboxed webview w
 | `npm run test:e2e:docker` | Runs the same suite inside the pinned Playwright Linux image. | Reproducing a CI browser failure, or touching a Linux pixel baseline. |
 | `npm run vsix` | Builds the installable package and runs the prepublish build. | Before release or manual installation testing. |
 
-One Windows-only shell-quoting test is expected to be skipped on macOS and Linux. Every other skipped, flaky, or failed check needs an explanation.
+Every skipped, flaky, or failed check needs an explanation.
 
 ## The three test layers, and what each one can see
 

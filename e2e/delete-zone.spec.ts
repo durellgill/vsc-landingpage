@@ -28,6 +28,17 @@ async function carryFirstCardToTheZone(page: Page) {
   return target;
 }
 
+test('a duration authored in milliseconds arms on the millisecond timescale', async ({ page }) => {
+  await openBoard(page);
+  await page.locator('.landingpage').evaluate(element => element.style.setProperty('--dur-arm', '40ms'));
+
+  await carryFirstCardToTheZone(page);
+
+  await expect(page.locator('.dropbin[data-armed]'), 'the millisecond dwell duration was treated as seconds').toBeAttached({ timeout: 500 });
+  await expect(page.locator('.project.dragging'), 'the bookmark was released while checking the dwell').toBeAttached();
+  expect(await postedCount(page, 'remove'), 'the dwell removed the bookmark without a release').toBe(0);
+});
+
 test('an early release is refused and an armed stationary release removes', async ({ page }) => {
   // The bug was a split verdict: the dwell timer changed the label to "Release to remove", while
   // the last `dragover` had already recorded `dropEffect: none`. Chromium then cancelled the

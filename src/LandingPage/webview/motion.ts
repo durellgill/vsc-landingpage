@@ -21,9 +21,11 @@ export function motion(token:'--dur-move'|'--dur-hover'|'--dur-arm'='--dur-move'
   const page = document.querySelector('.landingpage');
   if (!page) {return fallback;}
   const style = getComputedStyle(page);
-  const seconds = parseFloat(style.getPropertyValue(token));
+  // CSS time syntax permits seconds and milliseconds; WAAPI wants milliseconds.
+  const value = style.getPropertyValue(token).trim();
+  const milliseconds = parseFloat(value) * (value.endsWith('ms') ? 1 : 1000);
   const resolved = {
-    duration: Number.isFinite(seconds) ? seconds*1000 : fallback.duration,
+    duration: Number.isFinite(milliseconds) ? milliseconds : fallback.duration,
     easing: style.getPropertyValue('--ease-move').trim() || fallback.easing,
   };
   motionTokens.set(token, resolved);
