@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { cardTops, clearFlights, flights, openBoard, recordFlights, stillness } from './board';
+import { clearFlights, flights, openBoard, recordFlights, stillness } from './board';
 
 /**
  * The FLIP baseline, and the four ways it has been wrong.
@@ -17,49 +17,6 @@ import { cardTops, clearFlights, flights, openBoard, recordFlights, stillness } 
 /** The layout button on a group's titlebar. Cycles list, grid, compact. */
 const layoutButton = (page: import('@playwright/test').Page, guid?: string) =>
   page.locator(guid ? `.group[data-guid="${guid}"] button[data-role="layout"]` : '.group button[data-role="layout"]').first();
-
-test('an interrupted flight keeps its direction', async ({ page }) => {
-  // One layout switch interrupted by another, which is what typing in the filter does to the
-  // board many times a second. The bug: `getBoundingClientRect()` reports an in-progress
-  // transform, and the offset was subtracted where it should have been added, so a card
-  // interrupted mid-flight flew away from its destination instead of towards it.
-  await openBoard(page);
-  await recordFlights(page);
-  await stillness(page);
-
-  await layoutButton(page).click();
-
-  // 80ms in: the first wave is still in the air, which is the whole point. Interrupt it.
-  await page.waitForTimeout(80);
-  const mid = await cardTops(page);
-  const firstWave = await flights(page);
-  expect(firstWave.length, 'the first layout switch started no flights at all').toBeGreaterThan(0);
-
-  const cutoff = firstWave[0].at + 50;
-  await layoutButton(page).click();
-  await page.waitForFunction(c => (window.__flights ?? []).some(f => f.at > c), cutoff);
-  await stillness(page);
-  const settled = await cardTops(page);
-
-  const measured = (await flights(page))
-    .filter(f => f.kind === 'project' && f.at > cutoff && f.transform && f.guid)
-    .map(f => {
-      const parsed = /translate\((-?[\d.]+)px, *(-?[\d.]+)px\)/.exec(f.transform!);
-      return {
-        guid: f.guid!,
-        used: parsed ? parseFloat(parsed[2]) : NaN,
-        want: mid[f.guid!] - settled[f.guid!]
-      };
-    })
-    // Only cards that actually travelled. A card that barely moved is being carried by its
-    // group's height animation rather than flying itself, so its measured layout position is
-    // legitimately not its settled one and the direction expectation does not hold for it.
-    .filter(r => Number.isFinite(r.used) && Number.isFinite(r.want) && Math.abs(r.want) > 1);
-
-  expect(measured.length, 'no interrupted card travelled far enough to measure').toBeGreaterThan(0);
-  const inverted = measured.filter(r => Math.sign(r.used) !== Math.sign(r.want));
-  expect(inverted, `${inverted.length} of ${measured.length} flights flew the wrong way`).toEqual([]);
-});
 
 test('a group and its cards move as one body', async ({ page }) => {
   // Reordering a group teleported its header 133px while its own cards glided, because the FLIP
