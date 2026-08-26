@@ -47,6 +47,9 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# Local Vercel project link. It identifies this checkout to Vercel but is not project source.
+.vercel/
+
 # VS Code extension packaging files
 *.vsix
 *.vscode-test

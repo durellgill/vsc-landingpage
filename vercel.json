@@ -1,0 +1,14 @@
+{
+  "buildCommand": "npm run build:harness",
+  "functions": {
+    "api/index.mjs": {
+      "includeFiles": "out/harness-render.mjs"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index"
+    }
+  ]
+}

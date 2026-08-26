@@ -294,8 +294,8 @@ function recentsModel() {
   return board;
 }
 
-const server = createServer(async (request, response) => {
-  const url = new URL(request.url, 'http://localhost');
+/** Renders the landing page harness for the local server and Vercel function. */
+export async function renderLandingPageHarness(url) {
   const payload = url.searchParams.has('empty') ? {groups: []}
     : url.searchParams.has('recents') ? recentsModel()
     : model;
@@ -312,14 +312,23 @@ const server = createServer(async (request, response) => {
   html = html.replace('</head>', themeStyle(url.searchParams.get('theme')) + '</head>');
   // The harness is served over http, where the webview CSP meta tag only gets in the way.
   html = html.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/, '');
-  response.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
-  response.end(html);
-});
+  return html;
+}
 
-server.listen(port, () => {
-  console.log(`Landing page harness: http://localhost:${port}/  (append ?empty for the empty state, ?recents for hidden entries and paging)`);
-});
+const runsAsHarnessCommand = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
+if (runsAsHarnessCommand) {
+  const server = createServer(async (request, response) => {
+    const url = new URL(request.url, 'http://localhost');
+    const html = await renderLandingPageHarness(url);
+    response.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
+    response.end(html);
+  });
 
-for (const signal of ['SIGINT', 'SIGTERM']) {
-  process.on(signal, () => { server.close(); process.exit(0); });
+  server.listen(port, () => {
+    console.log(`Landing page harness: http://localhost:${port}/  (append ?empty for the empty state, ?recents for hidden entries and paging)`);
+  });
+
+  for (const signal of ['SIGINT', 'SIGTERM']) {
+    process.on(signal, () => { server.close(); process.exit(0); });
+  }
 }
