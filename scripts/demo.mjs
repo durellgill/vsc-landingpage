@@ -13,7 +13,7 @@
  *  - answers `refreshRecents` by rebuilding the Recent group, so the refresh control can
  *    actually be exercised
  *
- * Usage: `npm run harness` then open the printed URL. `?empty` renders the empty state.
+ * Usage: `npm run demo` then open the printed URL. `?empty` renders the empty state.
  */
 
 import { createServer } from 'node:http';
@@ -22,15 +22,15 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const rendererPath = join(root, 'out', 'harness-render.mjs');
-const harnessCspNonce = 'vsc-landingpage-harness';
+const rendererPath = join(root, 'out', 'demo-render.mjs');
+const demoCspNonce = 'vsc-landingpage-demo';
 
 /**
  * Loads the renderer, reloading it whenever the build has produced a newer one.
  *
  * Node caches ES modules by specifier for the life of the process, so importing once at
  * startup means every rebuild is invisible until the server is restarted - and a page that
- * silently serves the previous build is worse than no harness at all. The mtime query string
+ * silently serves the previous build is worse than no demo at all. The mtime query string
  * is what makes the specifier change.
  */
 let cached = {mtime: 0, render: null};
@@ -43,7 +43,7 @@ async function renderer() {
   return cached.render;
 }
 
-const port = Number(process.env.HARNESS_PORT || 5599);
+const port = Number(process.env.DEMO_PORT || 5599);
 
 /** A model wide enough to exercise every layout, both group kinds and a dead path. */
 const model = {
@@ -163,7 +163,7 @@ const stub = `<script>
       if (message.command === 'restoreHiddenRecents') { unhideAll(); }
       if (message.command === 'documentReady' || message.command === 'refreshRecents') { sync(); }
       // 'patch' is the host's persist-then-resync path. Applying it here means state that
-      // lives in the model - layout, shade, collapsed - actually round-trips in the harness
+      // lives in the model - layout, shade, collapsed - actually round-trips in the demo
       // instead of appearing to do nothing.
       if (message.command === 'patch') { patch(message); sync(); }
       // Stands in for copyPath(): the host writes the clipboard and confirms, which is what
@@ -171,10 +171,10 @@ const stub = `<script>
       if (message.command === 'copyPath') {
         setTimeout(() => window.dispatchEvent(new MessageEvent('message', {data: {command: 'pathCopied', guid: message.guid}})), 0);
       }
-      // The VS Code host opens this in the system browser. The hosted harness has no host, so
+      // The VS Code host opens this in the system browser. The hosted demo has no host, so
       // let its HTTPS deployment provide the equivalent new-tab link without affecting local tests.
       if (message.command === 'openLiveDemo' && location.protocol === 'https:') {
-        window.open('https://vsc-landingpage-harness.vercel.app/', '_blank', 'noopener');
+        window.open('https://vsc-landingpage-demo.vercel.app/', '_blank', 'noopener');
       }
       // Stands in for moveBookmark(): a card dragged to another group, or to a new position in
       // its own. Applying it here means a drop that lands in the wrong place is visible on the
@@ -299,38 +299,38 @@ function recentsModel() {
   return board;
 }
 
-/** Renders the landing page harness for the local server and Vercel function. */
-export async function renderLandingPageHarness(url) {
+/** Renders the landing page demo for the local server and Vercel function. */
+export async function renderLandingPageDemo(url) {
   const payload = url.searchParams.has('empty') ? {groups: []}
     : url.searchParams.has('recents') ? recentsModel()
     : model;
-  let html = (await renderer())("'self'", harnessCspNonce);
+  let html = (await renderer())("'self'", demoCspNonce);
   // The stub must be installed before the bundle runs, so it goes ahead of the page script.
   // ?healthy suppresses the missing-target verdict, for checking the undecorated board.
   const missing = url.searchParams.has('healthy') ? [] : ['p-6'];
   // Branch labels the host would have read from .git/HEAD, including a long one to check
   // that the badge truncates rather than pushing the path out of the card.
   const branches = {'p-1': 'main', 'p-2': 'feature/very-long-branch-name-here', 'MRU:a': 'main'};
-  const pageScriptTag = `<script nonce="${harnessCspNonce}">`;
+  const pageScriptTag = `<script nonce="${demoCspNonce}">`;
   html = html.replace(pageScriptTag, stub.replace('__MODEL__', JSON.stringify(payload)).replace('__MISSING__', JSON.stringify(missing)).replace('__BRANCHES__', JSON.stringify(branches)) + `\n${pageScriptTag}`);
   // Theme variables go last in <head> so they win over anything the page defines itself.
   html = html.replace('</head>', themeStyle(url.searchParams.get('theme')) + '</head>');
-  // The harness is served over http, where the webview CSP meta tag only gets in the way.
+  // The demo is served over http, where the webview CSP meta tag only gets in the way.
   html = html.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/, '');
   return html;
 }
 
-const runsAsHarnessCommand = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
-if (runsAsHarnessCommand) {
+const runsAsDemoCommand = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
+if (runsAsDemoCommand) {
   const server = createServer(async (request, response) => {
     const url = new URL(request.url, 'http://localhost');
-    const html = await renderLandingPageHarness(url);
+    const html = await renderLandingPageDemo(url);
     response.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
     response.end(html);
   });
 
   server.listen(port, () => {
-    console.log(`Landing page harness: http://localhost:${port}/  (append ?empty for the empty state, ?recents for hidden entries and paging)`);
+    console.log(`Landing page demo: http://localhost:${port}/  (append ?empty for the empty state, ?recents for hidden entries and paging)`);
   });
 
   for (const signal of ['SIGINT', 'SIGTERM']) {

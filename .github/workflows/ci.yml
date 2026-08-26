@@ -59,7 +59,7 @@ jobs:
       # a real extension host, which needs a display; `xvfb-run` supplies one.
       - run: xvfb-run -a npm test
 
-  # Browser-level checks against the real page, served by the harness. Runs in the Playwright
+  # Browser-level checks against the real page, served by the demo. Runs in the Playwright
   # image so the browsers and their system libraries are already present and match the pinned
   # dependency exactly - the same image `npm run test:e2e:docker` uses locally, which is what
   # makes a baseline generated in one comparable to a run in the other.

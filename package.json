@@ -23,7 +23,7 @@
     "type": "git",
     "url": "https://github.com/durellgill/vsc-landingpage"
   },
-  "homepage": "https://vsc-landingpage-harness.vercel.app/",
+  "homepage": "https://vsc-landingpage-demo.vercel.app/",
   "bugs": {
     "url": "https://github.com/durellgill/vsc-landingpage/issues"
   },
@@ -173,7 +173,7 @@
     "vscode:prepublish": "npm run package",
     "build:webview": "vite build --config vite.config.webview.mts",
     "build:extension": "vite build --config vite.config.extension.mts",
-    "build:harness": "vite build --config vite.config.harness.mts",
+    "build:demo": "vite build --config vite.config.demo.mts",
     "compile": "npm run build:webview && npm run build:extension",
     "watch": "node scripts/watch.mjs",
     "package": "npm run compile",
@@ -186,7 +186,7 @@
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test --fail-zero",
-    "harness": "npm run compile && npm run build:harness && node scripts/harness.mjs",
+    "demo": "npm run compile && npm run build:demo && node scripts/demo.mjs",
     "fallow": "fallow",
     "fallow:audit": "fallow audit --base origin/main",
     "impeccable": "impeccable",

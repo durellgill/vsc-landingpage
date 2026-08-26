@@ -25,7 +25,7 @@ export interface MessageFromWebview
 }
 
 /**
- * `postMessage` serializes a fresh object, so harness substitutes must `structuredClone` model data before handing it to Preact.
+ * `postMessage` serializes a fresh object, so demo substitutes must `structuredClone` model data before handing it to Preact.
  */
 export function syncModelInWebview(webviewPanel:vscode.WebviewPanel, sharedModel:LandingPageModel):void
 {

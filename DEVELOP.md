@@ -45,8 +45,8 @@ Errors surface in two separate places, because the page is a sandboxed webview w
 | `npm run lint` | Checks the TypeScript source for static defects. | Every code change. |
 | `npm run compile` | Builds the webview first and then the extension bundle. | Every code change and before F5. |
 | `npm test` | Runs the extension tests in the pinned VS Code 1.125 Extension Development Host. | Host logic, commands, storage, packaging, and before a commit. |
-| `npm run harness` | Builds and serves the real webview with a stubbed host at `http://localhost:5599`. | Webview behavior and visual work. |
-| `npm run test:e2e` | Drives the real page in Chromium through the harness: accessible names, geometry, focus, appearance, and every interaction regression - clicks, drags, dwell timers, and interrupted animations. | Webview behavior, layout, drag and drop, menus, focus, motion, or visual work. |
+| `npm run demo` | Builds and serves the real webview with a stubbed host at `http://localhost:5599`. | Webview behavior and visual work. |
+| `npm run test:e2e` | Drives the real page in Chromium through the demo: accessible names, geometry, focus, appearance, and every interaction regression - clicks, drags, dwell timers, and interrupted animations. | Webview behavior, layout, drag and drop, menus, focus, motion, or visual work. |
 | `npm run test:e2e:docker` | Runs the same suite inside the pinned Playwright Linux image. | Reproducing a CI browser failure, or touching a Linux pixel baseline. |
 | `npm run vsix` | Builds the installable package and runs the prepublish build. | Before release or manual installation testing. |
 
@@ -78,19 +78,19 @@ Three of them assert a negative: a scroll starts no flights, a resize flies nobo
 
 ## Why the integration tests use VS Code
 
-The extension host imports the `vscode` API, which exists only inside a VS Code Extension Development Host. The test CLI therefore downloads a pinned VS Code runtime into `.vscode-test/`. That is expected and gives the integration tests the same API and process boundary as the shipped extension. The browser harness does not replace this layer because it only tests the webview and a stubbed message bridge.
+The extension host imports the `vscode` API, which exists only inside a VS Code Extension Development Host. The test CLI therefore downloads a pinned VS Code runtime into `.vscode-test/`. That is expected and gives the integration tests the same API and process boundary as the shipped extension. The browser demo does not replace this layer because it only tests the webview and a stubbed message bridge.
 
 You do not need to install or commit a separate VS Code binary manually. `.vscode-test/` is a disposable, Git-ignored test cache: roughly a 315 MB download and 1 GB on disk. It is excluded from the .vsix, so it only ever costs local disk. Delete it any time with `rm -rf .vscode-test` and the next `npm test` re-downloads it. F5 downloads nothing, because it uses your installed VS Code.
 
 For a faster interactive loop, install the workspace recommendations, run the `tasks: watch-tests` task, and use VS Code's Testing view through the Extension Test Runner. That uses your installed VS Code; the pinned CLI run remains the reproducible check for automation and releases.
 
-## Browser harness
+## Browser demo
 
-F5 is not the quickest way to see a UI change. `npm run harness` builds everything and serves the *real* page at `http://localhost:5599` against a stubbed extension host, which gives you an ordinary browser console, an ordinary DOM inspector, and every message the page posts recorded on `window.__posted`.
+F5 is not the quickest way to see a UI change. `npm run demo` builds everything and serves the *real* page at `http://localhost:5599` against a stubbed extension host, which gives you an ordinary browser console, an ordinary DOM inspector, and every message the page posts recorded on `window.__posted`.
 
-Stop the server when finished. Query strings select a state: `?empty` for the first-run state, `?theme=light` for a light editor theme, `?theme=hc` for Dark High Contrast, and `?healthy` to suppress the missing-target markers. The harness supplies the `--vscode-*` theme variables itself, so colors are real rather than missing.
+Stop the server when finished. Query strings select a state: `?empty` for the first-run state, `?theme=light` for a light editor theme, `?theme=hc` for Dark High Contrast, and `?healthy` to suppress the missing-target markers. The demo supplies the `--vscode-*` theme variables itself, so colors are real rather than missing.
 
-The harness renders the same HTML, CSS, and Preact bundle as the extension. It records outgoing messages on `window.__posted`. Assert messages and state for behavior; use screenshots only for appearance.
+The demo renders the same HTML, CSS, and Preact bundle as the extension. It records outgoing messages on `window.__posted`. Assert messages and state for behavior; use screenshots only for appearance.
 
 ## Container runs
 
@@ -108,7 +108,7 @@ Architecture matters here, and only for pixel baselines. Colima's default VM is 
 - Add browser interaction regressions to `e2e/` when a build, typecheck, or DOM-only assertion cannot catch the defect. Geometry and posted messages over screenshots: a pixel diff showing a red rectangle is worse than an assertion saying the focus ring escaped its clip.
 - Prefer condition-based waits over fixed delays. Use an elapsed delay only when proving that something did not happen during a safeguard window.
 - Reproduce a bug first and confirm the new regression fails against the broken implementation before applying the fix.
-- Keep the harness message timing and data serialization aligned with the real extension host.
+- Keep the demo message timing and data serialization aligned with the real extension host.
 - Test both the safe and destructive paths for confirmations and drag-to-delete behavior.
 
 ## Agent tooling
@@ -119,7 +119,7 @@ Two analysis CLIs are ordinary dev dependencies, so `npm install` is all a fresh
 |---|---|
 | `npm run fallow:audit` | Dead code, complexity, duplication, and style drift in the diff against `origin/main`. Configured by `.fallowrc.json`. |
 | `npm run fallow -- health --hotspots` | Any other Fallow subcommand; the script is a passthrough. |
-| `npm run impeccable -- detect http://localhost:5599/` | UI anti-pattern scan of the running harness. It measures a rendered page, so pointing it at source files silently reports nothing. |
+| `npm run impeccable -- detect http://localhost:5599/` | UI anti-pattern scan of the running demo. It measures a rendered page, so pointing it at source files silently reports nothing. |
 
 Neither is wired into `pretest`. They are advisory and their findings are noisy on this codebase, so read them, do not gate on them.
 

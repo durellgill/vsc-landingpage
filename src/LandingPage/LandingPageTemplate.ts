@@ -6,7 +6,7 @@ import landingpageCss from './content/landingpage.css?inline';
 import landingpageJs from './content/dist/landingpage-preact.js?raw';
 
 /**
- * Has no `vscode` dependency, so the harness and extension render exactly the same page.
+ * Has no `vscode` dependency, so the demo and extension render exactly the same page.
  */
 export function renderLandingPage(cspSource:string, cspNonce:string):string
 {

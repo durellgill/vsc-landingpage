@@ -12,7 +12,7 @@ import { expect, type Page } from '@playwright/test';
  * `toHaveScreenshot` does its own two-frame stability check on top of this. The wait still
  * belongs here, because the aria and geometry specs do not get that for free.
  *
- * @param query Harness query string: `?empty`, `?theme=light`, `?healthy`, or nothing.
+ * @param query Demo query string: `?empty`, `?theme=light`, `?healthy`, or nothing.
  */
 export async function openBoard(page: Page, query = '') {
   await page.goto(`/${query}`);
@@ -111,7 +111,7 @@ export const cardTops = (page: Page) => page.evaluate(() =>
   Object.fromEntries([...document.querySelectorAll<HTMLElement>('.project')]
     .map(c => [c.dataset.guid ?? '', c.getBoundingClientRect().top])));
 
-/** How many messages the page has posted to the host. The harness records these. */
+/** How many messages the page has posted to the host. The demo records these. */
 export const postedCount = (page: Page, command?: string) => page.evaluate((only) => {
   const posted = (window as unknown as { __posted?: { command: string }[] }).__posted ?? [];
   return only ? posted.filter(m => m.command === only).length : posted.length;

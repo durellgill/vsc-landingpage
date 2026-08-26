@@ -1,8 +1,8 @@
 {
-  "buildCommand": "npm run build:harness",
+  "buildCommand": "npm run build:demo",
   "functions": {
     "api/index.mjs": {
-      "includeFiles": "out/harness-render.mjs"
+      "includeFiles": "out/demo-render.mjs"
     }
   },
   "rewrites": [

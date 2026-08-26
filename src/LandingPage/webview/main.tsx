@@ -353,7 +353,7 @@ function App() {
      * - the `bookmarkHealth` reply that follows every sync, a hover, a keystroke - compares
      * against the stale baseline and flies the whole board back up and down again. Adding one
      * bookmark to a group made both groups below it jump 20.6px and settle, measured in the
-     * harness, which is exactly the "weird refresh" of groups that were not touched.
+     * demo, which is exactly the "weird refresh" of groups that were not touched.
      *
      * So the positions are measured once more after everything has landed. Both sets have to be
      * waited on: the heights, and this effect's own flights, since a rect read while either is
@@ -378,7 +378,7 @@ function App() {
    * re-wraps every grid and re-flows every group, nothing re-renders, and then the next render
    * for any reason at all reads that stale baseline as movement and flies groups nobody touched.
    *
-   * Measured in the harness: narrow the panel, then switch `Recent` to another layout, and an
+   * Measured in the demo: narrow the panel, then switch `Recent` to another layout, and an
    * untouched group above it slid its card 34px sideways - the width it lost to the resize,
    * animated a beat late by the click that came after it.
    *

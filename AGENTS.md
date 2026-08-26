@@ -4,7 +4,7 @@ Project instructions for coding agents working on Landing Page.
 
 ## Read first
 
-- [DEVELOP.md](DEVELOP.md) explains the build, test, browser harness, and packaging workflow.
+- [DEVELOP.md](DEVELOP.md) explains the build, test, browser demo, and packaging workflow.
 - [DECISIONS.md](DECISIONS.md) records product and architecture decisions. Change that file when a durable decision changes. Do not turn this file into a change log.
 - [README.md](README.md) describes the extension from a user's point of view.
 - Keep ordered, in-flight work with a definition of done in a local `TODO.md` when needed. Durable rules belong in DECISIONS.md, not there.
@@ -80,11 +80,11 @@ Read [DECISIONS.md](DECISIONS.md) before changing these constraints. Update the 
 
 ## Verification
 
-Run the checks listed in [DEVELOP.md](DEVELOP.md). For a UI or interaction change, a green build is not enough. Exercise the real page through `npm run harness`, inspect the console, and assert on `window.__posted` messages.
+Run the checks listed in [DEVELOP.md](DEVELOP.md). For a UI or interaction change, a green build is not enough. Exercise the real page through `npm run demo`, inspect the console, and assert on `window.__posted` messages.
 
 Any regression check added for a bug must be observed failing against the broken implementation before the fix is accepted.
 
-Stop every harness or development server you start and confirm its port is free. Close every browser automation session you create.
+Stop every demo or development server you start and confirm its port is free. Close every browser automation session you create.
 
 Container checks run on Colima, not Docker Desktop. Run `colima start` before `npm run test:e2e:docker` and `colima stop` afterwards; the `docker` CLI alone has no daemon behind it. The VM is aarch64 and CI is x86_64, so never generate Linux pixel baselines here. See [DEVELOP.md](DEVELOP.md).
 

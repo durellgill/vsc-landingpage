@@ -22,7 +22,7 @@ Every entry uses the same five fields, so a specific field can be searched acros
 | Motion tokens, durations, reduced motion                 | D013        |
 | Menus, palettes, popovers, focus restoration             | D014        |
 | Keyboard navigation, screen readers, ARIA                | D015        |
-| Test layering, harness, regression checks                | D016        |
+| Test layering, demo, regression checks                   | D016        |
 | Accent marks, gutter, spine geometry                     | D012a, D017 |
 | Page width, centring, filter sizing                      | D018        |
 | Focus rings, outlines, ancestor clipping                 | D019, D014  |
@@ -112,7 +112,7 @@ Reason: Rendered order differs from stored order when bookmarks are pinned, and 
 
 Considered instead: Carrying the rendered index in the drag payload. Rejected because pinning makes rendered index and stored index diverge, so the drop lands in the wrong place for exactly the boards that use pinning most. Also considered: writing pin state into stored order, rejected because unpinning then cannot restore the previous position.
 
-Consequences: `beforeGuid` names the landing point. `moveBookmark` resolves it after removing the source. `moveGroup` adjusts downward indices after the source gap closes. Group drop handlers stop propagation so the page-level gap handler does not post a second move. This is the most timing-sensitive logic in the repository and is only provable through the harness, not through unit tests.
+Consequences: `beforeGuid` names the landing point. `moveBookmark` resolves it after removing the source. `moveGroup` adjusts downward indices after the source gap closes. Group drop handlers stop propagation so the page-level gap handler does not post a second move. This is the most timing-sensitive logic in the repository and is only provable through the demo, not through unit tests.
 
 ## D008: Drag-to-delete uses a dwell safeguard
 
@@ -232,13 +232,13 @@ Do not put `aria-label` on a bookmark card. The colocated Mocha tests are host-o
 
 Status: active
 
-Decision: Pure host logic uses colocated Mocha tests inside the VS Code Extension Host. Browser behavior uses the real harness and asserts on posted messages and geometry. Screenshots confirm appearance but do not prove behavior.
+Decision: Pure host logic uses colocated Mocha tests inside the VS Code Extension Host. Browser behavior uses the real demo and asserts on posted messages and geometry. Screenshots confirm appearance but do not prove behavior.
 
 Reason: Typechecking, linting, and bundling cannot detect timing, focus, drag, clipping, or animation bugs.
 
 Considered instead: A separate `test/` tree. Rejected because colocation puts a behaviour and its specification in one search, and `.vscodeignore` already excludes `src/**` and `**/*.ts` from the package, so a separate tree buys nothing at packaging time either. Also considered: treating screenshots as proof, rejected because appearance and behaviour fail independently.
 
-Consequences: Run the full matrix in `DEVELOP.md`. A regression check must fail against the broken implementation before the fix. The harness must mirror serialization and message timing from the real host - nothing detects drift between the stub and the real host, so a harness that has diverged keeps passing while proving nothing.
+Consequences: Run the full matrix in `DEVELOP.md`. A regression check must fail against the broken implementation before the fix. The demo must mirror serialization and message timing from the real host - nothing detects drift between the stub and the real host, so a demo that has diverged keeps passing while proving nothing.
 
 ## D017: One accent mark, in one gutter, at one width
 
@@ -279,7 +279,7 @@ Considered instead: Keeping the ring inside the card, rejected because the ring 
 Also considered lifting the fold clip, rejected because the surviving clipped container is what gives the fold animation a box after its cards unmount.
 
 Consequences: A card is guaranteed 6px outside itself and no more, so any future resting outline, shadow, or halo on `.project` must fit inside that allowance.
-The margin has no per-axis form in Chromium, so `e2e/fold.spec.ts` retains the mid-flight guard and focus-indicator changes must be inspected in both list and grid layouts through the harness.
+The margin has no per-axis form in Chromium, so `e2e/fold.spec.ts` retains the mid-flight guard and focus-indicator changes must be inspected in both list and grid layouts through the demo.
 This remains the in-page counterpart to D014: the popover top layer solves clipping for surfaces, while ordinary elements must be granted paint room explicitly.
 
 ## D020: Committed browser tests use Playwright; agent-browser stays interactive

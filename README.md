@@ -4,7 +4,7 @@ Landing Page is a customizable VS Code start page for bookmark groups and recent
 
 ![The board: two user groups in list and grid layout, a missing target marked, and Recent below](doc/img/landing-page-dark.png)
 
-[View the live demo](https://vsc-landingpage-harness.vercel.app/).
+[View the live demo](https://vsc-landingpage-demo.vercel.app/).
 
 A fork of [René Bühling's Landing Page](https://github.com/renebuehling/vsc-landingpage), MIT licensed.
 

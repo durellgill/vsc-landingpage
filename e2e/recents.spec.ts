@@ -10,7 +10,7 @@ import { openBoard, postedCount, stillness } from './board';
  * `maxRecentItems` - so in both cases the page shows a shorter list than the history holds and
  * gives no sign that it has done so.
  *
- * `?recents` is the harness state these need: a Recent group carrying hidden entries and another
+ * `?recents` is the demo state these need: a Recent group carrying hidden entries and another
  * page behind it. Its own query rather than the default model, so the appearance baselines are
  * not rewritten by a button that only some boards show.
  */
@@ -77,7 +77,7 @@ test.describe('hidden recents', () => {
   });
 
   test('the surface says so when nothing is hidden, rather than opening empty', async ({ page }) => {
-    // The default harness board has no hidden entries. An empty dialog with no explanation reads
+    // The default demo board has no hidden entries. An empty dialog with no explanation reads
     // as a broken feature; the absence of hidden entries is information the user came here for.
     await openBoard(page);
     await openRecentMenu(page);

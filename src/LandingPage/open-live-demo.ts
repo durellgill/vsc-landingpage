@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-const LANDING_PAGE_LIVE_DEMO_URL = 'https://vsc-landingpage-harness.vercel.app/';
+const LANDING_PAGE_LIVE_DEMO_URL = 'https://vsc-landingpage-demo.vercel.app/';
 
 /** Opens the live Landing Page demo in the user's external browser. */
 export async function openLandingPageLiveDemo():Promise<void>

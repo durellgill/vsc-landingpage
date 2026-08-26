@@ -3,8 +3,8 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * Browser-level ground truth for the page.
  *
- * These specs drive the real webview through the harness, which serves the identical HTML the
- * extension inlines against a stubbed host (see `scripts/harness.mjs`). They cover what the
+ * These specs drive the real webview through the demo, which serves the identical HTML the
+ * extension inlines against a stubbed host (see `scripts/demo.mjs`). They cover what the
  * extension-host suite structurally cannot reach: accessible names, geometry, focus, drag, and
  * appearance. The layering is D016; the choice of Playwright over `agent-browser` is D020.
  *
@@ -14,11 +14,11 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './e2e',
 
-  // The harness builds both bundles before it serves, so this one command covers compile and
-  // serve. `reuseExistingServer` locally means an already-running harness is used as-is, which
+  // The demo builds both bundles before it serves, so this one command covers compile and
+  // serve. `reuseExistingServer` locally means an already-running demo is used as-is, which
   // keeps the loop fast; on CI it is always started fresh so a stale server cannot be inherited.
   webServer: {
-    command: 'npm run harness',
+    command: 'npm run demo',
     url: 'http://localhost:5599/',
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
