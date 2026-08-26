@@ -61,17 +61,17 @@
       },
       {
         "command": "vsc-landingpage.addToGroup",
-        "title": "Add to Landing Page Group",
+        "title": "Add to Landing Page Group 📌",
         "category": "Landing Page"
       },
       {
         "command": "vsc-landingpage.openInNewWorkspace",
-        "title": "Open in New Workspace",
+        "title": "Open in New Workspace 📂",
         "category": "Landing Page"
       },
       {
         "command": "vsc-landingpage.openParentInNewWorkspace",
-        "title": "Open Parent Folder in New Workspace",
+        "title": "Open Parent Folder in New Workspace 📂",
         "category": "Landing Page"
       },
       {
