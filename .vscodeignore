@@ -31,6 +31,14 @@ skills-lock.json
 # CI configuration. Runs on GitHub, means nothing inside an installed extension.
 .github/**
 
+# Vercel deployment configuration stays in Git but does not belong in the installed extension.
+.env.local
+.env.*.local
+.vercel/**
+.vercelignore
+api/**
+vercel.json
+
 # Working scratch: standalone HTML the design tooling serves, dated worklogs, and the
 # tool-generated design and product briefs. All of these are gitignored too - `.vscodeignore`
 # does not inherit from `.gitignore`, so anything added there has to be added here as well or

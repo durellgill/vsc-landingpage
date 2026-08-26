@@ -21,11 +21,11 @@
   "icon": "assets/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Durellg/vsc-landingpage"
+    "url": "https://github.com/durellgill/vsc-landingpage"
   },
-  "homepage": "https://github.com/Durellg/vsc-landingpage#readme",
+  "homepage": "https://github.com/durellgill/vsc-landingpage#readme",
   "bugs": {
-    "url": "https://github.com/Durellg/vsc-landingpage/issues"
+    "url": "https://github.com/durellgill/vsc-landingpage/issues"
   },
   "pricing": "Free",
   "activationEvents": [

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-const LANDING_PAGE_REPOSITORY_URL = 'https://github.com/Durellg/vsc-landingpage';
+const LANDING_PAGE_REPOSITORY_URL = 'https://github.com/durellgill/vsc-landingpage';
 
 /** Opens the Landing Page GitHub repository in the user's external browser. */
 export async function openLandingPageRepository():Promise<void>

@@ -174,7 +174,7 @@ const stub = `<script>
       // The VS Code host opens this in the system browser. The hosted harness has no host, so
       // let its HTTPS deployment provide the equivalent new-tab link without affecting local tests.
       if (message.command === 'openRepository' && location.protocol === 'https:') {
-        window.open('https://github.com/Durellg/vsc-landingpage', '_blank', 'noopener');
+        window.open('https://github.com/durellgill/vsc-landingpage', '_blank', 'noopener');
       }
       // Stands in for moveBookmark(): a card dragged to another group, or to a new position in
       // its own. Applying it here means a drop that lands in the wrong place is visible on the
