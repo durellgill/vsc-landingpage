@@ -183,6 +183,15 @@ export function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,pick
   const [showHiddenRecents, setShowHiddenRecents] = useState(false);
   const hiddenRecentsButton = useRef<HTMLButtonElement>(null);
 
+  // The rename row focuses itself when it appears. `useFocusTrap` above does not cover this: it is
+  // keyed off the picker, so it does not re-run when Rename swaps the button for the input row.
+  // The field carried `autoFocus` instead, which happened to work - but the same attribute did
+  // nothing for the clone popover in `main.tsx`, so it is not something to rely on. Keyed off
+  // whether the row is open rather than off `rename` itself, which changes on every keystroke.
+  const renameInput = useRef<HTMLInputElement>(null);
+  const renaming = rename !== null;
+  useLayoutEffect(() => { if (renaming) {renameInput.current?.focus();} }, [renaming]);
+
   if (picker==='shade') return <Palette type="shade" x={menu.x} y={menu.y} choose={chooseShade} close={close}/>;
   if (picker==='glyph') return <Palette type="glyph" x={menu.x} y={menu.y} choose={chooseGlyph} close={close}/>;
   // `role="dialog"` rather than `role="menu"`. A menu role obliges roving tabindex and arrow-key
@@ -195,7 +204,7 @@ export function ActionMenu({menu,target,rename,setRename,confirm,setConfirm,pick
       {project && offersNewWindow(target.item, codeCliAvailable) && <button onClick={()=>{post('open',{guid:target.item.guid,newWindow:true});close();}}><Svg name="appWindow"/><span>Open in new window</span></button>}
       {project && <button onClick={()=>{post('copyPath',{guid:target.item.guid});close();}}><Svg name="copy"/><span>Copy path</span></button>}
       {project && <button onClick={()=>{post('patch',{guid:target.item.guid,field:'pinned',value:!target.item.pinned});close();}}><Svg name={target.item.pinned?'pinOff':'pin'}/><span>{target.item.pinned?'Unpin':'Pin to top'}</span></button>}
-      {!sealed && <>{rename!==null ? <div class="ctxrename"><input autoFocus value={rename} onInput={(event:any)=>setRename(event.currentTarget.value)} onKeyDown={(event:any)=>{if(event.key==='Enter')renameTarget();if(event.key==='Escape')close();}}/><button onClick={renameTarget}>Save</button><button onClick={close}>Cancel</button></div> : <button onClick={()=>setRename(target.item.label)}><Svg name="textCursorInput"/><span>Rename</span></button>}</>}
+      {!sealed && <>{rename!==null ? <div class="ctxrename"><input ref={renameInput} value={rename} onInput={(event:any)=>setRename(event.currentTarget.value)} onKeyDown={(event:any)=>{if(event.key==='Enter')renameTarget();if(event.key==='Escape')close();}}/><button onClick={renameTarget}>Save</button><button onClick={close}>Cancel</button></div> : <button onClick={()=>setRename(target.item.label)}><Svg name="textCursorInput"/><span>Rename</span></button>}</>}
       <button onClick={()=>setPicker('shade')}><Svg name="paintbrush"/><span>Accent colour</span></button>
       <button onClick={()=>setPicker('glyph')}><Svg name="image"/><span>Custom icon</span></button>
       {project && !sealed && <button onClick={()=>{post('moveToGroup',{guid:target.item.guid});close();}}><Svg name="folderInput"/><span>Move to group</span></button>}

@@ -150,6 +150,52 @@ test.describe('focus containment', () => {
 });
 
 /**
+ * Opening the clone form puts the caret in the URL field, so a paste lands without a second click.
+ * The field used to carry `autoFocus`, which did nothing here: Preact has no autofocus handling of
+ * its own, it only sets the HTML attribute, and the browser declined to act on it for this popover.
+ * It does fire for the rename row in `components.tsx`, so the attribute cannot be trusted either
+ * way - a ref that focuses on mount is the only form that works in both places.
+ */
+test('the clone popover focuses its URL field when it opens', async ({ page }) => {
+  await openBoard(page);
+  await page.getByRole('button', { name: 'Clone a repository' }).click();
+  await expect(page.locator('.popover-clone input')).toBeFocused();
+});
+
+/**
+ * Choosing Rename swaps the button for an input row, and the caret has to land in it. The focus
+ * trap does not cover this - it is keyed off the picker, so it does not re-run for a swap inside
+ * an already-open menu - and the field's `autoFocus` was doing the work by luck of browser
+ * behaviour the clone popover did not get.
+ */
+test('the rename row focuses its input', async ({ page }) => {
+  await openBoard(page);
+  await openCardMenu(page);
+  await menuItem(page, 'Rename').click();
+  await expect(page.locator('.ctxrename input')).toBeFocused();
+});
+
+/**
+ * The focus must happen once, when the row opens - not on every render. The menu re-renders for
+ * things that have nothing to do with renaming, and a focus attached per render would fire on each
+ * of them and drag the caret back out of whatever the user had tabbed to.
+ */
+test('a re-render while renaming does not drag focus back to the input', async ({ page }) => {
+  await openBoard(page);
+  await openCardMenu(page);
+  await menuItem(page, 'Rename').click();
+  await expect(page.locator('.ctxrename input')).toBeFocused();
+
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Save' })).toBeFocused();
+  // A host message the menu does not read, purely to make the tree render again.
+  await page.evaluate(() => window.dispatchEvent(new MessageEvent('message', {
+    data: { command: 'bookmarkHealth', missing: [], branches: {} },
+  })));
+  await expect(page.getByRole('button', { name: 'Save' })).toBeFocused();
+});
+
+/**
  * Scrolling dismisses the anchored surfaces, which have no way to follow the point they were
  * opened against. Dismissing one must not strand the keyboard: focus goes back to whatever opened
  * it, exactly as closing it any other way would.
@@ -157,7 +203,12 @@ test.describe('focus containment', () => {
 test('scrolling closes the clone popover and returns focus to its trigger', async ({ page }) => {
   await openBoard(page);
   await page.getByRole('button', { name: 'Clone a repository' }).click();
-  await page.locator('.popover-clone input').focus();
+  // Not cosmetic. The listener that closes on scroll is installed by an effect, which Preact
+  // flushes a frame after the render that put the popover on screen. Scrolling before that frame
+  // dispatched the event into nothing, and the test failed about half the time. The popover's
+  // entrance animation spans those frames, so waiting it out is the honest wait.
+  await stillness(page);
+  await expect(page.locator('.popover-clone input')).toBeFocused();
 
   await page.evaluate(() => { document.scrollingElement!.scrollTop = 100; });
   await expect(page.locator('.popover-clone')).toHaveCount(0);

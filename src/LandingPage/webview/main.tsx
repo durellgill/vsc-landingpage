@@ -28,6 +28,12 @@ function App() {
   const [health,setHealth] = useState<{missing:string[];branches:Record<string,string>}>({missing:[],branches:{}});
 
   const filterInput = useRef<HTMLInputElement>(null);
+  // The clone popover's URL field takes focus as it opens, so a pasted URL lands without a second
+  // click. Keyed off the popover rather than attached as an inline ref callback, which Preact would
+  // re-run on every unrelated re-render and yank focus back off the Clone button.
+  const cloneInput = useRef<HTMLInputElement>(null);
+  const cloning = popover === 'clone';
+  useLayoutEffect(() => { if (cloning) {cloneInput.current?.focus();} }, [cloning]);
   const [hover,setHover] = useState<{guid:string;left:number;top:number;bottom:number}|null>(null);
   const hovercard = useRef<HTMLDivElement>(null);
   const menuOpen = useRef(false);
@@ -548,7 +554,10 @@ function App() {
         </div>
         <div class="menu-anchor">
           <button class="btn-ghost btn-small" title="Clone a repository" aria-label="Clone a repository" aria-haspopup="true" aria-expanded={popover==='clone'} onClick={()=>setPopover(popover==='clone'?null:'clone')}><Svg name="gitBranch"/></button>
-          {popover==='clone' && <form class="popover popover-clone" onSubmit={event => {event.preventDefault(); const url=(event.currentTarget.elements.namedItem('url') as HTMLInputElement).value.trim(); if (url) {setPopover(null); post('cloneRepository',{url});}}}><input name="url" required autoFocus aria-label="Git repository URL" placeholder="Paste a Git URL"/><button class="btn-secondary">Clone</button></form>}
+          {/* The URL field focuses via the effect above, not `autoFocus`. Preact only forwards the
+              attribute and the browser did not act on it here, so the caret stayed on the trigger
+              and a paste went nowhere. */}
+          {popover==='clone' && <form class="popover popover-clone" onSubmit={event => {event.preventDefault(); const url=(event.currentTarget.elements.namedItem('url') as HTMLInputElement).value.trim(); if (url) {setPopover(null); post('cloneRepository',{url});}}}><input name="url" required ref={cloneInput} aria-label="Git repository URL" placeholder="Paste a Git URL"/><button class="btn-secondary">Clone</button></form>}
         </div>
         <button class="btn-ghost btn-small" title="Settings" onClick={()=>post('openSettings')}><Svg name="settings"/></button>
       </div></div>
