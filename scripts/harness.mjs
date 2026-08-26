@@ -58,7 +58,7 @@ const model = {
     },
     {
       guid: 'g-play', label: 'Playground', layout: 'grid', projects: [
-        {guid: 'p-4', label: 'shader-toys', path: 'file:///Users/dev/play/shader-toys', icon: 'folder'},
+        {guid: 'p-4', label: 'visual-experiments', path: 'file:///Users/dev/play/visual-experiments', icon: 'folder'},
         {guid: 'p-5', label: 'everything.code-workspace', path: 'file:///Users/dev/play/everything.code-workspace', icon: 'workspace'},
         // Deliberately the same GUID as the `Recent` entry below. A bookmark that is also in
         // the recently-opened list appears twice on the board under one GUID, which is the
@@ -173,8 +173,8 @@ const stub = `<script>
       }
       // The VS Code host opens this in the system browser. The hosted harness has no host, so
       // let its HTTPS deployment provide the equivalent new-tab link without affecting local tests.
-      if (message.command === 'openRepository' && location.protocol === 'https:') {
-        window.open('https://github.com/durellgill/vsc-landingpage', '_blank', 'noopener');
+      if (message.command === 'openLiveDemo' && location.protocol === 'https:') {
+        window.open('https://vsc-landingpage-harness.vercel.app/', '_blank', 'noopener');
       }
       // Stands in for moveBookmark(): a card dragged to another group, or to a new position in
       // its own. Applying it here means a drop that lands in the wrong place is visible on the

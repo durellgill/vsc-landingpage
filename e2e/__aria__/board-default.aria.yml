@@ -54,9 +54,9 @@
     - img
   - button "Settings for Playground":
     - img
-  - button "shader-toys":
+  - button "visual-experiments":
     - img
-    - text: shader-toys /Users/dev/play
+    - text: visual-experiments /Users/dev/play
     - button "Copy path":
       - img
     - button "More actions":

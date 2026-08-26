@@ -29,10 +29,10 @@ test('the confirmation refuses a double-click and accepts a deliberate one', asy
   await expectConfirmationArms(page);
 });
 
-test('the header opens the GitHub repository through the host', async ({ page }) => {
+test('the header opens the live demo through the host', async ({ page }) => {
   await openBoard(page);
-  await page.getByRole('button', { name: 'Open Landing Page on GitHub' }).click();
-  expect(await postedCount(page, 'openRepository')).toBe(1);
+  await page.getByRole('button', { name: 'View live demo' }).click();
+  expect(await postedCount(page, 'openLiveDemo')).toBe(1);
 });
 
 test('the New menu leaves bookmark selection to a group', async ({ page }) => {

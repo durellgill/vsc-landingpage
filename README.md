@@ -4,7 +4,7 @@ Landing Page is a customizable VS Code start page for bookmark groups and recent
 
 ![The board: two user groups in list and grid layout, a missing target marked, and Recent below](doc/img/landing-page-dark.png)
 
-[View the project on GitHub](https://github.com/Durellg/vsc-landingpage).
+[View the live demo](https://vsc-landingpage-harness.vercel.app/).
 
 A fork of [René Bühling's Landing Page](https://github.com/renebuehling/vsc-landingpage), MIT licensed.
 
@@ -16,7 +16,7 @@ A fork of [René Bühling's Landing Page](https://github.com/renebuehling/vsc-la
 - Use a group's **Add** button to create folder, file, or workspace bookmarks in that group.
 - **Folder on disk** in the page's **New** menu creates and opens a folder without adding a bookmark.
 - Click a bookmark to open it, or `Ctrl`/`Cmd`+click to open a folder or workspace in a new window.
-- Use the GitHub icon in the header to open this repository.
+- Use the external-link icon in the header to view the live demo.
 
 ## Organize bookmarks
 

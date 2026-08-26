@@ -33,6 +33,7 @@ Put dialogs, filesystem access, clipboard access, VS Code commands, persistence,
 | `group-destination.ts` | Choose a destination group |
 | `clipboard-path.ts` | Quote and copy bookmark paths |
 | `clone-repository.ts` | Clone repositories |
+| `open-live-demo.ts` | Open the hosted live demo |
 | `uri-name-parts.ts` | Split URI labels and extensions |
 
 Keep `communication.ts` as a dispatcher. Put new host behavior in the module that answers the relevant question.

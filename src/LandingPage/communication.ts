@@ -14,7 +14,7 @@ import { moveBookmark, moveGroup, moveToGroup } from './bookmark-moves';
 import { createDirectory } from './bookmark-creation';
 import { copyPath } from './clipboard-path';
 import { cloneRepository } from './clone-repository';
-import { openLandingPageRepository } from './open-repository';
+import { openLandingPageLiveDemo } from './open-live-demo';
 
 export { registerExtensionContext } from './model-storage';
 
@@ -72,7 +72,7 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
 {
   // Refresh MRU only for commands that resolve or render model items.
   const needsMru = message.command!=='openSettings'
-                && message.command!=='openRepository'
+                && message.command!=='openLiveDemo'
                 && message.command!=='cloneRepository'
                 && message.command!=='openFolder';
   if (needsMru) {await populateVscMru(sharedModel, recentShown);}
@@ -274,8 +274,8 @@ export async function handleMessageFromWebview(message:MessageFromWebview,webvie
     case 'openSettings':
       vscode.commands.executeCommand('workbench.action.openSettings', 'vsc-landingpage');
       break;
-    case 'openRepository':
-      await openLandingPageRepository();
+    case 'openLiveDemo':
+      await openLandingPageLiveDemo();
       break;
     case 'cloneRepository':
       await cloneRepository(message.url);

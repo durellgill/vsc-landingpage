@@ -74,7 +74,7 @@ import svgPin from 'lucide-static/icons/pin.svg?raw';
 import svgPinOff from 'lucide-static/icons/pin-off.svg?raw';
 import svgSearch from 'lucide-static/icons/search.svg?raw';
 import svgFolderOpen from 'lucide-static/icons/folder-open.svg?raw';
-import svgGithub from 'lucide-static/icons/github.svg?raw';
+import svgExternalLink from 'lucide-static/icons/external-link.svg?raw';
 
 /**
  * Strips the fixed 24x24 sizing off a raw Lucide SVG so the CSS controls icon size.
@@ -182,6 +182,6 @@ export const icons=
   search : icon(svgSearch),
   folderOpen : icon(svgFolderOpen),
   folderGit : icon(svgFolderGit2),
-  github : icon(svgGithub)
+  externalLink : icon(svgExternalLink)
 
 };

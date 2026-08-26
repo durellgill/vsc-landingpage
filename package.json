@@ -23,7 +23,7 @@
     "type": "git",
     "url": "https://github.com/durellgill/vsc-landingpage"
   },
-  "homepage": "https://github.com/durellgill/vsc-landingpage#readme",
+  "homepage": "https://vsc-landingpage-harness.vercel.app/",
   "bugs": {
     "url": "https://github.com/durellgill/vsc-landingpage/issues"
   },
@@ -36,37 +36,48 @@
     "commands": [
       {
         "command": "vsc-landingpage.showWelcomePage",
-        "title": "Show Landing Page"
+        "title": "Show Landing Page",
+        "category": "Landing Page"
       },
       {
         "command": "vsc-landingpage.reset",
-        "title": "Reset/Delete Landing Page Contents"
+        "title": "Reset/Delete Landing Page Contents",
+        "category": "Landing Page"
       },
       {
         "command": "vsc-landingpage.reload",
         "title": "Reload Landing Page",
-        "when": "activeWebviewPanelId == 'vsc-landingpage'"
+        "category": "Landing Page"
       },
       {
         "command": "vsc-landingpage.refreshRecents",
-        "title": "Landing Page: Refresh Recent",
-        "when": "activeWebviewPanelId == 'vsc-landingpage'"
+        "title": "Refresh Recent",
+        "category": "Landing Page"
       },
       {
         "command": "vsc-landingpage.cloneRepository",
-        "title": "Landing Page: Clone Repository"
+        "title": "Clone Repository",
+        "category": "Landing Page"
       },
       {
         "command": "vsc-landingpage.addToGroup",
-        "title": "Add to Landing Page Group \ud83d\udccc"
+        "title": "Add to Landing Page Group",
+        "category": "Landing Page"
       },
       {
         "command": "vsc-landingpage.openInNewWorkspace",
-        "title": "Open in New Workspace \ud83d\udcc2"
+        "title": "Open in New Workspace",
+        "category": "Landing Page"
       },
       {
         "command": "vsc-landingpage.openParentInNewWorkspace",
-        "title": "Open Parent Folder in New Workspace \ud83d\udcc2"
+        "title": "Open Parent Folder in New Workspace",
+        "category": "Landing Page"
+      },
+      {
+        "command": "vsc-landingpage.focusInput",
+        "title": "Focus Filter",
+        "category": "Landing Page"
       }
     ],
     "keybindings": [
@@ -82,6 +93,14 @@
         {
           "command": "vsc-landingpage.showWelcomePage",
           "when": "true"
+        },
+        {
+          "command": "vsc-landingpage.reload",
+          "when": "activeWebviewPanelId == 'vsc-landingpage'"
+        },
+        {
+          "command": "vsc-landingpage.refreshRecents",
+          "when": "activeWebviewPanelId == 'vsc-landingpage'"
         },
         {
           "command": "vsc-landingpage.addToGroup",

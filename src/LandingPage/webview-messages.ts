@@ -3,7 +3,7 @@ import { LandingPageModel } from './LandingPageModel';
 
 export interface MessageFromWebview
 {
-	command:'documentReady'|'rename'|'createBookmark'|'createGroup'|'remove'|'hideRecent'|'restoreHiddenRecents'|'unhideRecent'|'refreshRecents'|'moveGroup'|'open'|'patch'|'openSettings'|'openRepository'|'cloneRepository'|'openFolder'|'moveToGroup'|'createDirectory'|'copyPath'|'moveBookmark';
+	command:'documentReady'|'rename'|'createBookmark'|'createGroup'|'remove'|'hideRecent'|'restoreHiddenRecents'|'unhideRecent'|'refreshRecents'|'moveGroup'|'open'|'patch'|'openSettings'|'openLiveDemo'|'cloneRepository'|'openFolder'|'moveToGroup'|'createDirectory'|'copyPath'|'moveBookmark';
 
   url?:string;
 

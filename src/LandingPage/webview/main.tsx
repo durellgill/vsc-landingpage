@@ -556,7 +556,7 @@ function App() {
               and a paste went nowhere. */}
           {popover==='clone' && <form class="popover popover-clone" onSubmit={event => {event.preventDefault(); const url=(event.currentTarget.elements.namedItem('url') as HTMLInputElement).value.trim(); if (url) {setPopover(null); post('cloneRepository',{url});}}}><input name="url" required ref={cloneInput} aria-label="Git repository URL" placeholder="Paste a Git URL"/><button class="btn-secondary">Clone</button></form>}
         </div>
-        <button class="btn-ghost btn-small" title="Open Landing Page on GitHub" aria-label="Open Landing Page on GitHub" onClick={()=>post('openRepository')}><Svg name="github"/></button>
+        <button class="btn-ghost btn-small" title="View live demo" aria-label="View live demo" onClick={()=>post('openLiveDemo')}><Svg name="externalLink"/></button>
         <button class="btn-ghost btn-small" title="Settings" onClick={()=>post('openSettings')}><Svg name="settings"/></button>
       </div></div>
     </header>

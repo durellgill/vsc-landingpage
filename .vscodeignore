@@ -50,12 +50,14 @@ PRODUCT.md
 
 # Scratch screenshots taken while working on the page. Referenced by nothing.
 board.png
+screenshots/**
 
 # Working notes for contributors and coding agents. README.md and CHANGELOG.md still ship,
 # because the marketplace renders those; these files are internal and were only being packaged
 # by accident.
 AGENTS.md
 CLAUDE.md
+NOTES.md
 TODO.md
 IDEAS.md
 HANDOFF.md
