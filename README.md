@@ -8,6 +8,18 @@ Landing Page is a customizable VS Code start page for bookmark groups and recent
 
 A fork of [René Bühling's Landing Page](https://github.com/renebuehling/vsc-landingpage), MIT licensed.
 
+## About
+
+I built this because I was creating new projects often and wanted an easier way to manage them.
+
+I also wanted to try out certain technologies, such as:
+
+- [Fallow](https://docs.fallow.tools) for static analysis of the code and the styles.
+- [Impeccable](https://impeccable.style) for UI anti-pattern detection on the rendered page.
+- [Project Wallace](https://www.projectwallace.com/) for CSS analysis.
+
+[DEVELOP.md](DEVELOP.md) covers how the first two are wired into the scripts.
+
 ## Use it
 
 - The page opens automatically in an empty VS Code window.
@@ -25,6 +37,17 @@ A fork of [René Bühling's Landing Page](https://github.com/renebuehling/vsc-la
 - Use a bookmark or group menu to rename it, choose an accent color, customize its icon, or change its layout.
 - Drag a bookmark to the delete area and hold briefly before releasing to remove it.
 - Recent is VS Code's history, so its entries can be hidden from this page but are not removed from VS Code.
+
+## Add from the Explorer
+
+Right-click any file or folder in the Explorer to bookmark it or open it as its own workspace, without leaving the tree.
+
+![The Explorer context menu showing Open in New Workspace and Add to Landing Page Group](doc/img/explorer-context-menu.png)
+
+- **Add to Landing Page Group** picks a destination group, then adds the item as a bookmark.
+- **Open in New Workspace** appears on folders and opens the folder in a new window.
+- **Open Parent Folder in New Workspace** appears on files and opens the folder holding the file.
+- An editor tab's context menu carries **Add to Landing Page Group** and **Open Parent Folder in New Workspace**.
 
 ## Keyboard
 

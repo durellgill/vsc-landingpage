@@ -18,6 +18,83 @@ import { clearFlights, flights, openBoard, recordFlights, stillness } from './bo
 const layoutButton = (page: import('@playwright/test').Page, guid?: string) =>
   page.locator(guid ? `.group[data-guid="${guid}"] button[data-role="layout"]` : '.group button[data-role="layout"]').first();
 
+/** Reorder one user group so it lands after another, through the production drag handlers. */
+async function reorderGroup(page: import('@playwright/test').Page, sourceGuid: string, targetGuid: string) {
+  await page.locator(`.group[data-guid="${sourceGuid}"] .titlebar`).evaluate(titlebar =>
+    titlebar.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: new DataTransfer() })));
+  await page.locator(`.group[data-guid="${sourceGuid}"].dragging`).waitFor();
+
+  await page.locator(`.group[data-guid="${targetGuid}"]`).evaluate(target => {
+    const box = target.getBoundingClientRect();
+    target.dispatchEvent(new DragEvent('dragover', {
+      bubbles: true, cancelable: true, dataTransfer: new DataTransfer(),
+      clientX: box.left + 20, clientY: box.bottom - 4
+    }));
+  });
+  await page.locator(`.group[data-guid="${targetGuid}"][data-drop]`).waitFor();
+  await page.locator(`.group[data-guid="${targetGuid}"]`).evaluate(target =>
+    target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: new DataTransfer() })));
+}
+
+test('an interrupted flight resumes from its visual position', async ({ page }) => {
+  // `getBoundingClientRect()` includes an in-progress transform, so a flight interrupted by a
+  // re-render read its own displacement as movement and left again by twice the offset. What
+  // the effect has already moved has to be added back, which is the second term of the delta
+  // in `main.tsx`.
+  //
+  // The previous version of this check interrupted after `waitForTimeout(80)`, and was flaky in
+  // both directions: a browser could start the flight after the wait, or advance it much
+  // further than intended. Freezing the flight at an exact point on its own timeline takes
+  // scheduling out of the measurement. Reordering a group rather than switching a layout keeps
+  // the simultaneous shelf-height animation out of the observed magnitude.
+  await openBoard(page);
+  const groups = await page.locator('.group:not(.sealed)').evaluateAll(elements =>
+    elements.map(element => (element as HTMLElement).dataset.guid!));
+  expect(groups.length, 'the interruption check needs two reorderable groups').toBeGreaterThanOrEqual(2);
+  const [source, target] = groups;
+
+  await recordFlights(page, 0.2);
+  await reorderGroup(page, source, target);
+  await expect(page.locator('.group:not(.sealed)').nth(1)).toHaveAttribute('data-guid', source);
+  await expect.poll(async () => (await flights(page)).some(entry => entry.kind === 'group' && entry.guid === source),
+    { message: 'the reorder started no flight for the group that moved' }).toBe(true);
+
+  // The flight is frozen partway, so this is the exact position the group is drawn at, and the
+  // position it must carry on from rather than jump away from.
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+  const interrupted = await page.locator(`.group[data-guid="${source}"]`).boundingBox();
+  expect(interrupted, 'the reordered group has no box to measure').not.toBeNull();
+
+  // Interrupt it. A right-click moves nothing on the board - the menu is `position: fixed` - so
+  // all it does is force the render that cancels the frozen flight, which is the whole gesture
+  // being reproduced here. Any second reorder would be a layout change on top of it, and the
+  // recovery flight would no longer be the only thing in the measurement.
+  await clearFlights(page);
+  await page.evaluate(() => { delete window.__pauseRecordedFlightsAt; });
+  // Dispatched rather than clicked: the group is frozen mid-flight and visually overlapping its
+  // neighbour, so a real click is refused by the hit test for a card that is perfectly visible.
+  await page.locator('.project').first().dispatchEvent('contextmenu');
+  await page.locator('.ctxmenu').waitFor();
+  // A recovery flight that never starts is the failure too: an effect that forgets what it has
+  // already moved computes a zero delta here and animates nothing, leaving the group to jump.
+  await expect.poll(async () => (await flights(page)).some(entry => entry.kind === 'group' && entry.guid === source),
+    { message: 'the interrupted group started no recovery flight' }).toBe(true);
+  await stillness(page);
+
+  const settled = await page.locator(`.group[data-guid="${source}"]`).boundingBox();
+  expect(settled, 'the settled group has no box to measure').not.toBeNull();
+  expect(Math.abs(interrupted!.y - settled!.y), 'the flight was not frozen partway, so nothing was interrupted')
+    .toBeGreaterThan(1);
+
+  const flight = (await flights(page)).find(entry => entry.kind === 'group' && entry.guid === source);
+  const offset = flight?.transform && /translate\((-?[\d.]+)px, *(-?[\d.]+)px\)/.exec(flight.transform);
+  expect(offset, 'the interrupted group started no recovery flight').not.toBeNull();
+  expect(Number(offset![1]), 'the interrupted group resumed from the wrong horizontal position')
+    .toBeCloseTo(interrupted!.x - settled!.x, 0);
+  expect(Number(offset![2]), 'the interrupted group resumed from the wrong vertical position')
+    .toBeCloseTo(interrupted!.y - settled!.y, 0);
+});
+
 test('a group and its cards move as one body', async ({ page }) => {
   // Reordering a group teleported its header 133px while its own cards glided, because the FLIP
   // effect only ever selected `.project`. The distance between a group's header and its first

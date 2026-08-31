@@ -53,6 +53,7 @@ export type Flight = {
 declare global {
   interface Window {
     __flights?: Flight[];
+    __pauseRecordedFlightsAt?: number;
   }
 }
 
@@ -71,17 +72,18 @@ declare global {
  * Call {@link stillness} after this and before acting, or the board's own entrance lands in the
  * recording.
  */
-export async function recordFlights(page: Page) {
-  await page.evaluate(() => {
+export async function recordFlights(page: Page, pauseAtProgress?: number) {
+  await page.evaluate((progress) => {
     window.__flights = [];
+    window.__pauseRecordedFlightsAt = progress;
     const real = Element.prototype.animate;
     Element.prototype.animate = function (this: Element, frames, options) {
       const kind = this.classList?.contains('project')
         ? 'project'
         : this.classList?.contains('group') ? 'group' : null;
+      const first = Array.isArray(frames) ? (frames[0] as Keyframe | undefined) : undefined;
+      const transform = first && first.transform !== undefined ? String(first.transform) : null;
       if (kind) {
-        const first = Array.isArray(frames) ? (frames[0] as Keyframe | undefined) : undefined;
-        const transform = first && first.transform !== undefined ? String(first.transform) : null;
         window.__flights?.push({
           kind,
           guid: this.getAttribute('data-guid'),
@@ -90,9 +92,17 @@ export async function recordFlights(page: Page) {
           at: performance.now()
         });
       }
-      return real.call(this, frames, options);
+      const animation = real.call(this, frames, options);
+      if (kind && transform && window.__pauseRecordedFlightsAt !== undefined) {
+        const duration = typeof options === 'number' ? options : options?.duration;
+        if (typeof duration === 'number') {
+          animation.pause();
+          animation.currentTime = duration * window.__pauseRecordedFlightsAt;
+        }
+      }
+      return animation;
     };
-  });
+  }, pauseAtProgress);
 }
 
 /** Everything {@link recordFlights} has seen so far. */
@@ -100,16 +110,6 @@ export const flights = (page: Page) => page.evaluate(() => window.__flights ?? [
 
 /** Clear the recording without reinstalling the patch. */
 export const clearFlights = (page: Page) => page.evaluate(() => { window.__flights = []; });
-
-/**
- * The top of every card, keyed by guid.
- *
- * Viewport-relative on purpose: that is the coordinate space the FLIP effect itself compares in,
- * and comparing it across renders is what checks 1, 6 and 10 are all about.
- */
-export const cardTops = (page: Page) => page.evaluate(() =>
-  Object.fromEntries([...document.querySelectorAll<HTMLElement>('.project')]
-    .map(c => [c.dataset.guid ?? '', c.getBoundingClientRect().top])));
 
 /** How many messages the page has posted to the host. The demo records these. */
 export const postedCount = (page: Page, command?: string) => page.evaluate((only) => {
