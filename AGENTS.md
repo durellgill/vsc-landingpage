@@ -5,7 +5,7 @@ Project instructions for coding agents working on Landing Page.
 ## Read first
 
 - [DEVELOP.md](DEVELOP.md) explains the build, test, browser demo, and packaging workflow.
-- [DECISIONS.md](DECISIONS.md) records product and architecture decisions. Change that file when a durable decision changes. Do not turn this file into a change log.
+- [DECISIONS.md](DECISIONS.md) records product and architecture decisions. Change that file when a durable decision changes. Do not turn this file into a change log. It records only what was chosen, never rejected options: an evaluation that ends in "keep doing what we do" writes nothing (owner, 2026-08-22).
 - [README.md](README.md) describes the extension from a user's point of view.
 - Keep ordered, in-flight work with a definition of done in a local `TODO.md` when needed. Durable rules belong in DECISIONS.md, not there.
 
@@ -101,3 +101,10 @@ After making code changes that affect the extension behavior:
 3. Notify the user it's ready and they should reload VS Code (Cmd+Shift+P -> "Developer: Reload Window")
 
 This ensures the user can test your changes immediately without manual packaging steps.
+
+## Project facts
+
+- This is a fork of René Bühling's extension: `LICENSE` keeps both copyright lines (René Bühling 2025, Durell Gill 2025-2026), as MIT requires.
+- The `openInNewWorkspace` command and the emoji suffixes on command titles in `package.json` are wanted features; never flag them as scope creep (owner, 2026-08-20).
+- The browser harness is for agents only: never leave it running for the owner to look at; the owner checks through `npm run install-local`.
+- On macOS, CDP mouse input cannot arm the delete zone during a native HTML5 drag (the drag's nested loop swallows later events), so Escape-cancel paths need a manual check (measured 2026-08-20).
